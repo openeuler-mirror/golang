@@ -1,0 +1,49 @@
+From 6eee9903c7f970defbc0c9770397790b2bed5709 Mon Sep 17 00:00:00 2001
+From: Lynn Boger <laboger@linux.vnet.ibm.com>
+Date: Mon, 28 Oct 2019 09:29:40 -0400
+Subject: [PATCH] [release-branch.go1.13] runtime: fix textOff for multiple
+ text sections
+
+If a compilation has multiple text sections, code in
+textOff must compare the offset argument against the range
+for each text section to determine which one it is in.
+The comparison looks like this:
+
+if uintptr(off) >= sectaddr && uintptr(off) <= sectaddr+sectlen
+
+If the off value being compared is equal to sectaddr+sectlen then it
+is not within the range of the text section but after it. The
+comparison should be just '<'.
+
+Fixes #35211
+
+Change-Id: I114633fd734563d38f4e842dd884c6c239f73c95
+Reviewed-on: https://go-review.googlesource.com/c/go/+/203817
+Run-TryBot: Lynn Boger <laboger@linux.vnet.ibm.com>
+TryBot-Result: Gobot Gobot <gobot@golang.org>
+Reviewed-by: Ian Lance Taylor <iant@golang.org>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+(cherry picked from commit 0ae9389609f23dc905c58fc2ad7bcc16b770f337)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/203819
+Run-TryBot: Carlos Amedee <carlos@golang.org>
+Reviewed-by: Keith Randall <khr@golang.org>
+---
+ src/runtime/type.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/runtime/type.go b/src/runtime/type.go
+index 660b45ef39..5ae3c4b09e 100644
+--- a/src/runtime/type.go
++++ b/src/runtime/type.go
+@@ -287,7 +287,7 @@ func (t *_type) textOff(off textOff) unsafe.Pointer {
+ 		for i := range md.textsectmap {
+ 			sectaddr := md.textsectmap[i].vaddr
+ 			sectlen := md.textsectmap[i].length
+-			if uintptr(off) >= sectaddr && uintptr(off) <= sectaddr+sectlen {
++			if uintptr(off) >= sectaddr && uintptr(off) < sectaddr+sectlen {
+ 				res = md.textsectmap[i].baseaddr + uintptr(off) - uintptr(md.textsectmap[i].vaddr)
+ 				break
+ 			}
+-- 
+2.17.1
+

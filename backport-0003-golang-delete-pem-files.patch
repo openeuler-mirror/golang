@@ -1,0 +1,44 @@
+From de4a8f2f1c0e7c30dc5f54d19212eb29d01871ed Mon Sep 17 00:00:00 2001
+From: jingrui <jingrui@huawei.com>
+Date: Wed, 27 Nov 2019 10:46:52 +0800
+Subject: [PATCH 6/6] golang: delete pem files
+
+Signed-off-by: jingrui <jingrui@huawei.com>
+---
+ src/crypto/tls/testdata/example-cert.pem | 11 -----------
+ src/crypto/tls/testdata/example-key.pem  |  5 -----
+ 2 files changed, 16 deletions(-)
+ delete mode 100644 src/crypto/tls/testdata/example-cert.pem
+ delete mode 100644 src/crypto/tls/testdata/example-key.pem
+
+diff --git a/src/crypto/tls/testdata/example-cert.pem b/src/crypto/tls/testdata/example-cert.pem
+deleted file mode 100644
+index e0bf7db..0000000
+--- a/src/crypto/tls/testdata/example-cert.pem
++++ /dev/null
+@@ -1,11 +0,0 @@
+------BEGIN CERTIFICATE-----
+-MIIBhTCCASugAwIBAgIQIRi6zePL6mKjOipn+dNuaTAKBggqhkjOPQQDAjASMRAw
+-DgYDVQQKEwdBY21lIENvMB4XDTE3MTAyMDE5NDMwNloXDTE4MTAyMDE5NDMwNlow
+-EjEQMA4GA1UEChMHQWNtZSBDbzBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABD0d
+-7VNhbWvZLWPuj/RtHFjvtJBEwOkhbN/BnnE8rnZR8+sbwnc/KhCk3FhnpHZnQz7B
+-5aETbbIgmuvewdjvSBSjYzBhMA4GA1UdDwEB/wQEAwICpDATBgNVHSUEDDAKBggr
+-BgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MCkGA1UdEQQiMCCCDmxvY2FsaG9zdDo1
+-NDUzgg4xMjcuMC4wLjE6NTQ1MzAKBggqhkjOPQQDAgNIADBFAiEA2zpJEPQyz6/l
+-Wf86aX6PepsntZv2GYlA5UpabfT2EZICICpJ5h/iI+i341gBmLiAFQOyTDT+/wQc
+-6MF9+Yw1Yy0t
+------END CERTIFICATE-----
+diff --git a/src/crypto/tls/testdata/example-key.pem b/src/crypto/tls/testdata/example-key.pem
+deleted file mode 100644
+index 104fb09..0000000
+--- a/src/crypto/tls/testdata/example-key.pem
++++ /dev/null
+@@ -1,5 +0,0 @@
+------BEGIN EC PRIVATE KEY-----
+-MHcCAQEEIIrYSSNQFaA2Hwf1duRSxKtLYX5CB04fSeQ6tF1aY/PuoAoGCCqGSM49
+-AwEHoUQDQgAEPR3tU2Fta9ktY+6P9G0cWO+0kETA6SFs38GecTyudlHz6xvCdz8q
+-EKTcWGekdmdDPsHloRNtsiCa697B2O9IFA==
+------END EC PRIVATE KEY-----
+-- 
+2.17.1
+

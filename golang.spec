@@ -1,104 +1,74 @@
+%global debug_package %{nil}
+%global _binaries_in_noarch_packages_terminate_build 0
+%global golibdir %{_libdir}/golang
+%global goroot /usr/lib/%{name}
+%global go_api 1.13
+%global go_version 1.13
+%global __spec_install_post /usr/lib/rpm/check-rpaths /usr/lib/rpm/check-buildroot /usr/lib/rpm/brp-compress
+%global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
+%global __strip /bin/true
+%define _use_internal_dependency_generator 0
+%define __find_requires %{nil}
+
 %bcond_with bootstrap
-# temporalily ignore test failures
 %ifarch x86_64 aarch64
 %bcond_without ignore_tests
 %else
 %bcond_with ignore_tests
 %endif
 
-# build ids are not currently generated:
-# https://code.google.com/p/go/issues/detail?id=5238
-#
-# also, debuginfo extraction currently fails with
-# "Failed to write file: invalid section alignment"
-%global debug_package %{nil}
-
-# we are shipping the full contents of src in the data subpackage, which
-# contains binary-like things (ELF data for tests, etc)
-%global _binaries_in_noarch_packages_terminate_build 0
-
-# Do not check any files in doc or src for requires
-%global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
-
-# Don't alter timestamps of especially the .a files (or else go will rebuild later)
-# Actually, don't strip at all since we are not even building debug packages and this corrupts the dwarf testdata
-%global __strip /bin/true
-
-# rpmbuild magic to keep from having meta dependency on libc.so.6
-%define _use_internal_dependency_generator 0
-%define __find_requires %{nil}
-%global __spec_install_post /usr/lib/rpm/check-rpaths   /usr/lib/rpm/check-buildroot  \
-  /usr/lib/rpm/brp-compress
-
-%global golibdir %{_libdir}/golang
-
-# Golang build options.
-
-# Build golang using external/internal(close to cgo disabled) linking.
 %ifarch x86_64 aarch64
 %global external_linker 1
 %else
 %global external_linker 0
 %endif
 
-# Build golang with cgo enabled/disabled(later equals more or less to internal linking).
 %ifarch x86_64 aarch64
 %global cgo_enabled 1
 %else
 %global cgo_enabled 0
 %endif
 
-# Use golang/gcc-go as bootstrap compiler
 %if %{with bootstrap}
 %global golang_bootstrap 0
 %else
 %global golang_bootstrap 1
 %endif
 
-# Controls what ever we fail on failed tests
 %if %{with ignore_tests}
 %global fail_on_tests 0
 %else
 %global fail_on_tests 1
 %endif
 
-# Build golang shared objects for stdlib
 %ifarch x86_64 aarch64
 %global shared 1
 %else
 %global shared 0
 %endif
 
-# Pre build std lib with -race enabled
 %ifarch x86_64
 %global race 1
 %else
 %global race 0
 %endif
 
-%global goroot          /usr/lib/%{name}
-
 %ifarch x86_64
-%global gohostarch  amd64
+%global gohostarch amd64
 %endif
 %ifarch aarch64
-%global gohostarch  arm64
+%global gohostarch arm64
 %endif
 
-%global go_api 1.11
-%global go_version 1.11
-
 Name:           golang
-Version:        1.11
-Release:        4
+Version:        1.13
+Release:        3.1
 Summary:        The Go Programming Language
-# source tree includes several copies of Mark.Twain-Tom.Sawyer.txt under Public Domain
 License:        BSD and Public Domain
 URL:            http://golang.org/
 Source0:        https://storage.googleapis.com/golang/go%{go_version}.src.tar.gz
-# make possible to override default traceback level at build time by setting build tag rpm_crashtraceback
+Source100:      golang-gdbinit
 
-# The compiler is written in Go. Needs go(1.4+) compiler for build.
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
 %else
@@ -110,46 +80,22 @@ BuildRequires:  pcre-devel, glibc-static, perl-interpreter, procps-ng
 
 Provides:       go = %{version}-%{release}
 Requires:       %{name}-devel = %{version}-%{release}
-# Pre-go1.5, all arches had to be bootstrapped individually, before usable, and
-# env variables to compile for the target os-arch.
-# Now the host compiler needs only the GOOS and GOARCH environment variables
-# set to compile for the target os-arch.
+
 Obsoletes:      %{name}-pkg-bin-linux-386 < 1.4.99
 Obsoletes:      %{name}-pkg-bin-linux-amd64 < 1.4.99
 Obsoletes:      %{name}-pkg-bin-linux-arm < 1.4.99
 Obsoletes:      %{name}-pkg-linux-386 < 1.4.99
 Obsoletes:      %{name}-pkg-linux-amd64 < 1.4.99
 Obsoletes:      %{name}-pkg-linux-arm < 1.4.99
-Obsoletes:      %{name}-pkg-darwin-386 < 1.4.99
-Obsoletes:      %{name}-pkg-darwin-amd64 < 1.4.99
-Obsoletes:      %{name}-pkg-windows-386 < 1.4.99
-Obsoletes:      %{name}-pkg-windows-amd64 < 1.4.99
-Obsoletes:      %{name}-pkg-plan9-386 < 1.4.99
-Obsoletes:      %{name}-pkg-plan9-amd64 < 1.4.99
-Obsoletes:      %{name}-pkg-freebsd-386 < 1.4.99
-Obsoletes:      %{name}-pkg-freebsd-amd64 < 1.4.99
-Obsoletes:      %{name}-pkg-freebsd-arm < 1.4.99
-Obsoletes:      %{name}-pkg-netbsd-386 < 1.4.99
-Obsoletes:      %{name}-pkg-netbsd-amd64 < 1.4.99
-Obsoletes:      %{name}-pkg-netbsd-arm < 1.4.99
-Obsoletes:      %{name}-pkg-openbsd-386 < 1.4.99
-Obsoletes:      %{name}-pkg-openbsd-amd64 < 1.4.99
-
-Obsoletes:      golang-vet < 0-12.1
-Obsoletes:      golang-cover < 0-12.1
+Obsoletes:      %{name}-vet < 0-12.1
+Obsoletes:      %{name}-cover < 0-12.1
 
 Requires(post): %{_sbindir}/update-alternatives
 Requires(postun): %{_sbindir}/update-alternatives
-
-# We strip the meta dependency, but go does require glibc.
-# This is an odd issue, still looking for a better fix.
-Requires:       glibc
-Requires:       gcc
-Requires:       git, subversion, mercurial
+Requires:       glibc gcc git, subversion, mercurial
 
 
-
-# Bundled/Vendored provides generated by
+# generated by:
 # go list -f {{.ImportPath}} ./src/vendor/... | sed "s:_$PWD/src/vendor/::g;s:_:.:;s:.*:Provides\: bundled(golang(&)):" && go list -f {{.ImportPath}} ./src/cmd/vendor/... | sed "s:_$PWD/src/cmd/vendor/::g;s:_:.:;s:.*:Provides\: bundled(golang(&)):"
 Provides: bundled(golang(golang.org/x/crypto/chacha20poly1305))
 Provides: bundled(golang(golang.org/x/crypto/cryptobyte))
@@ -194,29 +140,30 @@ Provides: bundled(golang(golang.org/x/crypto/ssh/terminal))
 Provides: bundled(golang(golang.org/x/sys/unix))
 Provides: bundled(golang(golang.org/x/sys/windows))
 Provides: bundled(golang(golang.org/x/sys/windows/registry))
+
 Provides:       %{name}-bin = %{version}-%{release}
 Obsoletes:      %{name}-bin
 Obsoletes:      %{name}-shared
-Requires:       go-srpm-macros
-
-Patch1:       0001-Don-t-use-the-bundled-tzdata-at-runtime-except-for-t.patch
-Patch2:       0002-syscall-expose-IfInfomsg.X__ifi_pad-on-s390x.patch
-Patch3:       0003-release-branch.go1.11-security-crypto-elliptic-reduc.patch
-Patch4:       0004-fix-CVE-2019-9512-9514.patch
-
-# Having documentation separate was broken
 Obsoletes:      %{name}-docs
-
-# RPM can't handle symlink -> dir with subpackages, so merge back
 Obsoletes:      %{name}-data < 1.1.1-4
-
-# go1.4 deprecates a few packages
 Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
+Requires:       openEuler-rpm-config
+
+Patch6001:       backport-0001-Don-t-use-the-bundled-tzdata-at-runtime-except-for-t.patch
+Patch6002:       backport-0002-syscall-expose-IfInfomsg.X__ifi_pad-on-s390x.patch
+Patch6003:       backport-0003-golang-delete-pem-files.patch
+Patch6004:       backport-0004-syscall-implement-rawVforkSyscall-for-linux-arm64.patch
+Patch6005:       backport-0005-runtime-fix-crash-during-VDSO-calls-on-arm.patch
+Patch6006:       backport-0006-runtime-save-fetch-g-register-during-VDSO-on-ARM-and.patch
+Patch6007:       backport-0007-runtime-don-t-fetch-G-from-signal-stack-when-using-c.patch
+Patch6008:       backport-0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
+Patch6009:       backport-0009-release-branch.go1.13-net-http-don-t-cache-http2.err.patch
+Patch6010:       backport-0010-release-branch.go1.13-net-http-fix-Server.ConnContex.patch
+Patch6011:       backport-0011-release-branch.go1.13-runtime-fix-textOff-for-multip.patch
 
 ExclusiveArch:  %{golang_arches}
 
-Source100:      golang-gdbinit
 
 %description
 %{summary}.
@@ -230,14 +177,13 @@ Obsoletes:     %{name}-docs
 Provides:      %{name}-shared = %{version}-%{release}
 Obsoletes:     %{name}-shared
 
-
 %description   help
 %{summary}.
 
 %package       devel
 Summary:       Golang compiler devel
-Requires:      %{name} = %{version}-%{release}
 BuildArch:     noarch
+Requires:      %{name} = %{version}-%{release}
 Provides:      %{name}-src  = %{version}-%{release}
 Obsoletes:     %{name}-src
 Provides:      %{name}-tests = %{version}-%{release}
@@ -263,26 +209,21 @@ end
 %autosetup -n go -p1
 
 %build
-# print out system information
 uname -a
 cat /proc/cpuinfo
 cat /proc/meminfo
 
-# bootstrap compiler GOROOT
 %if !%{golang_bootstrap}
 export GOROOT_BOOTSTRAP=/
 %else
 export GOROOT_BOOTSTRAP=%{goroot}
 %endif
 
-# set up final install location
 export GOROOT_FINAL=%{goroot}
-
 export GOHOSTOS=linux
 export GOHOSTARCH=%{gohostarch}
 
 pushd src
-# use our gcc options for this build, but store gcc as default for compiler
 export CFLAGS="$RPM_OPT_FLAGS"
 export LDFLAGS="$RPM_LD_FLAGS"
 export CC="gcc"
@@ -303,7 +244,6 @@ export GO_LDFLAGS="-s -w"
 ./make.bash --no-clean -v
 popd
 
-# build shared std lib
 %if %{shared}
 GOROOT=$(pwd) PATH=$(pwd)/bin:$PATH go install -buildmode=shared -v -x std
 %endif
@@ -313,24 +253,20 @@ GOROOT=$(pwd) PATH=$(pwd)/bin:$PATH go install -race -v -x std
 %endif
 
 %install
-rm -rf $RPM_BUILD_ROOT
-# remove GC build cache
+rm -rf %{buildroot}
 rm -rf pkg/obj/go-build/*
 
-# create the top level directories
-mkdir -p $RPM_BUILD_ROOT%{_bindir}
-mkdir -p $RPM_BUILD_ROOT%{goroot}
+mkdir -p %{buildroot}%{_bindir}
+mkdir -p %{buildroot}%{goroot}
 
-# install everything into libdir (until symlink problems are fixed)
-# https://code.google.com/p/go/issues/detail?id=5830
 cp -apv api bin doc favicon.ico lib pkg robots.txt src misc test VERSION \
-   $RPM_BUILD_ROOT%{goroot}
+   %{buildroot}%{goroot}
 
 # bz1099206
-find $RPM_BUILD_ROOT%{goroot}/src -exec touch -r $RPM_BUILD_ROOT%{goroot}/VERSION "{}" \;
+find %{buildroot}%{goroot}/src -exec touch -r %{buildroot}%{goroot}/VERSION "{}" \;
 # and level out all the built archives
-touch $RPM_BUILD_ROOT%{goroot}/pkg
-find $RPM_BUILD_ROOT%{goroot}/pkg -exec touch -r $RPM_BUILD_ROOT%{goroot}/pkg "{}" \;
+touch %{buildroot}%{goroot}/pkg
+find %{buildroot}%{goroot}/pkg -exec touch -r %{buildroot}%{goroot}/pkg "{}" \;
 # generate the spec file ownership of this source tree and packages
 cwd=$(pwd)
 src_list=$cwd/go-src.list
@@ -342,7 +278,7 @@ docs_list=$cwd/go-docs.list
 tests_list=$cwd/go-tests.list
 rm -f $src_list $pkg_list $docs_list $misc_list $tests_list $shared_list $race_list
 touch $src_list $pkg_list $docs_list $misc_list $tests_list $shared_list $race_list
-pushd $RPM_BUILD_ROOT%{goroot}
+pushd %{buildroot}%{goroot}
     find src/ -type d -a \( ! -name testdata -a ! -ipath '*/testdata/*' \) -printf '%%%dir %{goroot}/%p\n' >> $src_list
     find src/ ! -type d -a \( ! -ipath '*/testdata/*' -a ! -name '*_test.go' \) -printf '%{goroot}/%p\n' >> $src_list
 
@@ -388,24 +324,19 @@ pushd $RPM_BUILD_ROOT%{goroot}
     find lib/ ! -type d -printf '%{goroot}/%p\n' >> $tests_list
 popd
 
-# remove the doc Makefile
-rm -rfv $RPM_BUILD_ROOT%{goroot}/doc/Makefile
+rm -rfv %{buildroot}%{goroot}/doc/Makefile
 
-# put binaries to bindir, linked to the arch we're building,
-# leave the arch independent pieces in {goroot}
-mkdir -p $RPM_BUILD_ROOT%{goroot}/bin/linux_%{gohostarch}
-ln -sf %{goroot}/bin/go $RPM_BUILD_ROOT%{goroot}/bin/linux_%{gohostarch}/go
-ln -sf %{goroot}/bin/gofmt $RPM_BUILD_ROOT%{goroot}/bin/linux_%{gohostarch}/gofmt
+mkdir -p %{buildroot}%{goroot}/bin/linux_%{gohostarch}
+ln -sf %{goroot}/bin/go %{buildroot}%{goroot}/bin/linux_%{gohostarch}/go
+ln -sf %{goroot}/bin/gofmt %{buildroot}%{goroot}/bin/linux_%{gohostarch}/gofmt
 
-# ensure these exist and are owned
-mkdir -p $RPM_BUILD_ROOT%{gopath}/src/github.com
-mkdir -p $RPM_BUILD_ROOT%{gopath}/src/bitbucket.org
-mkdir -p $RPM_BUILD_ROOT%{gopath}/src/code.google.com/p
-mkdir -p $RPM_BUILD_ROOT%{gopath}/src/golang.org/x
+mkdir -p %{buildroot}%{gopath}/src/github.com
+mkdir -p %{buildroot}%{gopath}/src/bitbucket.org
+mkdir -p %{buildroot}%{gopath}/src/code.google.com/p
+mkdir -p %{buildroot}%{gopath}/src/golang.org/x
 
-# gdbinit
-mkdir -p $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d
-cp -av %{SOURCE100} $RPM_BUILD_ROOT%{_sysconfdir}/gdbinit.d/golang.gdb
+mkdir -p %{buildroot}%{_sysconfdir}/gdbinit.d
+cp -av %{SOURCE100} %{buildroot}%{_sysconfdir}/gdbinit.d/golang.gdb
 
 %check
 export GOROOT=$(pwd -P)
@@ -422,17 +353,14 @@ export GO_LDFLAGS="-linkmode internal"
 export CGO_ENABLED=0
 %endif
 
-# make sure to not timeout
 export GO_TEST_TIMEOUT_SCALE=2
 
 %if %{fail_on_tests}
-# ./run.bash --no-rebuild -v -v -v -k
 echo tests ignored
 %else
 ./run.bash --no-rebuild -v -v -v -k || :
 %endif
 cd ..
-
 
 %post
 %{_sbindir}/update-alternatives --install %{_bindir}/go \
@@ -444,23 +372,17 @@ if [ $1 = 0 ]; then
     %{_sbindir}/update-alternatives --remove go %{goroot}/bin/go
 fi
 
-
 %files -f go-pkg.list
 %doc AUTHORS CONTRIBUTORS LICENSE PATENTS
-# VERSION has to be present in the GOROOT, for `go install std` to work
 %doc %{goroot}/VERSION
 %dir %{goroot}/doc
 %doc %{goroot}/doc/*
-
-# go files
 %dir %{goroot}
 %exclude %{goroot}/src/
 %exclude %{goroot}/doc/
 %exclude %{goroot}/misc/
 %exclude %{goroot}/test/
 %{goroot}/*
-
-# ensure directory ownership, so they are cleaned up if empty
 %dir %{gopath}
 %dir %{gopath}/src
 %dir %{gopath}/src/github.com/
@@ -470,7 +392,6 @@ fi
 %dir %{gopath}/src/golang.org
 %dir %{gopath}/src/golang.org/x
 
-# gdbinit (for gdb debugging)
 %{_sysconfdir}/gdbinit.d
 
 %files help -f go-docs.list -f go-shared.list
@@ -478,5 +399,8 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Dec 10 2019 jingrui<jingrui@huawei.com> - 1.13.3.1
+- upgrade to golang 1.13.3
+
 * Tue Sep 03 2019 leizhongkai<leizhongkai@huawei.com> - 1.11-1
 - backport fix CVE-2019-9512 and CVE-2019-9514
