@@ -66,7 +66,7 @@ Release:        3.1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            http://golang.org/
-Source0:        https://storage.googleapis.com/golang/go%{go_version}.src.tar.gz
+Source0:        https://dl.google.com/go/go%{version}.src.tar.gz
 Source100:      golang-gdbinit
 
 %if !%{golang_bootstrap}
