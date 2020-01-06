@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13
-Release:        3.1
+Release:        3.2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            http://golang.org/
@@ -150,7 +150,6 @@ Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
-Patch6001:       0001-Don-t-use-the-bundled-tzdata-at-runtime-except-for-t.patch
 Patch6002:       0002-syscall-expose-IfInfomsg.X__ifi_pad-on-s390x.patch
 Patch6003:       0003-golang-delete-pem-files.patch
 Patch6004:       0004-syscall-implement-rawVforkSyscall-for-linux-arm64.patch
