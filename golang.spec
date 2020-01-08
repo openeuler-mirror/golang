@@ -160,6 +160,7 @@ Patch6008:       0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
 Patch6009:       0009-release-branch.go1.13-net-http-don-t-cache-http2.err.patch
 Patch6010:       0010-release-branch.go1.13-net-http-fix-Server.ConnContex.patch
 Patch6011:       0011-release-branch.go1.13-runtime-fix-textOff-for-multip.patch
+Patch6012:       0012-release-branch.go1.13-runtime-ensure-memmove-write-p.patch
 
 ExclusiveArch:  %{golang_arches}
 
