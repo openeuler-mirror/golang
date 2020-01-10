@@ -67,7 +67,6 @@ Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            http://golang.org/
 Source0:        https://dl.google.com/go/go%{version}.src.tar.gz
-Source100:      golang-gdbinit
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -335,9 +334,6 @@ mkdir -p %{buildroot}%{gopath}/src/bitbucket.org
 mkdir -p %{buildroot}%{gopath}/src/code.google.com/p
 mkdir -p %{buildroot}%{gopath}/src/golang.org/x
 
-mkdir -p %{buildroot}%{_sysconfdir}/gdbinit.d
-cp -av %{SOURCE100} %{buildroot}%{_sysconfdir}/gdbinit.d/golang.gdb
-
 %check
 export GOROOT=$(pwd -P)
 export PATH="$GOROOT"/bin:"$PATH"
@@ -391,8 +387,6 @@ fi
 %dir %{gopath}/src/code.google.com/p/
 %dir %{gopath}/src/golang.org
 %dir %{gopath}/src/golang.org/x
-
-%{_sysconfdir}/gdbinit.d
 
 %files help -f go-docs.list -f go-shared.list
 
