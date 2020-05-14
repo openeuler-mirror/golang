@@ -61,8 +61,8 @@
 %endif
 
 Name:           golang
-Version:        1.13
-Release:        3.3
+Version:        1.13.3
+Release:        6
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            http://golang.org/
@@ -160,6 +160,8 @@ Patch6009:       0009-release-branch.go1.13-net-http-don-t-cache-http2.err.patch
 Patch6010:       0010-release-branch.go1.13-net-http-fix-Server.ConnContex.patch
 Patch6011:       0011-release-branch.go1.13-runtime-fix-textOff-for-multip.patch
 Patch6012:       0012-release-branch.go1.13-runtime-ensure-memmove-write-p.patch
+Patch6013:       backport-0013-release-branch.go1.13-security-src-go.mod-import-x-c.patch
+Patch6014:       0013-drop-hard-code-cert.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -393,6 +395,15 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13.6
+- rename tar name and make it same with upstream
+
+* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13.5
+- drop hard code cert
+
+* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13.4
+- fix CVE-2020-7919
+
 * Thu Feb 20 2020 openEuler Buildteam <buildteam@openeuler.org> - 1.13-3.2
 - requires remove mercurial
 
