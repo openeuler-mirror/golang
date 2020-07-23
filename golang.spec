@@ -61,12 +61,12 @@
 %endif
 
 Name:           golang
-Version:        1.13.3
-Release:        6
+Version:        1.13.4
+Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            http://golang.org/
-Source0:        https://dl.google.com/go/go%{version}.src.tar.gz
+Source0:        https://dl.google.com/go/go1.13.3.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -162,6 +162,7 @@ Patch6011:       0011-release-branch.go1.13-runtime-fix-textOff-for-multip.patch
 Patch6012:       0012-release-branch.go1.13-runtime-ensure-memmove-write-p.patch
 Patch6013:       backport-0013-release-branch.go1.13-security-src-go.mod-import-x-c.patch
 Patch6014:       0013-drop-hard-code-cert.patch
+Patch6015:	 0014-bump-version-to-1.13.4.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -395,13 +396,16 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13.6
+* Thu Jul 23 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
+- bump to 1.13.4
+
+* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
 - rename tar name and make it same with upstream
 
-* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13.5
+* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
 - drop hard code cert
 
-* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13.4
+* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
 - fix CVE-2020-7919
 
 * Thu Feb 20 2020 openEuler Buildteam <buildteam@openeuler.org> - 1.13-3.2
