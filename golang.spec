@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13.14
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -390,6 +390,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Jul 31 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
+- add yaml file
+
 * Thu Jul 30 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
 - upgrade to 1.13.14
 
