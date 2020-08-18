@@ -61,12 +61,12 @@
 %endif
 
 Name:           golang
-Version:        1.13.14
-Release:        2
+Version:        1.13.15
+Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
-Source0:        https://dl.google.com/go/go1.13.14.src.tar.gz
+Source0:        https://dl.google.com/go/go1.13.15.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -390,6 +390,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
+- upgrade to 1.13.15
+
 * Fri Jul 31 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
 - add yaml file
 
