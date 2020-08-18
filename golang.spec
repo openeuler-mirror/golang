@@ -61,11 +61,11 @@
 %endif
 
 Name:           golang
-Version:        1.13.3
-Release:        6
+Version:        1.13.15
+Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
-URL:            http://golang.org/
+URL:            https://golang.org/
 Source0:        https://dl.google.com/go/go%{version}.src.tar.gz
 
 %if !%{golang_bootstrap}
@@ -156,11 +156,6 @@ Patch6005:       0005-runtime-fix-crash-during-VDSO-calls-on-arm.patch
 Patch6006:       0006-runtime-save-fetch-g-register-during-VDSO-on-ARM-and.patch
 Patch6007:       0007-runtime-don-t-fetch-G-from-signal-stack-when-using-c.patch
 Patch6008:       0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
-Patch6009:       0009-release-branch.go1.13-net-http-don-t-cache-http2.err.patch
-Patch6010:       0010-release-branch.go1.13-net-http-fix-Server.ConnContex.patch
-Patch6011:       0011-release-branch.go1.13-runtime-fix-textOff-for-multip.patch
-Patch6012:       0012-release-branch.go1.13-runtime-ensure-memmove-write-p.patch
-Patch6013:       backport-0013-release-branch.go1.13-security-src-go.mod-import-x-c.patch
 Patch6014:       0013-drop-hard-code-cert.patch
 
 ExclusiveArch:  %{golang_arches}
@@ -395,6 +390,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
+- upgrade to 1.13.15
+
 * Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13.6
 - rename tar name and make it same with upstream
 
