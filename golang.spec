@@ -2,8 +2,8 @@
 %global _binaries_in_noarch_packages_terminate_build 0
 %global golibdir %{_libdir}/golang
 %global goroot /usr/lib/%{name}
-%global go_api 1.13
-%global go_version 1.13
+%global go_api 1.15
+%global go_version 1.15
 %global __spec_install_post /usr/lib/rpm/check-rpaths /usr/lib/rpm/check-buildroot /usr/lib/rpm/brp-compress
 %global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
 %global __strip /bin/true
@@ -61,12 +61,12 @@
 %endif
 
 Name:           golang
-Version:        1.13.15
+Version:        1.15.5
 Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
-Source0:        https://dl.google.com/go/go1.13.15.src.tar.gz
+Source0:        https://dl.google.com/go/go1.15.5.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -148,15 +148,6 @@ Obsoletes:      %{name}-data < 1.1.1-4
 Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
-
-Patch6002:       0002-syscall-expose-IfInfomsg.X__ifi_pad-on-s390x.patch
-Patch6003:       0003-golang-delete-pem-files.patch
-Patch6004:       0004-syscall-implement-rawVforkSyscall-for-linux-arm64.patch
-Patch6005:       0005-runtime-fix-crash-during-VDSO-calls-on-arm.patch
-Patch6006:       0006-runtime-save-fetch-g-register-during-VDSO-on-ARM-and.patch
-Patch6007:       0007-runtime-don-t-fetch-G-from-signal-stack-when-using-c.patch
-Patch6008:       0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
-Patch6014:       0013-drop-hard-code-cert.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -390,6 +381,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Dec 18 liuzekun <liuzekun@huawei.com> - 1.15.5-1
+- upgrade to 1.15.5
+
 * Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
 - upgrade to 1.13.15
 
