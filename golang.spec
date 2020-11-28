@@ -11,19 +11,19 @@
 %define __find_requires %{nil}
 
 %bcond_with bootstrap
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %bcond_without ignore_tests
 %else
 %bcond_with ignore_tests
 %endif
 
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %global external_linker 1
 %else
 %global external_linker 0
 %endif
 
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %global cgo_enabled 1
 %else
 %global cgo_enabled 0
@@ -59,10 +59,14 @@
 %ifarch aarch64
 %global gohostarch arm64
 %endif
+%ifarch riscv64
+%global gohostarch riscv64
+%endif
+
 
 Name:           golang
 Version:        1.15.5
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -376,11 +380,16 @@ fi
 %dir %{gopath}/src/golang.org
 %dir %{gopath}/src/golang.org/x
 
+%if %{shared}
 %files help -f go-docs.list -f go-shared.list
+%endif
 
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
+- Adate for RISC-V
+
 * Tue Dec 18 liuzekun <liuzekun@huawei.com> - 1.15.5-1
 - upgrade to 1.15.5
 
