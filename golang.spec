@@ -390,25 +390,25 @@ fi
 * Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
 - Adate for RISC-V
 
-* Tue Dec 18 liuzekun <liuzekun@huawei.com> - 1.15.5-1
+* Wed Nov 18 2020 liuzekun <liuzekun@huawei.com> - 1.15.5-1
 - upgrade to 1.15.5
 
-* Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
+* Tue Aug 18 2020 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
 - upgrade to 1.13.15
 
-* Fri Jul 31 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
+* Fri Jul 31 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
 - add yaml file
 
-* Thu Jul 30 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
+* Thu Jul 30 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
 - upgrade to 1.13.14
 
-* Thu Jul 23 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
+* Thu Jul 23 2020 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
 - bump to 1.13.4
 
 * Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
 - rename tar name and make it same with upstream
 
-* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
+* Tue Mar 24 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
 - drop hard code cert
 
 * Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
