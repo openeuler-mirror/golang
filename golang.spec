@@ -11,19 +11,19 @@
 %define __find_requires %{nil}
 
 %bcond_with bootstrap
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %bcond_without ignore_tests
 %else
 %bcond_with ignore_tests
 %endif
 
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %global external_linker 1
 %else
 %global external_linker 0
 %endif
 
-%ifarch x86_64 aarch64
+%ifarch x86_64 aarch64 riscv64
 %global cgo_enabled 1
 %else
 %global cgo_enabled 0
@@ -59,10 +59,14 @@
 %ifarch aarch64
 %global gohostarch arm64
 %endif
+%ifarch riscv64
+%global gohostarch riscv64
+%endif
+
 
 Name:           golang
 Version:        1.15.5
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -376,30 +380,35 @@ fi
 %dir %{gopath}/src/golang.org
 %dir %{gopath}/src/golang.org/x
 
+%if %{shared}
 %files help -f go-docs.list -f go-shared.list
+%endif
 
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Tue Dec 18 liuzekun <liuzekun@huawei.com> - 1.15.5-1
+* Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
+- Adate for RISC-V
+
+* Wed Nov 18 2020 liuzekun <liuzekun@huawei.com> - 1.15.5-1
 - upgrade to 1.15.5
 
-* Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
+* Tue Aug 18 2020 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
 - upgrade to 1.13.15
 
-* Fri Jul 31 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
+* Fri Jul 31 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
 - add yaml file
 
-* Thu Jul 30 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
+* Thu Jul 30 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
 - upgrade to 1.13.14
 
-* Thu Jul 23 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
+* Thu Jul 23 2020 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
 - bump to 1.13.4
 
 * Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
 - rename tar name and make it same with upstream
 
-* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
+* Tue Mar 24 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
 - drop hard code cert
 
 * Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
