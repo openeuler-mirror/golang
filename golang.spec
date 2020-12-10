@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.15.5
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -154,6 +154,13 @@ Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
 ExclusiveArch:  %{golang_arches}
+
+Patch1:		riscv-support-external-linking.patch
+Patch2:		riscv-TLS-support.patch
+Patch3:		riscv-cmd-internal-move-rigisrter.patch
+Patch4:		riscv-go-runtime-add-support-cgo.patch
+Patch5:		riscv-enable-build-modes.patch
+
 
 
 %description
@@ -387,6 +394,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon Dec 7 2020 yangyanchao <yangyanchao6@huawei.com> - 1.15.5-3
+- Enable Cgo for RISC-V
+
 * Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
 - Adate for RISC-V
 
