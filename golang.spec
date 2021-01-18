@@ -62,11 +62,11 @@
 
 Name:           golang
 Version:        1.13.15
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
-Source0:        https://dl.google.com/go/go1.13.15.src.tar.gz
+Source0:        https://dl.google.com/go/go%{version}.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -156,7 +156,12 @@ Patch6005:       0005-runtime-fix-crash-during-VDSO-calls-on-arm.patch
 Patch6006:       0006-runtime-save-fetch-g-register-during-VDSO-on-ARM-and.patch
 Patch6007:       0007-runtime-don-t-fetch-G-from-signal-stack-when-using-c.patch
 Patch6008:       0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
-Patch6014:       0013-drop-hard-code-cert.patch
+Patch6013:       0013-drop-hard-code-cert.patch
+Patch6019:       0019-net-http-cgi-net-http-fcgi-add-Content-Type-detectio.patch
+Patch6020:       0020-golang-fix-CVE-2020-28366.patch
+Patch6021:       0021-golang-fix-CVE-2020-28367.patch
+Patch6022:       0022-fix-CVE-2020-29509-CVE-2020-29511.patch
+Patch6023:       0023-fix-CVE-2020-29510.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -390,25 +395,19 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Tue Aug 18 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
+* Mon Jan 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-2
+- sync cve fix
+
+* Tue Aug 18 2020 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
 - upgrade to 1.13.15
 
-* Fri Jul 31 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
-- add yaml file
-
-* Thu Jul 30 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
-- upgrade to 1.13.14
-
-* Thu Jul 23 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
-- bump to 1.13.4
-
-* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
+* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13.6
 - rename tar name and make it same with upstream
 
-* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
+* Tue Mar 17 2020 jingrui <jingrui@huawei.com> - 1.13.5
 - drop hard code cert
 
-* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
+* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13.4
 - fix CVE-2020-7919
 
 * Thu Feb 20 2020 openEuler Buildteam <buildteam@openeuler.org> - 1.13-3.2
