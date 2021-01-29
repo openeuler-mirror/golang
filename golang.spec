@@ -65,12 +65,12 @@
 
 
 Name:           golang
-Version:        1.15.5
-Release:        3
+Version:        1.15.7
+Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
-Source0:        https://dl.google.com/go/go1.15.5.src.tar.gz
+Source0:        https://dl.google.com/go/go1.15.7.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -394,6 +394,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Jan 28 2021 xingweizheng <xingweizheng@huawei.com> - 1.15.7-1
+- upgrade to 1.15.7
+
 * Mon Dec 7 2020 yangyanchao <yangyanchao6@huawei.com> - 1.15.5-3
 - Enable Cgo for RISC-V
 
