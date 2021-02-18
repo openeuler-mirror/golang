@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13.15
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -395,6 +395,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Feb 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-3
+- fix CVE-2021-3114
+
 * Mon Jan 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-2
 - sync cve fix
 
