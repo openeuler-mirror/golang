@@ -61,8 +61,8 @@
 %endif
 
 Name:           golang
-Version:        1.13.15
-Release:        4
+Version:        1.15.7
+Release:        1
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -148,21 +148,6 @@ Obsoletes:      %{name}-data < 1.1.1-4
 Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
-
-Patch6002:       0002-syscall-expose-IfInfomsg.X__ifi_pad-on-s390x.patch
-Patch6003:       0003-golang-delete-pem-files.patch
-Patch6004:       0004-syscall-implement-rawVforkSyscall-for-linux-arm64.patch
-Patch6005:       0005-runtime-fix-crash-during-VDSO-calls-on-arm.patch
-Patch6006:       0006-runtime-save-fetch-g-register-during-VDSO-on-ARM-and.patch
-Patch6007:       0007-runtime-don-t-fetch-G-from-signal-stack-when-using-c.patch
-Patch6008:       0008-runtime-don-t-save-G-during-VDSO-if-we-re-handling-s.patch
-Patch6013:       0013-drop-hard-code-cert.patch
-Patch6019:       0019-net-http-cgi-net-http-fcgi-add-Content-Type-detectio.patch
-Patch6020:       0020-golang-fix-CVE-2020-28366.patch
-Patch6021:       0021-golang-fix-CVE-2020-28367.patch
-Patch6022:       0022-fix-CVE-2020-29509-CVE-2020-29511.patch
-Patch6023:       0023-fix-CVE-2020-29510.patch
-Patch6024:       0024-crypto-elliptic-fix-P-224-field-reduction.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -396,8 +381,8 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Thu Feb 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-3
-- fix CVE-2021-3114
+* Thu Jan 28 2021 xingweizheng <xingweizheng@huawei.com> - 1.15.7-1
+- upgrade to 1.15.7
 
 * Mon Jan 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-2
 - sync cve fix
