@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -342,7 +342,7 @@ export GO_TEST_TIMEOUT_SCALE=2
 %if %{fail_on_tests}
 echo tests ignored
 %else
-./run.bash --no-rebuild -v -v -v -k || :
+./run.bash --no-rebuild -v -v -v -k go_test:testing || :
 %endif
 cd ..
 
@@ -381,6 +381,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
+- speed up build progress
+
 * Thu Jan 28 2021 xingweizheng <xingweizheng@huawei.com> - 1.15.7-1
 - upgrade to 1.15.7
 
