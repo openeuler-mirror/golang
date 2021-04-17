@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13.15
-Release:        4
+Release:        5
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -163,6 +163,7 @@ Patch6021:       0021-golang-fix-CVE-2020-28367.patch
 Patch6022:       0022-fix-CVE-2020-29509-CVE-2020-29511.patch
 Patch6023:       0023-fix-CVE-2020-29510.patch
 Patch6024:       0024-crypto-elliptic-fix-P-224-field-reduction.patch
+Patch6025:       0025-fix-CVE-2021-27918.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -396,6 +397,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Apr 17 2021 chenjiankun<chenjiankun1@huawei.com> - 1.13.15-5
+- fix CVE-2021-27918
+
 * Thu Feb 18 2021 jingrui<jingrui@huawei.com> - 1.13.15-3
 - fix CVE-2021-3114
 
