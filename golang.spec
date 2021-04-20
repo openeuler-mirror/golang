@@ -2,8 +2,8 @@
 %global _binaries_in_noarch_packages_terminate_build 0
 %global golibdir %{_libdir}/golang
 %global goroot /usr/lib/%{name}
-%global go_api 1.13
-%global go_version 1.13
+%global go_api 1.15
+%global go_version 1.15
 %global __spec_install_post /usr/lib/rpm/check-rpaths /usr/lib/rpm/check-buildroot /usr/lib/rpm/brp-compress
 %global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
 %global __strip /bin/true
@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -381,6 +381,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Apr 23 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-3
+- fix CVE-2021-27918
+
 * Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
 - speed up build progress
 
