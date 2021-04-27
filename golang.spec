@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -394,6 +394,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Apr 23 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-3
+- fix CVE-2021-27918
+
 * Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
 - speed up build progress
 
