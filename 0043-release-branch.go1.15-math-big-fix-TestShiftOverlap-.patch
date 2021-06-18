@@ -1,0 +1,65 @@
+From 44a6805ca92b00f30d5ed3f9e8d0b464d3f402bf Mon Sep 17 00:00:00 2001
+From: SparrowLii <liyuancylx@gmail.com>
+Date: Mon, 24 Aug 2020 14:43:32 +0800
+Subject: [PATCH 43/44] [release-branch.go1.15] math/big: fix TestShiftOverlap
+ for test -count arguments > 1
+
+Don't overwrite incoming test data.
+
+The change uses copy instead of assigning statement to avoid this.
+
+For #45335
+
+Change-Id: Ib907101822d811de5c45145cb9d7961907e212c3
+Reviewed-on: https://go-review.googlesource.com/c/go/+/250137
+Run-TryBot: Emmanuel Odeke <emm.odeke@gmail.com>
+TryBot-Result: Gobot Gobot <gobot@golang.org>
+Reviewed-by: Robert Griesemer <gri@golang.org>
+(cherry picked from commit 41bc0a1713b9436e96c2d64211ad94e42cafd591)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/319831
+Run-TryBot: Carlos Amedee <carlos@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Trust: Carlos Amedee <carlos@golang.org>
+Reviewed-by: Jonathan Albrecht <jonathan.albrecht@ibm.com>
+Reviewed-by: Emmanuel Odeke <emmanuel@orijtech.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/44a6805ca92b00f30d5ed3f9e8d0b464d3f402bf
+
+---
+ src/math/big/arith_test.go | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/math/big/arith_test.go b/src/math/big/arith_test.go
+index 05136f1895..e2b982c89c 100644
+--- a/src/math/big/arith_test.go
++++ b/src/math/big/arith_test.go
+@@ -241,20 +241,20 @@ var argshrVU = []argVU{
+ }
+ 
+ func testShiftFunc(t *testing.T, f func(z, x []Word, s uint) Word, a argVU) {
+-	// save a.d for error message, or it will be overwritten.
++	// work on copy of a.d to preserve the original data.
+ 	b := make([]Word, len(a.d))
+ 	copy(b, a.d)
+-	z := a.d[a.zp : a.zp+a.l]
+-	x := a.d[a.xp : a.xp+a.l]
++	z := b[a.zp : a.zp+a.l]
++	x := b[a.xp : a.xp+a.l]
+ 	c := f(z, x, a.s)
+ 	for i, zi := range z {
+ 		if zi != a.r[i] {
+-			t.Errorf("d := %v, %s(d[%d:%d], d[%d:%d], %d)\n\tgot z[%d] = %#x; want %#x", b, a.m, a.zp, a.zp+a.l, a.xp, a.xp+a.l, a.s, i, zi, a.r[i])
++			t.Errorf("d := %v, %s(d[%d:%d], d[%d:%d], %d)\n\tgot z[%d] = %#x; want %#x", a.d, a.m, a.zp, a.zp+a.l, a.xp, a.xp+a.l, a.s, i, zi, a.r[i])
+ 			break
+ 		}
+ 	}
+ 	if c != a.c {
+-		t.Errorf("d := %v, %s(d[%d:%d], d[%d:%d], %d)\n\tgot c = %#x; want %#x", b, a.m, a.zp, a.zp+a.l, a.xp, a.xp+a.l, a.s, c, a.c)
++		t.Errorf("d := %v, %s(d[%d:%d], d[%d:%d], %d)\n\tgot c = %#x; want %#x", a.d, a.m, a.zp, a.zp+a.l, a.xp, a.xp+a.l, a.s, c, a.c)
+ 	}
+ }
+ 
+-- 
+2.27.0
+

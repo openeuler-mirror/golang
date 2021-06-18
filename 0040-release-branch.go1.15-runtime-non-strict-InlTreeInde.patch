@@ -1,0 +1,54 @@
+From c0a7ecfae775a9d50d338e8123fac32a5d04308c Mon Sep 17 00:00:00 2001
+From: Michael Pratt <mpratt@google.com>
+Date: Fri, 9 Apr 2021 17:01:45 -0400
+Subject: [PATCH 40/44] [release-branch.go1.15] runtime: non-strict
+ InlTreeIndex lookup in expandFinalInlineFrame
+
+This is a follow-up to golang.org/cl/301369, which made the same change
+in Frames.Next. The same logic applies here: a profile stack may have
+been truncated at an invalid PC provided by cgoTraceback.
+expandFinalInlineFrame will then try to lookup the inline tree and
+crash.
+
+The same fix applies as well: upon encountering a bad PC, simply leave
+it as-is and move on.
+
+For #44971
+For #45480
+Fixes #45481
+
+Change-Id: I2823c67a1f3425466b05384cc6d30f5fc8ee6ddc
+Reviewed-on: https://go-review.googlesource.com/c/go/+/309109
+Reviewed-by: Michael Knyszek <mknyszek@google.com>
+Trust: Michael Pratt <mpratt@google.com>
+(cherry picked from commit aad13cbb749d1e6c085ff0556d306de1a2d5d063)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/309550
+Run-TryBot: Michael Pratt <mpratt@google.com>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/c0a7ecfae775a9d50d338e8123fac32a5d04308c
+
+---
+ src/runtime/symtab.go | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/runtime/symtab.go b/src/runtime/symtab.go
+index c77d513e74..75772f4fd8 100644
+--- a/src/runtime/symtab.go
++++ b/src/runtime/symtab.go
+@@ -185,7 +185,9 @@ func runtime_expandFinalInlineFrame(stk []uintptr) []uintptr {
+ 	var cache pcvalueCache
+ 	inltree := (*[1 << 20]inlinedCall)(inldata)
+ 	for {
+-		ix := pcdatavalue(f, _PCDATA_InlTreeIndex, tracepc, &cache)
++		// Non-strict as cgoTraceback may have added bogus PCs
++		// with a valid funcInfo but invalid PCDATA.
++		ix := pcdatavalue1(f, _PCDATA_InlTreeIndex, tracepc, &cache, false)
+ 		if ix < 0 {
+ 			break
+ 		}
+-- 
+2.27.0
+

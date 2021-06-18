@@ -1,0 +1,38 @@
+From aaef93bba34740d793e987d95355feb312f01cfd Mon Sep 17 00:00:00 2001
+From: Jay Conrod <jayconrod@google.com>
+Date: Wed, 20 Jan 2021 09:45:03 -0500
+Subject: [PATCH 02/44] [release-branch.go1.15] cmd/go: fix mod_get_fallback
+ test
+
+Fixes #43797
+
+Change-Id: I3d791d0ac9ce0b523c78c649aaf5e339a7f63b76
+Reviewed-on: https://go-review.googlesource.com/c/go/+/284797
+Trust: Jay Conrod <jayconrod@google.com>
+Run-TryBot: Jay Conrod <jayconrod@google.com>
+Reviewed-by: Bryan C. Mills <bcmills@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+(cherry picked from commit be28e5abc5ddca0d6b2d8c91b7bb9c05717154e7)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/284799
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/aaef93bba34740d793e987d95355feb312f01cfd
+
+---
+ src/cmd/go/testdata/script/mod_get_fallback.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/cmd/go/testdata/script/mod_get_fallback.txt b/src/cmd/go/testdata/script/mod_get_fallback.txt
+index a9834a324e..9733fa366b 100644
+--- a/src/cmd/go/testdata/script/mod_get_fallback.txt
++++ b/src/cmd/go/testdata/script/mod_get_fallback.txt
+@@ -6,5 +6,5 @@ env GOPROXY=https://proxy.golang.org,direct
+ env GOSUMDB=off
+ 
+ go get -x -v -d golang.org/x/tools/cmd/goimports
+-stderr '# get https://proxy.golang.org/golang.org/x/tools/@latest'
++stderr '# get https://proxy.golang.org/golang.org/x/tools/@v/list'
+ ! stderr '# get https://golang.org'
+-- 
+2.27.0
+

@@ -1,0 +1,58 @@
+From aa9b48cd1837644a1555fd7a370800924cef627a Mon Sep 17 00:00:00 2001
+From: Derek Parker <parkerderek86@gmail.com>
+Date: Wed, 25 Nov 2020 16:31:57 +0000
+Subject: [PATCH 08/44] [release-branch.go1.15] cmd/link/internal/ld/pe: fix
+ segfault adding resource section
+
+The resource symbol may have been copied to the mmap'd
+output buffer. If so, certain conditions can cause that
+mmap'd output buffer to be munmap'd before we get a chance
+to use it. To avoid any issues we copy the data to the heap
+when the resource symbol exists.
+
+Fixes #42384
+
+Change-Id: I32ef5420802d7313a3d965b8badfbcfb9f0fba4a
+GitHub-Last-Rev: 7b0f43011d06083ee3e871e48a87847636f738f9
+GitHub-Pull-Request: golang/go#42427
+Reviewed-on: https://go-review.googlesource.com/c/go/+/268018
+Run-TryBot: Carlos Amedee <carlos@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Russ Cox <rsc@golang.org>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+Reviewed-by: Than McIntosh <thanm@google.com>
+Trust: Carlos Amedee <carlos@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/aa9b48cd1837644a1555fd7a370800924cef627a
+
+---
+ src/cmd/link/internal/ld/pe.go | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/cmd/link/internal/ld/pe.go b/src/cmd/link/internal/ld/pe.go
+index c9cb25dbe5..5d68ca7d9c 100644
+--- a/src/cmd/link/internal/ld/pe.go
++++ b/src/cmd/link/internal/ld/pe.go
+@@ -1515,6 +1515,18 @@ func Asmbpe(ctxt *Link) {
+ 	case sys.AMD64, sys.I386, sys.ARM:
+ 	}
+ 
++	if rsrcsym != 0 {
++		// The resource symbol may have been copied to the mmap'd
++		// output buffer. If so, certain conditions can cause that
++		// mmap'd output buffer to be munmap'd before we get a chance
++		// to use it. To avoid any issues we copy the data to the heap
++		// when the resource symbol exists.
++		rsrc := ctxt.loader.Syms[rsrcsym]
++		data := make([]byte, len(rsrc.P))
++		copy(data, rsrc.P)
++		rsrc.P = data
++	}
++
+ 	t := pefile.addSection(".text", int(Segtext.Length), int(Segtext.Length))
+ 	t.characteristics = IMAGE_SCN_CNT_CODE | IMAGE_SCN_CNT_INITIALIZED_DATA | IMAGE_SCN_MEM_EXECUTE | IMAGE_SCN_MEM_READ
+ 	if ctxt.LinkMode == LinkExternal {
+-- 
+2.27.0
+

@@ -1,0 +1,188 @@
+From 82f9c6cac1bcc6bc80f17d1415ac3f62c0afa6c5 Mon Sep 17 00:00:00 2001
+From: Quim Muntal <quimmuntal@gmail.com>
+Date: Thu, 22 Oct 2020 22:32:20 +0200
+Subject: [PATCH 34/44] [release-branch.go1.15] cmd/link: avoid exporting all
+ symbols on windows buildmode=pie
+
+Marking one functions with __declspec(dllexport) forces mingw to
+create .reloc section without having to export all symbols.
+
+See https://insights.sei.cmu.edu/cert/2018/08/when-aslr-is-not-really-aslr---the-case-of-incorrect-assumptions-and-bad-defaults.html for more info.
+
+This change cuts 73kb of a "hello world" pie binary.
+
+Updates #6853.
+Updates #40795.
+Fixes #43592.
+
+Change-Id: I3cc57c3b64f61187550bc8751dfa085f106c8475
+Reviewed-on: https://go-review.googlesource.com/c/go/+/264459
+Trust: Alex Brainman <alex.brainman@gmail.com>
+Run-TryBot: Alex Brainman <alex.brainman@gmail.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Alex Brainman <alex.brainman@gmail.com>
+Reviewed-by: Austin Clements <austin@google.com>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/300692
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+Reviewed-by: David Chase <drchase@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/82f9c6cac1bcc6bc80f17d1415ac3f62c0afa6c5
+
+---
+ misc/cgo/testcshared/cshared_test.go |  9 ++++----
+ src/cmd/go/go_test.go                | 33 ++++++++++++++++++++++++++++
+ src/cmd/link/internal/ld/lib.go      |  3 ---
+ src/runtime/cgo/gcc_windows_386.c    |  1 +
+ src/runtime/cgo/gcc_windows_amd64.c  |  1 +
+ src/runtime/cgo/libcgo_windows.h     | 12 ++++++++++
+ 6 files changed, 52 insertions(+), 7 deletions(-)
+ create mode 100644 src/runtime/cgo/libcgo_windows.h
+
+diff --git a/misc/cgo/testcshared/cshared_test.go b/misc/cgo/testcshared/cshared_test.go
+index d717b4dfb3..dff2682e20 100644
+--- a/misc/cgo/testcshared/cshared_test.go
++++ b/misc/cgo/testcshared/cshared_test.go
+@@ -401,7 +401,7 @@ func main() {
+ 	defer f.Close()
+ 	section := f.Section(".edata")
+ 	if section == nil {
+-		t.Error(".edata section is not present")
++		t.Fatalf(".edata section is not present")
+ 	}
+ 
+ 	// TODO: deduplicate this struct from cmd/link/internal/ld/pe.go
+@@ -418,7 +418,8 @@ func main() {
+ 		t.Fatalf("binary.Read failed: %v", err)
+ 	}
+ 
+-	expectedNumber := uint32(2)
++	// Only the two exported functions and _cgo_dummy_export should be exported
++	expectedNumber := uint32(3)
+ 
+ 	if exportAllSymbols {
+ 		if e.NumberOfFunctions <= expectedNumber {
+@@ -429,10 +430,10 @@ func main() {
+ 		}
+ 	} else {
+ 		if e.NumberOfFunctions != expectedNumber {
+-			t.Fatalf("too many exported functions: %v", e.NumberOfFunctions)
++			t.Fatalf("got %d exported functions; want %d", e.NumberOfFunctions, expectedNumber)
+ 		}
+ 		if e.NumberOfNames != expectedNumber {
+-			t.Fatalf("too many exported names: %v", e.NumberOfNames)
++			t.Fatalf("got %d exported names; want %d", e.NumberOfNames, expectedNumber)
+ 		}
+ 	}
+ }
+diff --git a/src/cmd/go/go_test.go b/src/cmd/go/go_test.go
+index 021930a8a8..3f790cdeab 100644
+--- a/src/cmd/go/go_test.go
++++ b/src/cmd/go/go_test.go
+@@ -9,6 +9,7 @@ import (
+ 	"debug/elf"
+ 	"debug/macho"
+ 	"debug/pe"
++	"encoding/binary"
+ 	"flag"
+ 	"fmt"
+ 	"go/format"
+@@ -2166,6 +2167,38 @@ func testBuildmodePIE(t *testing.T, useCgo, setBuildmodeToPIE bool) {
+ 		if (dc & pe.IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE) == 0 {
+ 			t.Error("IMAGE_DLLCHARACTERISTICS_DYNAMIC_BASE flag is not set")
+ 		}
++		if useCgo {
++			// Test that only one symbol is exported (#40795).
++			// PIE binaries don´t require .edata section but unfortunately
++			// binutils doesn´t generate a .reloc section unless there is
++			// at least one symbol exported.
++			// See https://sourceware.org/bugzilla/show_bug.cgi?id=19011
++			section := f.Section(".edata")
++			if section == nil {
++				t.Fatalf(".edata section is not present")
++			}
++			// TODO: deduplicate this struct from cmd/link/internal/ld/pe.go
++			type IMAGE_EXPORT_DIRECTORY struct {
++				_                 [2]uint32
++				_                 [2]uint16
++				_                 [2]uint32
++				NumberOfFunctions uint32
++				NumberOfNames     uint32
++				_                 [3]uint32
++			}
++			var e IMAGE_EXPORT_DIRECTORY
++			if err := binary.Read(section.Open(), binary.LittleEndian, &e); err != nil {
++				t.Fatalf("binary.Read failed: %v", err)
++			}
++
++			// Only _cgo_dummy_export should be exported
++			if e.NumberOfFunctions != 1 {
++				t.Fatalf("got %d exported functions; want 1", e.NumberOfFunctions)
++			}
++			if e.NumberOfNames != 1 {
++				t.Fatalf("got %d exported names; want 1", e.NumberOfNames)
++			}
++		}
+ 	default:
+ 		panic("unreachable")
+ 	}
+diff --git a/src/cmd/link/internal/ld/lib.go b/src/cmd/link/internal/ld/lib.go
+index fc89759997..d03fb6cf91 100644
+--- a/src/cmd/link/internal/ld/lib.go
++++ b/src/cmd/link/internal/ld/lib.go
+@@ -1423,9 +1423,6 @@ func (ctxt *Link) hostlink() {
+ 			if ctxt.Arch.PtrSize >= 8 {
+ 				argv = append(argv, "-Wl,--high-entropy-va")
+ 			}
+-			// Work around binutils limitation that strips relocation table for dynamicbase.
+-			// See https://sourceware.org/bugzilla/show_bug.cgi?id=19011
+-			argv = append(argv, "-Wl,--export-all-symbols")
+ 		default:
+ 			// ELF.
+ 			if ctxt.UseRelro() {
+diff --git a/src/runtime/cgo/gcc_windows_386.c b/src/runtime/cgo/gcc_windows_386.c
+index 9184b91393..60cb011bf2 100644
+--- a/src/runtime/cgo/gcc_windows_386.c
++++ b/src/runtime/cgo/gcc_windows_386.c
+@@ -9,6 +9,7 @@
+ #include <stdio.h>
+ #include <errno.h>
+ #include "libcgo.h"
++#include "libcgo_windows.h"
+ 
+ static void threadentry(void*);
+ 
+diff --git a/src/runtime/cgo/gcc_windows_amd64.c b/src/runtime/cgo/gcc_windows_amd64.c
+index 7192a24631..0f8c817f0e 100644
+--- a/src/runtime/cgo/gcc_windows_amd64.c
++++ b/src/runtime/cgo/gcc_windows_amd64.c
+@@ -9,6 +9,7 @@
+ #include <stdio.h>
+ #include <errno.h>
+ #include "libcgo.h"
++#include "libcgo_windows.h"
+ 
+ static void threadentry(void*);
+ 
+diff --git a/src/runtime/cgo/libcgo_windows.h b/src/runtime/cgo/libcgo_windows.h
+new file mode 100644
+index 0000000000..0013f06bae
+--- /dev/null
++++ b/src/runtime/cgo/libcgo_windows.h
+@@ -0,0 +1,12 @@
++// Copyright 2020 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Ensure there's one symbol marked __declspec(dllexport).
++// If there are no exported symbols, the unfortunate behavior of
++// the binutils linker is to also strip the relocations table,
++// resulting in non-PIE binary. The other option is the
++// --export-all-symbols flag, but we don't need to export all symbols
++// and this may overflow the export table (#40795).
++// See https://sourceware.org/bugzilla/show_bug.cgi?id=19011
++__declspec(dllexport) int _cgo_dummy_export;
+-- 
+2.27.0
+

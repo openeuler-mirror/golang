@@ -1,0 +1,47 @@
+From 9bb97ea047890e900dae04202a231685492c4b18 Mon Sep 17 00:00:00 2001
+From: Jay Conrod <jayconrod@google.com>
+Date: Fri, 22 Jan 2021 16:59:16 -0500
+Subject: [PATCH 05/44] [release-branch.go1.15] cmd/go: fix
+ get_update_unknown_protocol test
+
+This test needs to run in GOPATH mode. It broke when a go.mod file was
+added to github.com/golang/example. This change sets GO111MODULE=off,
+which matches master since CL 255051.
+
+Fixes #43861
+
+Change-Id: I9ea109a99509fac3185756a0f0d852a84c677bf5
+Reviewed-on: https://go-review.googlesource.com/c/go/+/285956
+Trust: Jay Conrod <jayconrod@google.com>
+Run-TryBot: Jay Conrod <jayconrod@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Bryan C. Mills <bcmills@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/9bb97ea047890e900dae04202a231685492c4b18
+
+---
+ src/cmd/go/testdata/script/get_update_unknown_protocol.txt | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/cmd/go/testdata/script/get_update_unknown_protocol.txt b/src/cmd/go/testdata/script/get_update_unknown_protocol.txt
+index 85c2e24bc8..b00adea70b 100644
+--- a/src/cmd/go/testdata/script/get_update_unknown_protocol.txt
++++ b/src/cmd/go/testdata/script/get_update_unknown_protocol.txt
+@@ -1,5 +1,6 @@
+ [!net] skip
+ [!exec:git] skip
++env GO111MODULE=off
+ 
+ # Clone the repo via HTTPS manually.
+ exec git clone -q https://github.com/golang/example github.com/golang/example
+@@ -10,4 +11,4 @@ cd github.com/golang/example
+ exec git remote set-url origin xyz://github.com/golang/example
+ exec git config --local url.https://github.com/.insteadOf xyz://github.com/
+ 
+-go get -d -u -f github.com/golang/example/hello
+\ No newline at end of file
++go get -d -u -f github.com/golang/example/hello
+-- 
+2.27.0
+

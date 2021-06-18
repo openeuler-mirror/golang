@@ -1,0 +1,81 @@
+From be872812063f29e9c0d280fb37289d40330d96db Mon Sep 17 00:00:00 2001
+From: Michael Fraenkel <michael.fraenkel@gmail.com>
+Date: Thu, 16 Jul 2020 21:30:12 -0600
+Subject: [PATCH 28/44] [release-branch.go1.15] net/http: fix detection of
+ Roundtrippers that always error
+
+CL 220905 added code to identify alternate transports that always error
+by using http2erringRoundTripper. This does not work when the transport
+is from another package, e.g., http2.erringRoundTripper.
+Expose a new method that allow detection of such a RoundTripper.
+Switch to an interface that is both a RoundTripper and can return the
+underlying error.
+
+Fixes #45076.
+Updates #40213.
+
+Change-Id: I170739857ab9e99dffb5fa55c99b24b23c2f9c54
+Reviewed-on: https://go-review.googlesource.com/c/go/+/243258
+Reviewed-by: Emmanuel Odeke <emm.odeke@gmail.com>
+Run-TryBot: Emmanuel Odeke <emm.odeke@gmail.com>
+TryBot-Result: Gobot Gobot <gobot@golang.org>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/304210
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Trust: Emmanuel Odeke <emmanuel@orijtech.com>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Emmanuel Odeke <emmanuel@orijtech.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/be872812063f29e9c0d280fb37289d40330d96db
+
+---
+ src/net/http/omithttp2.go | 4 ----
+ src/net/http/transport.go | 8 ++++++--
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/net/http/omithttp2.go b/src/net/http/omithttp2.go
+index 7e2f492579..c8f5c28a59 100644
+--- a/src/net/http/omithttp2.go
++++ b/src/net/http/omithttp2.go
+@@ -32,10 +32,6 @@ type http2Transport struct {
+ func (*http2Transport) RoundTrip(*Request) (*Response, error) { panic(noHTTP2) }
+ func (*http2Transport) CloseIdleConnections()                 {}
+ 
+-type http2erringRoundTripper struct{ err error }
+-
+-func (http2erringRoundTripper) RoundTrip(*Request) (*Response, error) { panic(noHTTP2) }
+-
+ type http2noDialH2RoundTripper struct{}
+ 
+ func (http2noDialH2RoundTripper) RoundTrip(*Request) (*Response, error) { panic(noHTTP2) }
+diff --git a/src/net/http/transport.go b/src/net/http/transport.go
+index 6e430b9885..88d15a5919 100644
+--- a/src/net/http/transport.go
++++ b/src/net/http/transport.go
+@@ -1531,6 +1531,10 @@ func (pconn *persistConn) addTLS(name string, trace *httptrace.ClientTrace) erro
+ 	return nil
+ }
+ 
++type erringRoundTripper interface {
++	RoundTripErr() error
++}
++
+ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (pconn *persistConn, err error) {
+ 	pconn = &persistConn{
+ 		t:             t,
+@@ -1697,9 +1701,9 @@ func (t *Transport) dialConn(ctx context.Context, cm connectMethod) (pconn *pers
+ 	if s := pconn.tlsState; s != nil && s.NegotiatedProtocolIsMutual && s.NegotiatedProtocol != "" {
+ 		if next, ok := t.TLSNextProto[s.NegotiatedProtocol]; ok {
+ 			alt := next(cm.targetAddr, pconn.conn.(*tls.Conn))
+-			if e, ok := alt.(http2erringRoundTripper); ok {
++			if e, ok := alt.(erringRoundTripper); ok {
+ 				// pconn.conn was closed by next (http2configureTransport.upgradeFn).
+-				return nil, e.err
++				return nil, e.RoundTripErr()
+ 			}
+ 			return &persistConn{t: t, cacheKey: pconn.cacheKey, alt: alt}, nil
+ 		}
+-- 
+2.27.0
+
