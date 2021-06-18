@@ -1,0 +1,166 @@
+From 30357d6ef6513b18fade686a629ab8d49987260f Mon Sep 17 00:00:00 2001
+From: Wei Fu <fuweid89@gmail.com>
+Date: Sun, 24 Jan 2021 18:21:06 +0800
+Subject: [PATCH 14/44] [release-branch.go1.15] internal/poll: netpollcheckerr
+ before sendfile
+
+In net/http package, the ServeContent/ServeFile doesn't check the I/O
+timeout error from chunkWriter or *net.TCPConn, which means that both
+HTTP status and headers might be missing when WriteTimeout happens. If
+the poll.SendFile() doesn't check the *poll.FD state before sending
+data, the client will only receive the response body with status and
+report "malformed http response/status code".
+
+This patch is to enable netpollcheckerr before sendfile, which should
+align with normal *poll.FD.Write() and Splice().
+
+For #43822
+Fixes #44294
+
+Change-Id: I32517e3f261bab883a58b577b813ef189214b954
+Reviewed-on: https://go-review.googlesource.com/c/go/+/285914
+Reviewed-by: Emmanuel Odeke <emmanuel@orijtech.com>
+Trust: Emmanuel Odeke <emmanuel@orijtech.com>
+Trust: Bryan C. Mills <bcmills@google.com>
+Run-TryBot: Emmanuel Odeke <emmanuel@orijtech.com>
+(cherry picked from commit f0d23c9dbb2142b975fa8fb13a57213d0c15bdd1)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/296530
+Trust: Ian Lance Taylor <iant@golang.org>
+Run-TryBot: Ian Lance Taylor <iant@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/30357d6ef6513b18fade686a629ab8d49987260f
+
+---
+ src/internal/poll/sendfile_bsd.go     |  4 ++
+ src/internal/poll/sendfile_linux.go   |  3 ++
+ src/internal/poll/sendfile_solaris.go |  3 ++
+ src/net/sendfile_test.go              | 64 +++++++++++++++++++++++++++
+ 4 files changed, 74 insertions(+)
+
+diff --git a/src/internal/poll/sendfile_bsd.go b/src/internal/poll/sendfile_bsd.go
+index a24e41dcaa..66005a9f5c 100644
+--- a/src/internal/poll/sendfile_bsd.go
++++ b/src/internal/poll/sendfile_bsd.go
+@@ -18,6 +18,10 @@ func SendFile(dstFD *FD, src int, pos, remain int64) (int64, error) {
+ 		return 0, err
+ 	}
+ 	defer dstFD.writeUnlock()
++	if err := dstFD.pd.prepareWrite(dstFD.isFile); err != nil {
++		return 0, err
++	}
++
+ 	dst := int(dstFD.Sysfd)
+ 	var written int64
+ 	var err error
+diff --git a/src/internal/poll/sendfile_linux.go b/src/internal/poll/sendfile_linux.go
+index d64283007d..d6442e8666 100644
+--- a/src/internal/poll/sendfile_linux.go
++++ b/src/internal/poll/sendfile_linux.go
+@@ -16,6 +16,9 @@ func SendFile(dstFD *FD, src int, remain int64) (int64, error) {
+ 		return 0, err
+ 	}
+ 	defer dstFD.writeUnlock()
++	if err := dstFD.pd.prepareWrite(dstFD.isFile); err != nil {
++		return 0, err
++	}
+ 
+ 	dst := int(dstFD.Sysfd)
+ 	var written int64
+diff --git a/src/internal/poll/sendfile_solaris.go b/src/internal/poll/sendfile_solaris.go
+index 762992e9eb..748c85131e 100644
+--- a/src/internal/poll/sendfile_solaris.go
++++ b/src/internal/poll/sendfile_solaris.go
+@@ -20,6 +20,9 @@ func SendFile(dstFD *FD, src int, pos, remain int64) (int64, error) {
+ 		return 0, err
+ 	}
+ 	defer dstFD.writeUnlock()
++	if err := dstFD.pd.prepareWrite(dstFD.isFile); err != nil {
++		return 0, err
++	}
+ 
+ 	dst := int(dstFD.Sysfd)
+ 	var written int64
+diff --git a/src/net/sendfile_test.go b/src/net/sendfile_test.go
+index 13842a1261..0e344b3649 100644
+--- a/src/net/sendfile_test.go
++++ b/src/net/sendfile_test.go
+@@ -10,6 +10,7 @@ import (
+ 	"bytes"
+ 	"crypto/sha256"
+ 	"encoding/hex"
++	"errors"
+ 	"fmt"
+ 	"io"
+ 	"io/ioutil"
+@@ -314,3 +315,66 @@ func TestSendfilePipe(t *testing.T) {
+ 
+ 	wg.Wait()
+ }
++
++// Issue 43822: tests that returns EOF when conn write timeout.
++func TestSendfileOnWriteTimeoutExceeded(t *testing.T) {
++	ln, err := newLocalListener("tcp")
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer ln.Close()
++
++	errc := make(chan error, 1)
++	go func(ln Listener) (retErr error) {
++		defer func() {
++			errc <- retErr
++			close(errc)
++		}()
++
++		conn, err := ln.Accept()
++		if err != nil {
++			return err
++		}
++		defer conn.Close()
++
++		// Set the write deadline in the past(1h ago). It makes
++		// sure that it is always write timeout.
++		if err := conn.SetWriteDeadline(time.Now().Add(-1 * time.Hour)); err != nil {
++			return err
++		}
++
++		f, err := os.Open(newton)
++		if err != nil {
++			return err
++		}
++		defer f.Close()
++
++		_, err = io.Copy(conn, f)
++		if errors.Is(err, os.ErrDeadlineExceeded) {
++			return nil
++		}
++
++		if err == nil {
++			err = fmt.Errorf("expected ErrDeadlineExceeded, but got nil")
++		}
++		return err
++	}(ln)
++
++	conn, err := Dial("tcp", ln.Addr().String())
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer conn.Close()
++
++	n, err := io.Copy(ioutil.Discard, conn)
++	if err != nil {
++		t.Fatalf("expected nil error, but got %v", err)
++	}
++	if n != 0 {
++		t.Fatalf("expected receive zero, but got %d byte(s)", n)
++	}
++
++	if err := <-errc; err != nil {
++		t.Fatal(err)
++	}
++}
+-- 
+2.27.0
+

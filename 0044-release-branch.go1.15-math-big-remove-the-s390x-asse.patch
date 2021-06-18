@@ -1,0 +1,337 @@
+From 963687891319d118c20a2a71f0234ceb3a8dade4 Mon Sep 17 00:00:00 2001
+From: Jonathan Albrecht <jonathan.albrecht@ibm.com>
+Date: Wed, 2 Dec 2020 10:44:10 -0500
+Subject: [PATCH 44/44] [release-branch.go1.15] math/big: remove the s390x
+ assembly for shlVU and shrVU
+
+The s390x assembly for shlVU does a forward copy when the shift amount s
+is 0. This causes corruption of the result z when z is aliased to the
+input x.
+
+This fix removes the s390x assembly for both shlVU and shrVU so the pure
+go implementations will be used.
+
+Test cases have been added to the existing TestShiftOverlap test to
+cover shift values of 0, 1 and (_W - 1).
+
+Fixes #45335
+
+Change-Id: I75ca0e98f3acfaa6366a26355dcd9dd82499a48b
+Reviewed-on: https://go-review.googlesource.com/c/go/+/274442
+Run-TryBot: Robert Griesemer <gri@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Robert Griesemer <gri@golang.org>
+Reviewed-by: Matthew Dempsky <mdempsky@google.com>
+Trust: Robert Griesemer <gri@golang.org>
+(cherry picked from commit b1369d5862bc78eaa902ae637c874e6a6133f1f9)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/320169
+Trust: Carlos Amedee <carlos@golang.org>
+Run-TryBot: Carlos Amedee <carlos@golang.org>
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/963687891319d118c20a2a71f0234ceb3a8dade4
+
+---
+ src/math/big/arith_s390x.s | 192 +------------------------------------
+ src/math/big/arith_test.go |  55 ++++++++++-
+ 2 files changed, 54 insertions(+), 193 deletions(-)
+
+diff --git a/src/math/big/arith_s390x.s b/src/math/big/arith_s390x.s
+index 4891768111..153c42679c 100644
+--- a/src/math/big/arith_s390x.s
++++ b/src/math/big/arith_s390x.s
+@@ -702,199 +702,11 @@ returnC:
+ 
+ // func shlVU(z, x []Word, s uint) (c Word)
+ TEXT ·shlVU(SB), NOSPLIT, $0
+-	MOVD z_len+8(FP), R5
+-	MOVD $0, R0
+-	SUB  $1, R5          // n--
+-	BLT  X8b             // n < 0        (n <= 0)
+-
+-	// n > 0
+-	MOVD   s+48(FP), R4
+-	CMPBEQ R0, R4, Z80     // handle 0 case beq
+-	MOVD   $64, R6
+-	CMPBEQ R6, R4, Z864    // handle 64 case beq
+-	MOVD   z+0(FP), R2
+-	MOVD   x+24(FP), R8
+-	SLD    $3, R5          // n = n*8
+-	SUB    R4, R6, R7
+-	MOVD   (R8)(R5*1), R10 // w1 = x[i-1]
+-	SRD    R7, R10, R3
+-	MOVD   R3, c+56(FP)
+-
+-	MOVD $0, R1 // i = 0
+-	BR   E8
+-
+-	// i < n-1
+-L8:
+-	MOVD R10, R3           // w = w1
+-	MOVD -8(R8)(R5*1), R10 // w1 = x[i+1]
+-
+-	SLD  R4, R3         // w<<s | w1>>ŝ
+-	SRD  R7, R10, R6
+-	OR   R6, R3
+-	MOVD R3, (R2)(R5*1) // z[i] = w<<s | w1>>ŝ
+-	SUB  $8, R5         // i--
+-
+-E8:
+-	CMPBGT R5, R0, L8 // i < n-1
+-
+-	// i >= n-1
+-X8a:
+-	SLD  R4, R10   // w1<<s
+-	MOVD R10, (R2) // z[0] = w1<<s
+-	RET
+-
+-X8b:
+-	MOVD R0, c+56(FP)
+-	RET
+-
+-Z80:
+-	MOVD z+0(FP), R2
+-	MOVD x+24(FP), R8
+-	SLD  $3, R5       // n = n*8
+-
+-	MOVD (R8), R10
+-	MOVD $0, R3
+-	MOVD R3, c+56(FP)
+-
+-	MOVD $0, R1 // i = 0
+-	BR   E8Z
+-
+-	// i < n-1
+-L8Z:
+-	MOVD R10, R3
+-	MOVD 8(R8)(R1*1), R10
+-
+-	MOVD R3, (R2)(R1*1)
+-	ADD  $8, R1
+-
+-E8Z:
+-	CMPBLT R1, R5, L8Z
+-
+-	// i >= n-1
+-	MOVD R10, (R2)(R5*1)
+-	RET
+-
+-Z864:
+-	MOVD z+0(FP), R2
+-	MOVD x+24(FP), R8
+-	SLD  $3, R5         // n = n*8
+-	MOVD (R8)(R5*1), R3 // w1 = x[n-1]
+-	MOVD R3, c+56(FP)   // z[i] = x[n-1]
+-
+-	BR E864
+-
+-	// i < n-1
+-L864:
+-	MOVD -8(R8)(R5*1), R3
+-
+-	MOVD R3, (R2)(R5*1) // z[i] = x[n-1]
+-	SUB  $8, R5         // i--
+-
+-E864:
+-	CMPBGT R5, R0, L864 // i < n-1
+-
+-	MOVD R0, (R2) // z[n-1] = 0
+-	RET
++	BR ·shlVU_g(SB)
+ 
+-// CX = R4, r8 = r8, r10 = r2 , r11 = r5, DX = r3, AX = r10 , BX = R1 , 64-count = r7 (R0 set to 0) temp = R6
+ // func shrVU(z, x []Word, s uint) (c Word)
+ TEXT ·shrVU(SB), NOSPLIT, $0
+-	MOVD z_len+8(FP), R5
+-	MOVD $0, R0
+-	SUB  $1, R5          // n--
+-	BLT  X9b             // n < 0        (n <= 0)
+-
+-	// n > 0
+-	MOVD   s+48(FP), R4
+-	CMPBEQ R0, R4, ZB0  // handle 0 case beq
+-	MOVD   $64, R6
+-	CMPBEQ R6, R4, ZB64 // handle 64 case beq
+-	MOVD   z+0(FP), R2
+-	MOVD   x+24(FP), R8
+-	SLD    $3, R5       // n = n*8
+-	SUB    R4, R6, R7
+-	MOVD   (R8), R10    // w1 = x[0]
+-	SLD    R7, R10, R3
+-	MOVD   R3, c+56(FP)
+-
+-	MOVD $0, R1 // i = 0
+-	BR   E9
+-
+-	// i < n-1
+-L9:
+-	MOVD R10, R3          // w = w1
+-	MOVD 8(R8)(R1*1), R10 // w1 = x[i+1]
+-
+-	SRD  R4, R3         // w>>s | w1<<s
+-	SLD  R7, R10, R6
+-	OR   R6, R3
+-	MOVD R3, (R2)(R1*1) // z[i] = w>>s | w1<<s
+-	ADD  $8, R1         // i++
+-
+-E9:
+-	CMPBLT R1, R5, L9 // i < n-1
+-
+-	// i >= n-1
+-X9a:
+-	SRD  R4, R10         // w1>>s
+-	MOVD R10, (R2)(R5*1) // z[n-1] = w1>>s
+-	RET
+-
+-X9b:
+-	MOVD R0, c+56(FP)
+-	RET
+-
+-ZB0:
+-	MOVD z+0(FP), R2
+-	MOVD x+24(FP), R8
+-	SLD  $3, R5       // n = n*8
+-
+-	MOVD (R8), R10    // w1 = x[0]
+-	MOVD $0, R3       // R10 << 64
+-	MOVD R3, c+56(FP)
+-
+-	MOVD $0, R1 // i = 0
+-	BR   E9Z
+-
+-	// i < n-1
+-L9Z:
+-	MOVD R10, R3          // w = w1
+-	MOVD 8(R8)(R1*1), R10 // w1 = x[i+1]
+-
+-	MOVD R3, (R2)(R1*1) // z[i] = w>>s | w1<<s
+-	ADD  $8, R1         // i++
+-
+-E9Z:
+-	CMPBLT R1, R5, L9Z // i < n-1
+-
+-	// i >= n-1
+-	MOVD R10, (R2)(R5*1) // z[n-1] = w1>>s
+-	RET
+-
+-ZB64:
+-	MOVD z+0(FP), R2
+-	MOVD x+24(FP), R8
+-	SLD  $3, R5       // n = n*8
+-	MOVD (R8), R3     // w1 = x[0]
+-	MOVD R3, c+56(FP)
+-
+-	MOVD $0, R1 // i = 0
+-	BR   E964
+-
+-	// i < n-1
+-L964:
+-	MOVD 8(R8)(R1*1), R3 // w1 = x[i+1]
+-
+-	MOVD R3, (R2)(R1*1) // z[i] = w>>s | w1<<s
+-	ADD  $8, R1         // i++
+-
+-E964:
+-	CMPBLT R1, R5, L964 // i < n-1
+-
+-	// i >= n-1
+-	MOVD $0, R10         // w1>>s
+-	MOVD R10, (R2)(R5*1) // z[n-1] = w1>>s
+-	RET
++	BR ·shrVU_g(SB)
+ 
+ // CX = R4, r8 = r8, r9=r9, r10 = r2 , r11 = r5, DX = r3, AX = r6 , BX = R1 , (R0 set to 0) + use R11 + use R7 for i
+ // func mulAddVWW(z, x []Word, y, r Word) (c Word)
+diff --git a/src/math/big/arith_test.go b/src/math/big/arith_test.go
+index e2b982c89c..fbbaa0e122 100644
+--- a/src/math/big/arith_test.go
++++ b/src/math/big/arith_test.go
+@@ -224,13 +224,36 @@ type argVU struct {
+ 	m  string // message.
+ }
+ 
++var argshlVUIn = []Word{1, 2, 4, 8, 16, 32, 64, 0, 0, 0}
++var argshlVUr0 = []Word{1, 2, 4, 8, 16, 32, 64}
++var argshlVUr1 = []Word{2, 4, 8, 16, 32, 64, 128}
++var argshlVUrWm1 = []Word{1 << (_W - 1), 0, 1, 2, 4, 8, 16}
++
+ var argshlVU = []argVU{
+ 	// test cases for shlVU
+ 	{[]Word{1, _M, _M, _M, _M, _M, 3 << (_W - 2), 0}, 7, 0, 0, 1, []Word{2, _M - 1, _M, _M, _M, _M, 1<<(_W-1) + 1}, 1, "complete overlap of shlVU"},
+ 	{[]Word{1, _M, _M, _M, _M, _M, 3 << (_W - 2), 0, 0, 0, 0}, 7, 0, 3, 1, []Word{2, _M - 1, _M, _M, _M, _M, 1<<(_W-1) + 1}, 1, "partial overlap by half of shlVU"},
+ 	{[]Word{1, _M, _M, _M, _M, _M, 3 << (_W - 2), 0, 0, 0, 0, 0, 0, 0}, 7, 0, 6, 1, []Word{2, _M - 1, _M, _M, _M, _M, 1<<(_W-1) + 1}, 1, "partial overlap by 1 Word of shlVU"},
+ 	{[]Word{1, _M, _M, _M, _M, _M, 3 << (_W - 2), 0, 0, 0, 0, 0, 0, 0, 0}, 7, 0, 7, 1, []Word{2, _M - 1, _M, _M, _M, _M, 1<<(_W-1) + 1}, 1, "no overlap of shlVU"},
+-}
++	// additional test cases with shift values of 0, 1 and (_W-1)
++	{argshlVUIn, 7, 0, 0, 0, argshlVUr0, 0, "complete overlap of shlVU and shift of 0"},
++	{argshlVUIn, 7, 0, 0, 1, argshlVUr1, 0, "complete overlap of shlVU and shift of 1"},
++	{argshlVUIn, 7, 0, 0, _W - 1, argshlVUrWm1, 32, "complete overlap of shlVU and shift of _W - 1"},
++	{argshlVUIn, 7, 0, 1, 0, argshlVUr0, 0, "partial overlap by 6 Words of shlVU and shift of 0"},
++	{argshlVUIn, 7, 0, 1, 1, argshlVUr1, 0, "partial overlap by 6 Words of shlVU and shift of 1"},
++	{argshlVUIn, 7, 0, 1, _W - 1, argshlVUrWm1, 32, "partial overlap by 6 Words of shlVU and shift of _W - 1"},
++	{argshlVUIn, 7, 0, 2, 0, argshlVUr0, 0, "partial overlap by 5 Words of shlVU and shift of 0"},
++	{argshlVUIn, 7, 0, 2, 1, argshlVUr1, 0, "partial overlap by 5 Words of shlVU and shift of 1"},
++	{argshlVUIn, 7, 0, 2, _W - 1, argshlVUrWm1, 32, "partial overlap by 5 Words of shlVU abd shift of _W - 1"},
++	{argshlVUIn, 7, 0, 3, 0, argshlVUr0, 0, "partial overlap by 4 Words of shlVU and shift of 0"},
++	{argshlVUIn, 7, 0, 3, 1, argshlVUr1, 0, "partial overlap by 4 Words of shlVU and shift of 1"},
++	{argshlVUIn, 7, 0, 3, _W - 1, argshlVUrWm1, 32, "partial overlap by 4 Words of shlVU and shift of _W - 1"},
++}
++
++var argshrVUIn = []Word{0, 0, 0, 1, 2, 4, 8, 16, 32, 64}
++var argshrVUr0 = []Word{1, 2, 4, 8, 16, 32, 64}
++var argshrVUr1 = []Word{0, 1, 2, 4, 8, 16, 32}
++var argshrVUrWm1 = []Word{4, 8, 16, 32, 64, 128, 0}
+ 
+ var argshrVU = []argVU{
+ 	// test cases for shrVU
+@@ -238,6 +261,19 @@ var argshrVU = []argVU{
+ 	{[]Word{0, 0, 0, 0, 3, _M, _M, _M, _M, _M, 1 << (_W - 1)}, 7, 4, 1, 1, []Word{1<<(_W-1) + 1, _M, _M, _M, _M, _M >> 1, 1 << (_W - 2)}, 1 << (_W - 1), "partial overlap by half of shrVU"},
+ 	{[]Word{0, 0, 0, 0, 0, 0, 0, 3, _M, _M, _M, _M, _M, 1 << (_W - 1)}, 7, 7, 1, 1, []Word{1<<(_W-1) + 1, _M, _M, _M, _M, _M >> 1, 1 << (_W - 2)}, 1 << (_W - 1), "partial overlap by 1 Word of shrVU"},
+ 	{[]Word{0, 0, 0, 0, 0, 0, 0, 0, 3, _M, _M, _M, _M, _M, 1 << (_W - 1)}, 7, 8, 1, 1, []Word{1<<(_W-1) + 1, _M, _M, _M, _M, _M >> 1, 1 << (_W - 2)}, 1 << (_W - 1), "no overlap of shrVU"},
++	// additional test cases with shift values of 0, 1 and (_W-1)
++	{argshrVUIn, 7, 3, 3, 0, argshrVUr0, 0, "complete overlap of shrVU and shift of 0"},
++	{argshrVUIn, 7, 3, 3, 1, argshrVUr1, 1 << (_W - 1), "complete overlap of shrVU and shift of 1"},
++	{argshrVUIn, 7, 3, 3, _W - 1, argshrVUrWm1, 2, "complete overlap of shrVU and shift of _W - 1"},
++	{argshrVUIn, 7, 3, 2, 0, argshrVUr0, 0, "partial overlap by 6 Words of shrVU and shift of 0"},
++	{argshrVUIn, 7, 3, 2, 1, argshrVUr1, 1 << (_W - 1), "partial overlap by 6 Words of shrVU and shift of 1"},
++	{argshrVUIn, 7, 3, 2, _W - 1, argshrVUrWm1, 2, "partial overlap by 6 Words of shrVU and shift of _W - 1"},
++	{argshrVUIn, 7, 3, 1, 0, argshrVUr0, 0, "partial overlap by 5 Words of shrVU and shift of 0"},
++	{argshrVUIn, 7, 3, 1, 1, argshrVUr1, 1 << (_W - 1), "partial overlap by 5 Words of shrVU and shift of 1"},
++	{argshrVUIn, 7, 3, 1, _W - 1, argshrVUrWm1, 2, "partial overlap by 5 Words of shrVU and shift of _W - 1"},
++	{argshrVUIn, 7, 3, 0, 0, argshrVUr0, 0, "partial overlap by 4 Words of shrVU and shift of 0"},
++	{argshrVUIn, 7, 3, 0, 1, argshrVUr1, 1 << (_W - 1), "partial overlap by 4 Words of shrVU and shift of 1"},
++	{argshrVUIn, 7, 3, 0, _W - 1, argshrVUrWm1, 2, "partial overlap by 4 Words of shrVU and shift of _W - 1"},
+ }
+ 
+ func testShiftFunc(t *testing.T, f func(z, x []Word, s uint) Word, a argVU) {
+@@ -274,11 +310,24 @@ func TestIssue31084(t *testing.T) {
+ 	// compute 10^n via 5^n << n.
+ 	const n = 165
+ 	p := nat(nil).expNN(nat{5}, nat{n}, nil)
+-	p = p.shl(p, uint(n))
++	p = p.shl(p, n)
+ 	got := string(p.utoa(10))
+ 	want := "1" + strings.Repeat("0", n)
+ 	if got != want {
+-		t.Errorf("shl(%v, %v)\n\tgot %s; want %s\n", p, uint(n), got, want)
++		t.Errorf("shl(%v, %v)\n\tgot  %s\n\twant %s", p, n, got, want)
++	}
++}
++
++const issue42838Value = "159309191113245227702888039776771180559110455519261878607388585338616290151305816094308987472018268594098344692611135542392730712890625"
++
++func TestIssue42838(t *testing.T) {
++	const s = 192
++	z, _, _, _ := nat(nil).scan(strings.NewReader(issue42838Value), 0, false)
++	z = z.shl(z, s)
++	got := string(z.utoa(10))
++	want := "1" + strings.Repeat("0", s)
++	if got != want {
++		t.Errorf("shl(%v, %v)\n\tgot  %s\n\twant %s", z, s, got, want)
+ 	}
+ }
+ 
+-- 
+2.27.0
+

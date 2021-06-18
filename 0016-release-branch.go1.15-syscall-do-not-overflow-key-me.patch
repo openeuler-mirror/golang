@@ -1,0 +1,115 @@
+From 4fda89d4201fc9f0c1e192bbcc95dd8d660e9122 Mon Sep 17 00:00:00 2001
+From: "Jason A. Donenfeld" <Jason@zx2c4.com>
+Date: Tue, 23 Feb 2021 13:29:40 +0100
+Subject: [PATCH 16/44] [release-branch.go1.15] syscall: do not overflow key
+ memory in GetQueuedCompletionStatus
+
+The third argument to GetQueuedCompletionStatus is a pointer to a
+uintptr, not a uint32. Users of this functions have therefore been
+corrupting their memory every time they used it. Either that memory
+corruption was silent (dangerous), or their programs didn't work so they
+chose a different API to use.
+
+This fixes the problem by passing through an intermediate buffer.
+
+Updates #44538.
+Fixes #44592.
+
+Change-Id: Icacd71f705b36e41e52bd8c4d74898559a27522f
+Reviewed-on: https://go-review.googlesource.com/c/go/+/296151
+Trust: Jason A. Donenfeld <Jason@zx2c4.com>
+Run-TryBot: Jason A. Donenfeld <Jason@zx2c4.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Bryan C. Mills <bcmills@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/4fda89d4201fc9f0c1e192bbcc95dd8d660e9122
+
+---
+ src/syscall/syscall_windows.go  | 34 ++++++++++++++++++++++++++++++---
+ src/syscall/zsyscall_windows.go |  6 +++---
+ 2 files changed, 34 insertions(+), 6 deletions(-)
+
+diff --git a/src/syscall/syscall_windows.go b/src/syscall/syscall_windows.go
+index f62c00d72f..fbb11a89ca 100644
+--- a/src/syscall/syscall_windows.go
++++ b/src/syscall/syscall_windows.go
+@@ -213,9 +213,9 @@ func NewCallbackCDecl(fn interface{}) uintptr {
+ //sys	SetEndOfFile(handle Handle) (err error)
+ //sys	GetSystemTimeAsFileTime(time *Filetime)
+ //sys	GetTimeZoneInformation(tzi *Timezoneinformation) (rc uint32, err error) [failretval==0xffffffff]
+-//sys	CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uint32, threadcnt uint32) (handle Handle, err error)
+-//sys	GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uint32, overlapped **Overlapped, timeout uint32) (err error)
+-//sys	PostQueuedCompletionStatus(cphandle Handle, qty uint32, key uint32, overlapped *Overlapped) (err error)
++//sys	createIoCompletionPort(filehandle Handle, cphandle Handle, key uintptr, threadcnt uint32) (handle Handle, err error) = CreateIoCompletionPort
++//sys	getQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uintptr, overlapped **Overlapped, timeout uint32) (err error) = GetQueuedCompletionStatus
++//sys	postQueuedCompletionStatus(cphandle Handle, qty uint32, key uintptr, overlapped *Overlapped) (err error) = PostQueuedCompletionStatus
+ //sys	CancelIo(s Handle) (err error)
+ //sys	CancelIoEx(s Handle, o *Overlapped) (err error)
+ //sys	CreateProcess(appName *uint16, commandLine *uint16, procSecurity *SecurityAttributes, threadSecurity *SecurityAttributes, inheritHandles bool, creationFlags uint32, env *uint16, currentDir *uint16, startupInfo *StartupInfo, outProcInfo *ProcessInformation) (err error) = CreateProcessW
+@@ -1209,3 +1209,31 @@ func Readlink(path string, buf []byte) (n int, err error) {
+ 
+ 	return n, nil
+ }
++
++// Deprecated: CreateIoCompletionPort has the wrong function signature. Use x/sys/windows.CreateIoCompletionPort.
++func CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uint32, threadcnt uint32) (Handle, error) {
++	return createIoCompletionPort(filehandle, cphandle, uintptr(key), threadcnt)
++}
++
++// Deprecated: GetQueuedCompletionStatus has the wrong function signature. Use x/sys/windows.GetQueuedCompletionStatus.
++func GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uint32, overlapped **Overlapped, timeout uint32) error {
++	var ukey uintptr
++	var pukey *uintptr
++	if key != nil {
++		ukey = uintptr(*key)
++		pukey = &ukey
++	}
++	err := getQueuedCompletionStatus(cphandle, qty, pukey, overlapped, timeout)
++	if key != nil {
++		*key = uint32(ukey)
++		if uintptr(*key) != ukey && err == nil {
++			err = errorspkg.New("GetQueuedCompletionStatus returned key overflow")
++		}
++	}
++	return err
++}
++
++// Deprecated: PostQueuedCompletionStatus has the wrong function signature. Use x/sys/windows.PostQueuedCompletionStatus.
++func PostQueuedCompletionStatus(cphandle Handle, qty uint32, key uint32, overlapped *Overlapped) error {
++	return postQueuedCompletionStatus(cphandle, qty, uintptr(key), overlapped)
++}
+diff --git a/src/syscall/zsyscall_windows.go b/src/syscall/zsyscall_windows.go
+index 2348f6534f..2762fb3b74 100644
+--- a/src/syscall/zsyscall_windows.go
++++ b/src/syscall/zsyscall_windows.go
+@@ -539,7 +539,7 @@ func GetTimeZoneInformation(tzi *Timezoneinformation) (rc uint32, err error) {
+ 	return
+ }
+ 
+-func CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uint32, threadcnt uint32) (handle Handle, err error) {
++func createIoCompletionPort(filehandle Handle, cphandle Handle, key uintptr, threadcnt uint32) (handle Handle, err error) {
+ 	r0, _, e1 := Syscall6(procCreateIoCompletionPort.Addr(), 4, uintptr(filehandle), uintptr(cphandle), uintptr(key), uintptr(threadcnt), 0, 0)
+ 	handle = Handle(r0)
+ 	if handle == 0 {
+@@ -552,7 +552,7 @@ func CreateIoCompletionPort(filehandle Handle, cphandle Handle, key uint32, thre
+ 	return
+ }
+ 
+-func GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uint32, overlapped **Overlapped, timeout uint32) (err error) {
++func getQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uintptr, overlapped **Overlapped, timeout uint32) (err error) {
+ 	r1, _, e1 := Syscall6(procGetQueuedCompletionStatus.Addr(), 5, uintptr(cphandle), uintptr(unsafe.Pointer(qty)), uintptr(unsafe.Pointer(key)), uintptr(unsafe.Pointer(overlapped)), uintptr(timeout), 0)
+ 	if r1 == 0 {
+ 		if e1 != 0 {
+@@ -564,7 +564,7 @@ func GetQueuedCompletionStatus(cphandle Handle, qty *uint32, key *uint32, overla
+ 	return
+ }
+ 
+-func PostQueuedCompletionStatus(cphandle Handle, qty uint32, key uint32, overlapped *Overlapped) (err error) {
++func postQueuedCompletionStatus(cphandle Handle, qty uint32, key uintptr, overlapped *Overlapped) (err error) {
+ 	r1, _, e1 := Syscall6(procPostQueuedCompletionStatus.Addr(), 4, uintptr(cphandle), uintptr(qty), uintptr(key), uintptr(unsafe.Pointer(overlapped)), 0, 0)
+ 	if r1 == 0 {
+ 		if e1 != 0 {
+-- 
+2.27.0
+

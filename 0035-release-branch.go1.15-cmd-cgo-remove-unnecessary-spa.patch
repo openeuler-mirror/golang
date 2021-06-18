@@ -1,0 +1,60 @@
+From 1373d92a75f70c62d74f9e4714cd17811f75c48b Mon Sep 17 00:00:00 2001
+From: Quim Muntal <quimmuntal@gmail.com>
+Date: Thu, 14 Jan 2021 21:29:49 +0100
+Subject: [PATCH 35/44] [release-branch.go1.15] cmd/cgo: remove unnecessary
+ space in cgo export header
+
+The cgo header has an unnecessary space in the exported function
+definition on non-windows goos.
+
+This was introduced in go1.16 so it would be good to fix it before
+release.
+
+Example:
+
+// Current behavior, notice there is an unecessary space
+// between extern and void
+extern  void Foo();
+
+// With this CL
+extern void Foo();
+
+Updates #43591.
+
+Change-Id: Ic2c21f8d806fe35a7be7183dbfe35ac605b6e4f6
+Reviewed-on: https://go-review.googlesource.com/c/go/+/283892
+Reviewed-by: Ian Lance Taylor <iant@golang.org>
+Trust: Katie Hockman <katie@golang.org>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/300694
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Trust: Emmanuel Odeke <emmanuel@orijtech.com>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: David Chase <drchase@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/1373d92a75f70c62d74f9e4714cd17811f75c48b
+
+---
+ src/cmd/cgo/out.go | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/cgo/out.go b/src/cmd/cgo/out.go
+index ee1c563495..be4f6ad2d5 100644
+--- a/src/cmd/cgo/out.go
++++ b/src/cmd/cgo/out.go
+@@ -963,9 +963,9 @@ func (p *Package) writeExports(fgo2, fm, fgcc, fgcch io.Writer) {
+ 		// Build the wrapper function compiled by gcc.
+ 		gccExport := ""
+ 		if goos == "windows" {
+-			gccExport = "__declspec(dllexport)"
++			gccExport = "__declspec(dllexport) "
+ 		}
+-		s := fmt.Sprintf("%s %s %s(", gccExport, gccResult, exp.ExpName)
++		s := fmt.Sprintf("%s%s %s(", gccExport, gccResult, exp.ExpName)
+ 		if fn.Recv != nil {
+ 			s += p.cgoType(fn.Recv.List[0].Type).C.String()
+ 			s += " recv"
+-- 
+2.27.0
+

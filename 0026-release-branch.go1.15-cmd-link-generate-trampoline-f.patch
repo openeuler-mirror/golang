@@ -1,0 +1,133 @@
+From 7c88ae4117c16c1e5b80189b81d67845e1c40d9d Mon Sep 17 00:00:00 2001
+From: Cherry Zhang <cherryyz@google.com>
+Date: Tue, 16 Feb 2021 10:20:58 -0500
+Subject: [PATCH 26/44] [release-branch.go1.15] cmd/link: generate trampoline
+ for inter-dependent packages
+
+Currently, in the trampoline generation pass we expect packages
+are laid out in dependency order, so a cross-package jump always
+has a known target address so we can check if a trampoline is
+needed. With linknames, there can be cycles in the package
+dependency graph, making this algorithm no longer work. For them,
+as the target address is unkown we conservatively generate a
+trampoline. This may generate unnecessary trampolines (if the
+packages turn out laid together), but package cycles are extremely
+rare so this is fine.
+
+Updates #44639.
+Fixes #44748.
+
+Change-Id: I2dc2998edacbda27d726fc79452313a21d07787a
+Reviewed-on: https://go-review.googlesource.com/c/go/+/292490
+Trust: Cherry Zhang <cherryyz@google.com>
+Reviewed-by: Than McIntosh <thanm@google.com>
+(cherry picked from commit 098504c73ff6ece19566a1ac811ceed73be7c81d)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/298030
+Run-TryBot: Cherry Zhang <cherryyz@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/7c88ae4117c16c1e5b80189b81d67845e1c40d9d
+
+---
+ src/cmd/link/internal/arm/asm.go   | 16 +++++++++++-----
+ src/cmd/link/internal/ld/data.go   | 12 +++++-------
+ src/cmd/link/internal/ppc64/asm.go | 12 +++++++++---
+ 3 files changed, 25 insertions(+), 15 deletions(-)
+
+diff --git a/src/cmd/link/internal/arm/asm.go b/src/cmd/link/internal/arm/asm.go
+index 903e62108e..43643341d2 100644
+--- a/src/cmd/link/internal/arm/asm.go
++++ b/src/cmd/link/internal/arm/asm.go
+@@ -373,10 +373,16 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
+ 	r := relocs.At2(ri)
+ 	switch r.Type() {
+ 	case objabi.R_CALLARM:
+-		// r.Add is the instruction
+-		// low 24-bit encodes the target address
+-		t := (ldr.SymValue(rs) + int64(signext24(r.Add()&0xffffff)*4) - (ldr.SymValue(s) + int64(r.Off()))) / 4
+-		if t > 0x7fffff || t < -0x800000 || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
++		var t int64
++		// ldr.SymValue(rs) == 0 indicates a cross-package jump to a function that is not yet
++		// laid out. Conservatively use a trampoline. This should be rare, as we lay out packages
++		// in dependency order.
++		if ldr.SymValue(rs) != 0 {
++			// r.Add is the instruction
++			// low 24-bit encodes the target address
++			t = (ldr.SymValue(rs) + int64(signext24(r.Add()&0xffffff)*4) - (ldr.SymValue(s) + int64(r.Off()))) / 4
++		}
++		if t > 0x7fffff || t < -0x800000 || ldr.SymValue(rs) == 0 || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
+ 			// direct call too far, need to insert trampoline.
+ 			// look up existing trampolines first. if we found one within the range
+ 			// of direct call, we can reuse it. otherwise create a new one.
+@@ -447,7 +453,7 @@ func gentramp(arch *sys.Arch, linkmode ld.LinkMode, ldr *loader.Loader, tramp *l
+ 	arch.ByteOrder.PutUint32(P[8:], o3)
+ 	tramp.SetData(P)
+ 
+-	if linkmode == ld.LinkExternal {
++	if linkmode == ld.LinkExternal || ldr.SymValue(target) == 0 {
+ 		r := loader.Reloc{
+ 			Off:  8,
+ 			Type: objabi.R_ADDR,
+diff --git a/src/cmd/link/internal/ld/data.go b/src/cmd/link/internal/ld/data.go
+index d3f308c8fa..2b55a5f6fc 100644
+--- a/src/cmd/link/internal/ld/data.go
++++ b/src/cmd/link/internal/ld/data.go
+@@ -105,14 +105,12 @@ func trampoline(ctxt *Link, s loader.Sym) {
+ 		}
+ 		rs = ldr.ResolveABIAlias(rs)
+ 		if ldr.SymValue(rs) == 0 && (ldr.SymType(rs) != sym.SDYNIMPORT && ldr.SymType(rs) != sym.SUNDEFEXT) {
+-			if ldr.SymPkg(rs) != ldr.SymPkg(s) {
+-				if !isRuntimeDepPkg(ldr.SymPkg(s)) || !isRuntimeDepPkg(ldr.SymPkg(rs)) {
+-					ctxt.Errorf(s, "unresolved inter-package jump to %s(%s) from %s", ldr.SymName(rs), ldr.SymPkg(rs), ldr.SymPkg(s))
+-				}
+-				// runtime and its dependent packages may call to each other.
+-				// they are fine, as they will be laid down together.
++			if ldr.SymPkg(rs) == ldr.SymPkg(s) {
++				continue // symbols in the same package are laid out together
++			}
++			if isRuntimeDepPkg(ldr.SymPkg(s)) && isRuntimeDepPkg(ldr.SymPkg(rs)) {
++				continue // runtime packages are laid out together
+ 			}
+-			continue
+ 		}
+ 
+ 		thearch.Trampoline(ctxt, ldr, ri, rs, s)
+diff --git a/src/cmd/link/internal/ppc64/asm.go b/src/cmd/link/internal/ppc64/asm.go
+index b1c0873d7a..a3ecd43f89 100644
+--- a/src/cmd/link/internal/ppc64/asm.go
++++ b/src/cmd/link/internal/ppc64/asm.go
+@@ -672,13 +672,19 @@ func trampoline(ctxt *ld.Link, ldr *loader.Loader, ri int, rs, s loader.Sym) {
+ 
+ 	relocs := ldr.Relocs(s)
+ 	r := relocs.At2(ri)
+-	t := ldr.SymValue(rs) + r.Add() - (ldr.SymValue(s) + int64(r.Off()))
++	var t int64
++	// ldr.SymValue(rs) == 0 indicates a cross-package jump to a function that is not yet
++	// laid out. Conservatively use a trampoline. This should be rare, as we lay out packages
++	// in dependency order.
++	if ldr.SymValue(rs) != 0 {
++		t = ldr.SymValue(rs) + r.Add() - (ldr.SymValue(s) + int64(r.Off()))
++	}
+ 	switch r.Type() {
+ 	case objabi.R_CALLPOWER:
+ 
+ 		// If branch offset is too far then create a trampoline.
+ 
+-		if (ctxt.IsExternal() && ldr.SymSect(s) != ldr.SymSect(rs)) || (ctxt.IsInternal() && int64(int32(t<<6)>>6) != t) || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
++		if (ctxt.IsExternal() && ldr.SymSect(s) != ldr.SymSect(rs)) || (ctxt.IsInternal() && int64(int32(t<<6)>>6) != t) || ldr.SymValue(rs) == 0 || (*ld.FlagDebugTramp > 1 && ldr.SymPkg(s) != ldr.SymPkg(rs)) {
+ 			var tramp loader.Sym
+ 			for i := 0; ; i++ {
+ 
+@@ -769,7 +775,7 @@ func gentramp(ctxt *ld.Link, ldr *loader.Loader, tramp *loader.SymbolBuilder, ta
+ 
+ 		// With external linking, the target address must be
+ 		// relocated using LO and HA
+-		if ctxt.IsExternal() {
++		if ctxt.IsExternal() || ldr.SymValue(target) == 0 {
+ 			r := loader.Reloc{
+ 				Off:  0,
+ 				Type: objabi.R_ADDRPOWER,
+-- 
+2.27.0
+

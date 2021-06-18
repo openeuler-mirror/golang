@@ -1,0 +1,208 @@
+From 4a48a7d7bda25a844a7e597e96041b55c9f32d4d Mon Sep 17 00:00:00 2001
+From: Jay Conrod <jayconrod@google.com>
+Date: Fri, 22 Jan 2021 14:27:24 -0500
+Subject: [PATCH 07/44] [release-branch.go1.15] cmd/go: don't lookup the path
+ for CC when invoking cgo
+
+Previously, if CC was a path without separators (like gcc or clang),
+we'd look it up in PATH in cmd/go using internal/execabs.LookPath,
+then pass the resolved path to cgo in CC.
+
+This caused a regression: if the directory in PATH containing CC has a
+space, cgo splits it and interprets it as multiple arguments.
+
+With this change, cmd/go no longer resolves CC before invoking
+cgo. cgo does the path lookup on each invocation. This reverts the
+security fix CL 284780, but that was redundant with the addition of
+internal/execabs (CL 955304), which still protects us.
+
+NOTE: This CL includes a related test fix from CL 286292.
+
+Fixes #43860
+
+Change-Id: I65d91a1e303856df8653881eb6e2e75a3bf95c49
+Reviewed-on: https://go-review.googlesource.com/c/go/+/285873
+Trust: Jay Conrod <jayconrod@google.com>
+Run-TryBot: Jay Conrod <jayconrod@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Bryan C. Mills <bcmills@google.com>
+(cherry picked from commit a2cef9b544708ecae983ed8836ee2425a28aab68)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/285954
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/4a48a7d7bda25a844a7e597e96041b55c9f32d4d
+
+---
+ src/cmd/go/internal/work/action.go            |  3 -
+ src/cmd/go/internal/work/exec.go              | 27 ++-------
+ src/cmd/go/testdata/script/cgo_path.txt       | 12 +++-
+ src/cmd/go/testdata/script/cgo_path_space.txt | 56 +++++++++++++++++++
+ 4 files changed, 72 insertions(+), 26 deletions(-)
+ create mode 100644 src/cmd/go/testdata/script/cgo_path_space.txt
+
+diff --git a/src/cmd/go/internal/work/action.go b/src/cmd/go/internal/work/action.go
+index 03ca301bdd..6b5f9e4807 100644
+--- a/src/cmd/go/internal/work/action.go
++++ b/src/cmd/go/internal/work/action.go
+@@ -56,9 +56,6 @@ type Builder struct {
+ 	id           sync.Mutex
+ 	toolIDCache  map[string]string // tool name -> tool ID
+ 	buildIDCache map[string]string // file name -> build ID
+-
+-	cgoEnvOnce  sync.Once
+-	cgoEnvCache []string
+ }
+ 
+ // NOTE: Much of Action would not need to be exported if not for test.
+diff --git a/src/cmd/go/internal/work/exec.go b/src/cmd/go/internal/work/exec.go
+index f5f9951afa..eb1efd9f82 100644
+--- a/src/cmd/go/internal/work/exec.go
++++ b/src/cmd/go/internal/work/exec.go
+@@ -1081,7 +1081,10 @@ func (b *Builder) vet(a *Action) error {
+ 	}
+ 
+ 	// TODO(rsc): Why do we pass $GCCGO to go vet?
+-	env := b.cgoEnv()
++	env := b.cCompilerEnv()
++	if cfg.BuildToolchainName == "gccgo" {
++		env = append(env, "GCCGO="+BuildToolchain.compiler())
++	}
+ 
+ 	p := a.Package
+ 	tool := VetTool
+@@ -2015,24 +2018,6 @@ func (b *Builder) cCompilerEnv() []string {
+ 	return []string{"TERM=dumb"}
+ }
+ 
+-// cgoEnv returns environment variables to set when running cgo.
+-// Some of these pass through to cgo running the C compiler,
+-// so it includes cCompilerEnv.
+-func (b *Builder) cgoEnv() []string {
+-	b.cgoEnvOnce.Do(func() {
+-		cc, err := exec.LookPath(b.ccExe()[0])
+-		if err != nil || filepath.Base(cc) == cc { // reject relative path
+-			cc = "/missing-cc"
+-		}
+-		gccgo := GccgoBin
+-		if filepath.Base(gccgo) == gccgo { // reject relative path
+-			gccgo = "/missing-gccgo"
+-		}
+-		b.cgoEnvCache = append(b.cCompilerEnv(), "CC="+cc, "GCCGO="+gccgo)
+-	})
+-	return b.cgoEnvCache
+-}
+-
+ // mkdir makes the named directory.
+ func (b *Builder) Mkdir(dir string) error {
+ 	// Make Mkdir(a.Objdir) a no-op instead of an error when a.Objdir == "".
+@@ -2622,7 +2607,7 @@ func (b *Builder) cgo(a *Action, cgoExe, objdir string, pcCFLAGS, pcLDFLAGS, cgo
+ 	// along to the host linker. At this point in the code, cgoLDFLAGS
+ 	// consists of the original $CGO_LDFLAGS (unchecked) and all the
+ 	// flags put together from source code (checked).
+-	cgoenv := b.cgoEnv()
++	cgoenv := b.cCompilerEnv()
+ 	if len(cgoLDFLAGS) > 0 {
+ 		flags := make([]string, len(cgoLDFLAGS))
+ 		for i, f := range cgoLDFLAGS {
+@@ -2843,7 +2828,7 @@ func (b *Builder) dynimport(a *Action, p *load.Package, objdir, importGo, cgoExe
+ 	if p.Standard && p.ImportPath == "runtime/cgo" {
+ 		cgoflags = []string{"-dynlinker"} // record path to dynamic linker
+ 	}
+-	return b.run(a, p.Dir, p.ImportPath, b.cgoEnv(), cfg.BuildToolexec, cgoExe, "-dynpackage", p.Name, "-dynimport", dynobj, "-dynout", importGo, cgoflags)
++	return b.run(a, p.Dir, p.ImportPath, b.cCompilerEnv(), cfg.BuildToolexec, cgoExe, "-dynpackage", p.Name, "-dynimport", dynobj, "-dynout", importGo, cgoflags)
+ }
+ 
+ // Run SWIG on all SWIG input files.
+diff --git a/src/cmd/go/testdata/script/cgo_path.txt b/src/cmd/go/testdata/script/cgo_path.txt
+index 0d15998426..3eba71bc15 100644
+--- a/src/cmd/go/testdata/script/cgo_path.txt
++++ b/src/cmd/go/testdata/script/cgo_path.txt
+@@ -1,12 +1,20 @@
+ [!cgo] skip
+ 
++# Set CC explicitly to something that requires a PATH lookup.
++# Normally, the default is gcc or clang, but if CC was set during make.bash,
++# that becomes the default.
++[exec:clang] env CC=clang
++[exec:gcc] env CC=gcc
++[!exec:clang] [!exec:gcc] skip 'Unknown C compiler'
++
+ env GOCACHE=$WORK/gocache  # Looking for compile flags, so need a clean cache.
+ [!windows] env PATH=.:$PATH
+-[!windows] chmod 0777 p/gcc p/clang
++[!windows] chmod 0755 p/gcc p/clang
+ [!windows] exists -exec p/gcc p/clang
+ [windows] exists -exec p/gcc.bat p/clang.bat
+ ! exists p/bug.txt
+-go build -x
++! go build -x
++stderr '^cgo: exec (clang|gcc): (clang|gcc) resolves to executable in current directory \(.[/\\](clang|gcc)(.bat)?\)$'
+ ! exists p/bug.txt
+ 
+ -- go.mod --
+diff --git a/src/cmd/go/testdata/script/cgo_path_space.txt b/src/cmd/go/testdata/script/cgo_path_space.txt
+new file mode 100644
+index 0000000000..654295dc69
+--- /dev/null
++++ b/src/cmd/go/testdata/script/cgo_path_space.txt
+@@ -0,0 +1,56 @@
++# Check that if the PATH directory containing the C compiler has a space,
++# we can still use that compiler with cgo.
++# Verifies #43808.
++[!cgo] skip
++
++# Set CC explicitly to something that requires a PATH lookup.
++# Normally, the default is gcc or clang, but if CC was set during make.bash,
++# that becomes the default.
++[exec:clang] env CC=clang
++[exec:gcc] env CC=gcc
++[!exec:clang] [!exec:gcc] skip 'Unknown C compiler'
++
++[!windows] chmod 0755 $WORK/'program files'/clang
++[!windows] chmod 0755 $WORK/'program files'/gcc
++[!windows] exists -exec $WORK/'program files'/clang
++[!windows] exists -exec $WORK/'program files'/gcc
++[!windows] env PATH=$WORK/'program files':$PATH
++[windows] exists -exec $WORK/'program files'/gcc.bat
++[windows] exists -exec $WORK/'program files'/clang.bat
++[windows] env PATH=$WORK\'program files';%PATH%
++
++! exists $WORK/log.txt
++? go build -x
++exists $WORK/log.txt
++rm $WORK/log.txt
++
++# TODO(#41400, #43078): when CC is set explicitly, it should be allowed to
++# contain spaces separating arguments, and it should be possible to quote
++# arguments with spaces (including the path), as in CGO_CFLAGS and other
++# variables. For now, this doesn't work.
++[!windows] env CC=$WORK/'program files'/gcc
++[windows] env CC=$WORK\'program files'\gcc.bat
++! go build -x
++! exists $WORK/log.txt
++
++-- go.mod --
++module m
++
++-- m.go --
++package m
++
++// #define X 1
++import "C"
++
++-- $WORK/program files/gcc --
++#!/bin/sh
++
++echo ok >$WORK/log.txt
++-- $WORK/program files/clang --
++#!/bin/sh
++
++echo ok >$WORK/log.txt
++-- $WORK/program files/gcc.bat --
++echo ok >%WORK%\log.txt
++-- $WORK/program files/clang.bat --
++echo ok >%WORK%\log.txt
+-- 
+2.27.0
+
