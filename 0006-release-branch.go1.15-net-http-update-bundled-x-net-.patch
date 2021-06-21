@@ -1,0 +1,106 @@
+From a01db0df00fed281f6a9673eb93fe6acae6197cf Mon Sep 17 00:00:00 2001
+From: Damien Neil <dneil@google.com>
+Date: Fri, 29 Jan 2021 11:01:37 -0800
+Subject: [PATCH 06/44] [release-branch.go1.15] net/http: update bundled
+ x/net/http2
+
+Updates bundled http2 to x/net git rev 16c2bbf55 for:
+
+	http2: send a nil error if we cancel a delayed body write
+	https://golang.org/cl/288013
+
+	http2: wait until the request body has been written
+	https://golang.org/cl/288012
+
+Created by:
+
+go mod edit -replace=golang.org/x/net=golang.org/x/net@release-branch.go1.15-bundle
+GOFLAGS='-mod=mod' go generate -run=bundle std
+go mod edit -dropreplace=golang.org/x/net
+go get -d golang.org/x/net@release-branch.go1.15
+go mod tidy
+go mod vendor
+
+Fixes golang/go#42539
+
+Change-Id: I299c6d4a67ebc036e45c978e4d03cba73717b363
+Reviewed-on: https://go-review.googlesource.com/c/go/+/288112
+Trust: Damien Neil <dneil@google.com>
+Run-TryBot: Damien Neil <dneil@google.com>
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/a01db0df00fed281f6a9673eb93fe6acae6197cf
+
+---
+ src/net/http/h2_bundle.go | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/src/net/http/h2_bundle.go b/src/net/http/h2_bundle.go
+index b03b84d2f3..678c6eb9d4 100644
+--- a/src/net/http/h2_bundle.go
++++ b/src/net/http/h2_bundle.go
+@@ -7592,6 +7592,9 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 			// we can keep it.
+ 			bodyWriter.cancel()
+ 			cs.abortRequestBodyWrite(http2errStopReqBodyWrite)
++			if hasBody && !bodyWritten {
++				<-bodyWriter.resc
++			}
+ 		}
+ 		if re.err != nil {
+ 			cc.forgetStreamID(cs.ID)
+@@ -7612,6 +7615,7 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 			} else {
+ 				bodyWriter.cancel()
+ 				cs.abortRequestBodyWrite(http2errStopReqBodyWriteAndCancel)
++				<-bodyWriter.resc
+ 			}
+ 			cc.forgetStreamID(cs.ID)
+ 			return nil, cs.getStartedWrite(), http2errTimeout
+@@ -7621,6 +7625,7 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 			} else {
+ 				bodyWriter.cancel()
+ 				cs.abortRequestBodyWrite(http2errStopReqBodyWriteAndCancel)
++				<-bodyWriter.resc
+ 			}
+ 			cc.forgetStreamID(cs.ID)
+ 			return nil, cs.getStartedWrite(), ctx.Err()
+@@ -7630,6 +7635,7 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 			} else {
+ 				bodyWriter.cancel()
+ 				cs.abortRequestBodyWrite(http2errStopReqBodyWriteAndCancel)
++				<-bodyWriter.resc
+ 			}
+ 			cc.forgetStreamID(cs.ID)
+ 			return nil, cs.getStartedWrite(), http2errRequestCanceled
+@@ -7639,6 +7645,7 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 			// forgetStreamID.
+ 			return nil, cs.getStartedWrite(), cs.resetErr
+ 		case err := <-bodyWriter.resc:
++			bodyWritten = true
+ 			// Prefer the read loop's response, if available. Issue 16102.
+ 			select {
+ 			case re := <-readLoopResCh:
+@@ -7649,7 +7656,6 @@ func (cc *http2ClientConn) roundTrip(req *Request) (res *Response, gotErrAfterRe
+ 				cc.forgetStreamID(cs.ID)
+ 				return nil, cs.getStartedWrite(), err
+ 			}
+-			bodyWritten = true
+ 			if d := cc.responseHeaderTimeout(); d != 0 {
+ 				timer := time.NewTimer(d)
+ 				defer timer.Stop()
+@@ -9060,7 +9066,9 @@ func (t *http2Transport) getBodyWriterState(cs *http2clientStream, body io.Reade
+ 
+ func (s http2bodyWriterState) cancel() {
+ 	if s.timer != nil {
+-		s.timer.Stop()
++		if s.timer.Stop() {
++			s.resc <- nil
++		}
+ 	}
+ }
+ 
+-- 
+2.27.0
+

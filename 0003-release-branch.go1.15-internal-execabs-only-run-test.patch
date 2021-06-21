@@ -1,0 +1,54 @@
+From e540758b604dd46b682593e284cf77a61ce3fde6 Mon Sep 17 00:00:00 2001
+From: Roland Shoemaker <roland@golang.org>
+Date: Wed, 20 Jan 2021 09:06:12 -0800
+Subject: [PATCH 03/44] [release-branch.go1.15] internal/execabs: only run
+ tests on platforms that support them
+
+Fixes #43793
+
+Change-Id: I3bf022a28b194f0089ea96d93e56bbd9fb7e0aa8
+Reviewed-on: https://go-review.googlesource.com/c/go/+/285056
+Trust: Roland Shoemaker <roland@golang.org>
+Run-TryBot: Roland Shoemaker <roland@golang.org>
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/e540758b604dd46b682593e284cf77a61ce3fde6
+
+---
+ src/internal/execabs/execabs_test.go | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/internal/execabs/execabs_test.go b/src/internal/execabs/execabs_test.go
+index a0b88dd2a0..1a197b8701 100644
+--- a/src/internal/execabs/execabs_test.go
++++ b/src/internal/execabs/execabs_test.go
+@@ -7,6 +7,7 @@ package execabs
+ import (
+ 	"context"
+ 	"fmt"
++	"internal/testenv"
+ 	"io/ioutil"
+ 	"os"
+ 	"os/exec"
+@@ -30,6 +31,8 @@ func TestFixCmd(t *testing.T) {
+ }
+ 
+ func TestCommand(t *testing.T) {
++	testenv.MustHaveExec(t)
++
+ 	for _, cmd := range []func(string) *Cmd{
+ 		func(s string) *Cmd { return Command(s) },
+ 		func(s string) *Cmd { return CommandContext(context.Background(), s) },
+@@ -71,6 +74,8 @@ func TestCommand(t *testing.T) {
+ }
+ 
+ func TestLookPath(t *testing.T) {
++	testenv.MustHaveExec(t)
++
+ 	tmpDir, err := ioutil.TempDir("", "execabs-test")
+ 	if err != nil {
+ 		t.Fatalf("ioutil.TempDir failed: %s", err)
+-- 
+2.27.0
+

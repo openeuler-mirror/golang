@@ -1,0 +1,157 @@
+From a07f9d2f82598d2f5cc0df0e813a6a2309cb96e6 Mon Sep 17 00:00:00 2001
+From: Michael Pratt <mpratt@google.com>
+Date: Thu, 11 Mar 2021 12:28:45 -0500
+Subject: [PATCH 32/44] [release-branch.go1.15] runtime: non-strict
+ InlTreeIndex lookup in Frames.Next
+
+When using cgo, some of the frames can be provided by cgoTraceback, a
+cgo-provided function to generate C tracebacks. Unlike Go tracebacks,
+cgoTraceback has no particular guarantees that it produces valid
+tracebacks.
+
+If one of the (invalid) frames happens to put the PC in the alignment
+region at the end of a function (filled with int 3's on amd64), then
+Frames.Next will find a valid funcInfo for the PC, but pcdatavalue will
+panic because PCDATA doesn't cover this PC.
+
+Tolerate this case by doing a non-strict PCDATA lookup. We'll still show
+a bogus frame, but at least avoid throwing.
+
+For #44971
+Fixes #45302
+
+Change-Id: I9eed728470d6f264179a7615bd19845c941db78c
+Reviewed-on: https://go-review.googlesource.com/c/go/+/301369
+Trust: Michael Pratt <mpratt@google.com>
+Run-TryBot: Michael Pratt <mpratt@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+(cherry picked from commit e4a4161f1f3157550846e1b6bd4fe83aae15778e)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/305890
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/a07f9d2f82598d2f5cc0df0e813a6a2309cb96e6
+
+---
+ src/runtime/symtab.go      |  4 +-
+ src/runtime/symtab_test.go | 85 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 88 insertions(+), 1 deletion(-)
+
+diff --git a/src/runtime/symtab.go b/src/runtime/symtab.go
+index 1e86662adc..c77d513e74 100644
+--- a/src/runtime/symtab.go
++++ b/src/runtime/symtab.go
+@@ -102,7 +102,9 @@ func (ci *Frames) Next() (frame Frame, more bool) {
+ 		name := funcname(funcInfo)
+ 		if inldata := funcdata(funcInfo, _FUNCDATA_InlTree); inldata != nil {
+ 			inltree := (*[1 << 20]inlinedCall)(inldata)
+-			ix := pcdatavalue(funcInfo, _PCDATA_InlTreeIndex, pc, nil)
++			// Non-strict as cgoTraceback may have added bogus PCs
++			// with a valid funcInfo but invalid PCDATA.
++			ix := pcdatavalue1(funcInfo, _PCDATA_InlTreeIndex, pc, nil, false)
+ 			if ix >= 0 {
+ 				// Note: entry is not modified. It always refers to a real frame, not an inlined one.
+ 				f = nil
+diff --git a/src/runtime/symtab_test.go b/src/runtime/symtab_test.go
+index 01e5002659..ffa07c7f3a 100644
+--- a/src/runtime/symtab_test.go
++++ b/src/runtime/symtab_test.go
+@@ -8,6 +8,7 @@ import (
+ 	"runtime"
+ 	"strings"
+ 	"testing"
++	"unsafe"
+ )
+ 
+ func TestCaller(t *testing.T) {
+@@ -165,3 +166,87 @@ func TestNilName(t *testing.T) {
+ 		t.Errorf("Name() = %q, want %q", got, "")
+ 	}
+ }
++
++var dummy int
++
++func inlined() {
++	// Side effect to prevent elimination of this entire function.
++	dummy = 42
++}
++
++// A function with an InlTree. Returns a PC within the function body.
++//
++// No inline to ensure this complete function appears in output.
++//
++//go:noinline
++func tracebackFunc(t *testing.T) uintptr {
++	// This body must be more complex than a single call to inlined to get
++	// an inline tree.
++	inlined()
++	inlined()
++
++	// Acquire a PC in this function.
++	pc, _, _, ok := runtime.Caller(0)
++	if !ok {
++		t.Fatalf("Caller(0) got ok false, want true")
++	}
++
++	return pc
++}
++
++// Test that CallersFrames handles PCs in the alignment region between
++// functions (int 3 on amd64) without crashing.
++//
++// Go will never generate a stack trace containing such an address, as it is
++// not a valid call site. However, the cgo traceback function passed to
++// runtime.SetCgoTraceback may not be completely accurate and may incorrect
++// provide PCs in Go code or the alignement region between functions.
++//
++// Go obviously doesn't easily expose the problematic PCs to running programs,
++// so this test is a bit fragile. Some details:
++//
++// * tracebackFunc is our target function. We want to get a PC in the
++//   alignment region following this function. This function also has other
++//   functions inlined into it to ensure it has an InlTree (this was the source
++//   of the bug in issue 44971).
++//
++// * We acquire a PC in tracebackFunc, walking forwards until FuncForPC says
++//   we're in a new function. The last PC of the function according to FuncForPC
++//   should be in the alignment region (assuming the function isn't already
++//   perfectly aligned).
++//
++// This is a regression test for issue 44971.
++func TestFunctionAlignmentTraceback(t *testing.T) {
++	pc := tracebackFunc(t)
++
++	// Double-check we got the right PC.
++	f := runtime.FuncForPC(pc)
++	if !strings.HasSuffix(f.Name(), "tracebackFunc") {
++		t.Fatalf("Caller(0) = %+v, want tracebackFunc", f)
++	}
++
++	// Iterate forward until we find a different function. Back up one
++	// instruction is (hopefully) an alignment instruction.
++	for runtime.FuncForPC(pc) == f {
++		pc++
++	}
++	pc--
++
++	// Is this an alignment region filler instruction? We only check this
++	// on amd64 for simplicity. If this function has no filler, then we may
++	// get a false negative, but will never get a false positive.
++	if runtime.GOARCH == "amd64" {
++		code := *(*uint8)(unsafe.Pointer(pc))
++		if code != 0xcc { // INT $3
++			t.Errorf("PC %v code got %#x want 0xcc", pc, code)
++		}
++	}
++
++	// Finally ensure that Frames.Next doesn't crash when processing this
++	// PC.
++	frames := runtime.CallersFrames([]uintptr{pc})
++	frame, _ := frames.Next()
++	if frame.Func != f {
++		t.Errorf("frames.Next() got %+v want %+v", frame.Func, f)
++	}
++}
+-- 
+2.27.0
+

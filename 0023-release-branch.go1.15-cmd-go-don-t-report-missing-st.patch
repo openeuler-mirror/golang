@@ -1,0 +1,121 @@
+From ba3dc70dc5c9f2162024b09d6b13bda1f4575b01 Mon Sep 17 00:00:00 2001
+From: Jay Conrod <jayconrod@google.com>
+Date: Thu, 4 Mar 2021 11:50:31 -0500
+Subject: [PATCH 23/44] [release-branch.go1.15] cmd/go: don't report missing
+ std import errors for tidy and vendor
+
+'go mod tidy' and 'go mod vendor' normally report errors when a
+package can't be imported, even if the import appears in a file that
+wouldn't be compiled by the current version of Go. These errors are
+common for packages introduced in higher versions of Go, like "embed"
+in 1.16.
+
+This change causes 'go mod tidy' and 'go mod vendor' to ignore
+missing package errors if the import path appears to come from the
+standard library because it lacks a dot in the first path element.
+
+NOTE: This change is not a clean cherry-pick of CL 298749 because
+parts of modload were substantially rewritten after 1.15.
+
+Fixes #44792
+Updates #27063
+
+Change-Id: I61d6443e77ab95fd8c0d1514f57ef4c8885a77cc
+Reviewed-on: https://go-review.googlesource.com/c/go/+/298749
+Trust: Jay Conrod <jayconrod@google.com>
+Run-TryBot: Jay Conrod <jayconrod@google.com>
+Reviewed-by: Bryan C. Mills <bcmills@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+(cherry picked from commit 56d52e661114be60fb1893b034ac0c5976b622af)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/298950
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/ba3dc70dc5c9f2162024b09d6b13bda1f4575b01
+
+---
+ src/cmd/go/internal/modcmd/tidy.go            | 1 +
+ src/cmd/go/internal/modcmd/vendor.go          | 1 +
+ src/cmd/go/internal/modload/init.go           | 6 ++++++
+ src/cmd/go/internal/modload/load.go           | 5 +++++
+ src/cmd/go/testdata/script/mod_tidy_error.txt | 4 ++--
+ 5 files changed, 15 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/go/internal/modcmd/tidy.go b/src/cmd/go/internal/modcmd/tidy.go
+index af2b04c0c2..5ff847485c 100644
+--- a/src/cmd/go/internal/modcmd/tidy.go
++++ b/src/cmd/go/internal/modcmd/tidy.go
+@@ -42,6 +42,7 @@ func runTidy(cmd *base.Command, args []string) {
+ 		base.Fatalf("go mod tidy: no arguments allowed")
+ 	}
+ 
++	modload.SilenceMissingStdImports = true
+ 	modload.LoadALL()
+ 	modload.TidyBuildList()
+ 	modTidyGoSum() // updates memory copy; WriteGoMod on next line flushes it out
+diff --git a/src/cmd/go/internal/modcmd/vendor.go b/src/cmd/go/internal/modcmd/vendor.go
+index 8509ceb7a8..5a5bb943a5 100644
+--- a/src/cmd/go/internal/modcmd/vendor.go
++++ b/src/cmd/go/internal/modcmd/vendor.go
+@@ -47,6 +47,7 @@ func runVendor(cmd *base.Command, args []string) {
+ 	if len(args) != 0 {
+ 		base.Fatalf("go mod vendor: vendor takes no arguments")
+ 	}
++	modload.SilenceMissingStdImports = true
+ 	pkgs := modload.LoadVendor()
+ 
+ 	vdir := filepath.Join(modload.ModRoot(), "vendor")
+diff --git a/src/cmd/go/internal/modload/init.go b/src/cmd/go/internal/modload/init.go
+index 664a2a1594..2360feef04 100644
+--- a/src/cmd/go/internal/modload/init.go
++++ b/src/cmd/go/internal/modload/init.go
+@@ -56,6 +56,12 @@ var (
+ 	CmdModModule string // module argument for 'go mod init'
+ 
+ 	allowMissingModuleImports bool
++
++	// SilenceMissingStdImports indicates that LoadALL should not print an error
++	// or terminate the process if an imported package is missing, and the import
++	// path looks like it might be in the standard library (perhaps in a future
++	// Go version).
++	SilenceMissingStdImports bool
+ )
+ 
+ // ModFile returns the parsed go.mod file.
+diff --git a/src/cmd/go/internal/modload/load.go b/src/cmd/go/internal/modload/load.go
+index 30992e0cc2..e5ea1a6c23 100644
+--- a/src/cmd/go/internal/modload/load.go
++++ b/src/cmd/go/internal/modload/load.go
+@@ -433,6 +433,11 @@ func loadAll(testAll bool) []string {
+ 	var paths []string
+ 	for _, pkg := range loaded.pkgs {
+ 		if pkg.err != nil {
++			if impErr := (*ImportMissingError)(nil); SilenceMissingStdImports &&
++				errors.As(pkg.err, &impErr) &&
++				search.IsStandardImportPath(impErr.Path) {
++				continue
++			}
+ 			base.Errorf("%s: %v", pkg.stackText(), pkg.err)
+ 			continue
+ 		}
+diff --git a/src/cmd/go/testdata/script/mod_tidy_error.txt b/src/cmd/go/testdata/script/mod_tidy_error.txt
+index b6c24ceaf7..395537b1a7 100644
+--- a/src/cmd/go/testdata/script/mod_tidy_error.txt
++++ b/src/cmd/go/testdata/script/mod_tidy_error.txt
+@@ -4,12 +4,12 @@ env GO111MODULE=on
+ # 'go mod tidy' and 'go mod vendor' should not hide loading errors.
+ 
+ ! go mod tidy
+-stderr '^issue27063 imports\n\tnonexist: package nonexist is not in GOROOT \(.*\)'
++! stderr 'package nonexist is not in GOROOT'
+ stderr '^issue27063 imports\n\tnonexist.example.com: cannot find module providing package nonexist.example.com'
+ stderr '^issue27063 imports\n\tissue27063/other imports\n\tother.example.com/nonexist: cannot find module providing package other.example.com/nonexist'
+ 
+ ! go mod vendor
+-stderr '^issue27063 imports\n\tnonexist: package nonexist is not in GOROOT \(.*\)'
++! stderr 'package nonexist is not in GOROOT'
+ stderr '^issue27063 imports\n\tnonexist.example.com: cannot find module providing package nonexist.example.com'
+ stderr '^issue27063 imports\n\tissue27063/other imports\n\tother.example.com/nonexist: cannot find module providing package other.example.com/nonexist'
+ 
+-- 
+2.27.0
+

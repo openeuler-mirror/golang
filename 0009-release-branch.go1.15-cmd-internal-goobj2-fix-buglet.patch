@@ -1,0 +1,73 @@
+From 58dc4452620ebefa75742661c538b8406b213b4a Mon Sep 17 00:00:00 2001
+From: Than McIntosh <thanm@google.com>
+Date: Tue, 15 Dec 2020 15:54:25 -0500
+Subject: [PATCH 09/44] [release-branch.go1.15] cmd/internal/goobj2: fix buglet
+ in object file reader
+
+The code in the Go object file reader was casting a pointer to mmaped
+memory into a large array prior to performing a read of the
+relocations section:
+
+	return (*[1<<20]Reloc)(unsafe.Pointer(&r.b[off]))[:n:n]
+
+For very large object files, this artificial array isn't large enough
+(that is, there are more than 1048576 relocs to read), so update the
+code to use a larger artifical array size.
+
+Fixes #43214.
+Updates #41621.
+
+Change-Id: Ic047c8aef4f8a3839f2e7e3594bce652ebd6bd5b
+Reviewed-on: https://go-review.googlesource.com/c/go/+/278492
+Run-TryBot: Than McIntosh <thanm@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+Reviewed-by: Jeremy Faller <jeremy@golang.org>
+Trust: Than McIntosh <thanm@google.com>
+(cherry picked from commit f4e7a6b905ce60448e506a3f6578d01b60602cdd)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/278673
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/58dc4452620ebefa75742661c538b8406b213b4a
+
+---
+ src/cmd/internal/goobj2/objfile.go | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/internal/goobj2/objfile.go b/src/cmd/internal/goobj2/objfile.go
+index 7f728e4f76..aba9b9856e 100644
+--- a/src/cmd/internal/goobj2/objfile.go
++++ b/src/cmd/internal/goobj2/objfile.go
+@@ -379,6 +379,11 @@ func (a *Aux) Write(w *Writer) { w.Bytes(a[:]) }
+ // for testing
+ func (a *Aux) fromBytes(b []byte) { copy(a[:], b) }
+ 
++// Used to construct an artifically large array type when reading an
++// item from the object file relocs section or aux sym section (needs
++// to work on 32-bit as well as 64-bit). See issue 41621.
++const huge = (1<<31 - 1) / RelocSize
++
+ // Referenced symbol name.
+ //
+ // Serialized format:
+@@ -652,7 +657,7 @@ func (r *Reader) Reloc(i int, j int) *Reloc {
+ func (r *Reader) Relocs(i int) []Reloc {
+ 	off := r.RelocOff(i, 0)
+ 	n := r.NReloc(i)
+-	return (*[1 << 20]Reloc)(unsafe.Pointer(&r.b[off]))[:n:n]
++	return (*[huge]Reloc)(unsafe.Pointer(&r.b[off]))[:n:n]
+ }
+ 
+ // NAux returns the number of aux symbols of the i-th symbol.
+@@ -678,7 +683,7 @@ func (r *Reader) Aux(i int, j int) *Aux {
+ func (r *Reader) Auxs(i int) []Aux {
+ 	off := r.AuxOff(i, 0)
+ 	n := r.NAux(i)
+-	return (*[1 << 20]Aux)(unsafe.Pointer(&r.b[off]))[:n:n]
++	return (*[huge]Aux)(unsafe.Pointer(&r.b[off]))[:n:n]
+ }
+ 
+ // DataOff returns the offset of the i-th symbol's data.
+-- 
+2.27.0
+

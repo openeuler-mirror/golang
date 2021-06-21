@@ -1,0 +1,52 @@
+From 069f9d96d179becc61231d566c9a75f1ec26e991 Mon Sep 17 00:00:00 2001
+From: Ian Lance Taylor <iant@golang.org>
+Date: Fri, 11 Dec 2020 19:10:00 -0800
+Subject: [PATCH 01/44] [release-branch.go1.15] doc/go1.15: mention 1.15.3 cgo
+ restriction on empty structs
+
+For #40954
+
+Change-Id: I6a30aed31a16e820817f4ca5c7f591222e922946
+Reviewed-on: https://go-review.googlesource.com/c/go/+/277432
+Trust: Ian Lance Taylor <iant@golang.org>
+Reviewed-by: Keith Randall <khr@golang.org>
+(cherry picked from commit 129bb1917b4914f0743ec9b4ef0dfb74df39c07d)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/278573
+Run-TryBot: Ian Lance Taylor <iant@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/069f9d96d179becc61231d566c9a75f1ec26e991
+
+---
+ doc/go1.15.html | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/doc/go1.15.html b/doc/go1.15.html
+index c691bf3bd5..c9997c0ca3 100644
+--- a/doc/go1.15.html
++++ b/doc/go1.15.html
+@@ -397,6 +397,19 @@ Do not send CLs removing the interior tags from such phrases.
+   documentation</a> for more information.
+ </p>
+ 
++<p><!-- CL 250940 -->
++  In Go 1.15.3 and later, cgo will not permit Go code to allocate an
++  undefined struct type (a C struct defined as just <code>struct
++  S;</code> or similar) on the stack or heap.
++  Go code will only be permitted to use pointers to those types.
++  Allocating an instance of such a struct and passing a pointer, or a
++  full struct value, to C code was always unsafe and unlikely to work
++  correctly; it is now forbidden.
++  The fix is to either rewrite the Go code to use only pointers, or to
++  ensure that the Go code sees the full definition of the struct by
++  including the appropriate C header file.
++</p>
++
+ <h3 id="commonname">X.509 CommonName deprecation</h3>
+ 
+ <p><!-- CL 231379 -->
+-- 
+2.27.0
+

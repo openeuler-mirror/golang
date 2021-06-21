@@ -1,0 +1,107 @@
+From f17b659d0a9a43235f67c155b08023124b3fc35b Mon Sep 17 00:00:00 2001
+From: Keith Randall <khr@golang.org>
+Date: Tue, 23 Mar 2021 14:48:47 -0700
+Subject: [PATCH 31/44] [release-branch.go1.15] cmd/compile: disable
+ shortcircuit optimization for intertwined phi values
+
+We need to be careful that when doing value graph surgery, we not
+re-substitute a value that has already been substituted. That can lead
+to confusing a previous iteration's value with the current iteration's
+value.
+
+The simple fix in this CL just aborts the optimization if it detects
+intertwined phis (a phi which is the argument to another phi). It
+might be possible to keep the optimization with a more complicated
+CL, but:
+  1) This CL is clearly safe to backport.
+  2) There were no instances of this abort triggering in
+     all.bash, prior to the test introduced in this CL.
+
+Fixes #45187
+
+Change-Id: I2411dca03948653c053291f6829a76bec0c32330
+Reviewed-on: https://go-review.googlesource.com/c/go/+/304251
+Trust: Keith Randall <khr@golang.org>
+Trust: Josh Bleecher Snyder <josharian@gmail.com>
+Run-TryBot: Keith Randall <khr@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Josh Bleecher Snyder <josharian@gmail.com>
+(cherry picked from commit 771c57e68ed5ef2bbb0eafc0d48419f59d143932)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/304529
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/f17b659d0a9a43235f67c155b08023124b3fc35b
+
+---
+ src/cmd/compile/internal/ssa/shortcircuit.go | 18 ++++++++++++
+ test/fixedbugs/issue45175.go                 | 29 ++++++++++++++++++++
+ 2 files changed, 47 insertions(+)
+ create mode 100644 test/fixedbugs/issue45175.go
+
+diff --git a/src/cmd/compile/internal/ssa/shortcircuit.go b/src/cmd/compile/internal/ssa/shortcircuit.go
+index c5df457c4e..9cf29fe413 100644
+--- a/src/cmd/compile/internal/ssa/shortcircuit.go
++++ b/src/cmd/compile/internal/ssa/shortcircuit.go
+@@ -138,6 +138,24 @@ func shortcircuitBlock(b *Block) bool {
+ 	if len(b.Values) != nval+nOtherPhi {
+ 		return false
+ 	}
++	if nOtherPhi > 0 {
++		// Check for any phi which is the argument of another phi.
++		// These cases are tricky, as substitutions done by replaceUses
++		// are no longer trivial to do in any ordering. See issue 45175.
++		m := make(map[*Value]bool, 1+nOtherPhi)
++		for _, v := range b.Values {
++			if v.Op == OpPhi {
++				m[v] = true
++			}
++		}
++		for v := range m {
++			for _, a := range v.Args {
++				if a != v && m[a] {
++					return false
++				}
++			}
++		}
++	}
+ 
+ 	// Locate index of first const phi arg.
+ 	cidx := -1
+diff --git a/test/fixedbugs/issue45175.go b/test/fixedbugs/issue45175.go
+new file mode 100644
+index 0000000000..02dfe8a0a9
+--- /dev/null
++++ b/test/fixedbugs/issue45175.go
+@@ -0,0 +1,29 @@
++// run
++
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package main
++
++//go:noinline
++func f(c bool) int {
++	b := true
++	x := 0
++	y := 1
++	for b {
++		b = false
++		y = x
++		x = 2
++		if c {
++			return 3
++		}
++	}
++	return y
++}
++
++func main() {
++	if got := f(false); got != 0 {
++		panic(got)
++	}
++}
+-- 
+2.27.0
+
