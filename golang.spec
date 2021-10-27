@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        4
+Release:        5
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -191,6 +191,14 @@ Patch6041:       0041-release-branch.go1.15-runtime-pprof-skip-tests-for-A.patch
 Patch6043:       0043-release-branch.go1.15-math-big-fix-TestShiftOverlap-.patch
 Patch6044:       0044-release-branch.go1.15-math-big-remove-the-s390x-asse.patch
 Patch6045:       0045-net-http-fix-hijack-hang-at-abortPendingRead.patch
+Patch6046:       0046-release-branch.go1.15-net-verify-results-from-Lookup.patch
+Patch6047:       0047-release-branch.go1.15-archive-zip-only-preallocate-F.patch
+Patch6048:       0048-release-branch.go1.15-net-http-httputil-always-remov.patch
+Patch6049:       0049-release-branch.go1.15-math-big-check-for-excessive-e.patch
+Patch6050:       0050-release-branch.go1.15-crypto-tls-test-key-type-when-.patch
+Patch6051:       0051-net-reject-leading-zeros-in-IP-address-parsers.patch
+Patch6052:       0052-release-branch.go1.16-misc-wasm-cmd-link-do-not-let-.patch
+Patch6053:       0053-net-http-httputil-close-incoming-ReverseProxy-reques.patch
 
 Patch9001:       0001-drop-hard-code-cert.patch
 
@@ -424,6 +432,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Wed Oct 27 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-5
+- fix CVE-2021-33195,CVE-2021-33196,CVE-2021-33197,CVE-2021-33198,CVE-2021-34558,CVE-2021-29923,CVE-2021-38297,CVE-2021-36221
+
 * Fri Jun 18 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-4
 - batch synchronization
 
