@@ -1,0 +1,49 @@
+From 69b943102868747ff2b62d9ada02c464d9984aef Mon Sep 17 00:00:00 2001
+From: Dmitri Shuralyov <dmitshur@golang.org>
+Date: Mon, 29 Mar 2021 11:19:23 -0400
+Subject: [PATCH 27/44] [release-branch.go1.15] net/http: update bundled
+ x/net/http2
+
+Bring in the change in CL 304309 with:
+
+	go mod edit -replace=golang.org/x/net=golang.org/x/net@release-branch.go1.15-bundle
+	GOFLAGS='-mod=mod' go generate -run=bundle std
+	go mod edit -dropreplace=golang.org/x/net
+	go get -d golang.org/x/net@release-branch.go1.15
+	go mod tidy
+	go mod vendor
+
+For #45076.
+Updates #40213.
+
+Change-Id: I68d5e1f2394508c9cf8627fb852dd9e906d45016
+Reviewed-on: https://go-review.googlesource.com/c/go/+/305489
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Trust: Emmanuel Odeke <emmanuel@orijtech.com>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+Reviewed-by: Emmanuel Odeke <emmanuel@orijtech.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/69b943102868747ff2b62d9ada02c464d9984aef
+
+---
+ src/net/http/h2_bundle.go | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/net/http/h2_bundle.go b/src/net/http/h2_bundle.go
+index 678c6eb9d4..3d83084702 100644
+--- a/src/net/http/h2_bundle.go
++++ b/src/net/http/h2_bundle.go
+@@ -8985,6 +8985,8 @@ func http2strSliceContains(ss []string, s string) bool {
+ 
+ type http2erringRoundTripper struct{ err error }
+ 
++func (rt http2erringRoundTripper) RoundTripErr() error { return rt.err }
++
+ func (rt http2erringRoundTripper) RoundTrip(*Request) (*Response, error) { return nil, rt.err }
+ 
+ // gzipReader wraps a response body so it can lazily
+-- 
+2.27.0
+

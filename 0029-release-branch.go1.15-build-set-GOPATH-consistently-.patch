@@ -1,0 +1,105 @@
+From 6df5d3a581380a85183c591d1fd9063a5e8e4b23 Mon Sep 17 00:00:00 2001
+From: Russ Cox <rsc@golang.org>
+Date: Tue, 26 Jan 2021 21:14:43 -0500
+Subject: [PATCH 29/44] [release-branch.go1.15] build: set GOPATH consistently
+ in run.bash, run.bat, run.rc
+
+We used to clear GOPATH in all the build scripts.
+Clearing GOPATH is misleading at best, since you just end up
+with the default GOPATH (%USERPROFILE%\go on Windows).
+Unless that's your GOROOT, in which case you end up with a
+fatal error from the go command (#43938).
+
+run.bash changed to setting GOPATH=/dev/null, which has no
+clear analogue on Windows.
+
+run.rc still clears GOPATH.
+
+Change them all to set GOPATH to a non-existent directory
+/nonexist-gopath or c:\nonexist-gopath.
+
+For #45238.
+Fixes #45239.
+
+Change-Id: I51edd66d37ff6a891b0d0541d91ecba97fbbb03d
+Reviewed-on: https://go-review.googlesource.com/c/go/+/288818
+Trust: Russ Cox <rsc@golang.org>
+Trust: Jason A. Donenfeld <Jason@zx2c4.com>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+Reviewed-by: Alex Brainman <alex.brainman@gmail.com>
+Reviewed-by: Jason A. Donenfeld <Jason@zx2c4.com>
+(cherry picked from commit bb6efb96092cc8ae398c29e3b052a0051c746f88)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/304773
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Alexander Rakoczy <alex@golang.org>
+Reviewed-by: Carlos Amedee <carlos@golang.org>
+Trust: Carlos Amedee <carlos@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/6df5d3a581380a85183c591d1fd9063a5e8e4b23
+
+---
+ src/run.bash | 10 +---------
+ src/run.bat  |  4 +---
+ src/run.rc   |  9 ++++-----
+ 3 files changed, 6 insertions(+), 17 deletions(-)
+
+diff --git a/src/run.bash b/src/run.bash
+index 706b4b60ee..2123c509f8 100755
+--- a/src/run.bash
++++ b/src/run.bash
+@@ -23,15 +23,7 @@ fi
+ 
+ eval $(../bin/go env)
+ export GOROOT   # The api test requires GOROOT to be set, so set it to match ../bin/go.
+-
+-# We disallow local import for non-local packages, if $GOROOT happens
+-# to be under $GOPATH, then some tests below will fail.  $GOPATH needs
+-# to be set to a non-empty string, else Go will set a default value
+-# that may also conflict with $GOROOT.  The $GOPATH value doesn't need
+-# to point to an actual directory, it just needs to pass the semantic
+-# checks performed by Go.  Use $GOROOT to define $GOPATH so that we
+-# don't blunder into a user-defined symbolic link.
+-export GOPATH=/dev/null
++export GOPATH=/nonexist-gopath
+ 
+ unset CDPATH	# in case user has it set
+ export GOBIN=$GOROOT/bin  # Issue 14340
+diff --git a/src/run.bat b/src/run.bat
+index c299671c13..edcaf52659 100644
+--- a/src/run.bat
++++ b/src/run.bat
+@@ -18,9 +18,7 @@ setlocal
+ 
+ set GOBUILDFAIL=0
+ 
+-:: we disallow local import for non-local packages, if %GOROOT% happens
+-:: to be under %GOPATH%, then some tests below will fail
+-set GOPATH=
++set GOPATH=c:\nonexist-gopath
+ :: Issue 14340: ignore GOBIN during all.bat.
+ set GOBIN=
+ set GOFLAGS=
+diff --git a/src/run.rc b/src/run.rc
+index ab7abfa991..a7b4801207 100755
+--- a/src/run.rc
++++ b/src/run.rc
+@@ -12,10 +12,9 @@ if(! test -f ../bin/go){
+ 
+ eval `{../bin/go env}
+ 
+-GOPATH = () # we disallow local import for non-local packages, if $GOROOT happens
+-            # to be under $GOPATH, then some tests below will fail
+-GOBIN = () # Issue 14340
+-GOFLAGS = ()
+-GO111MODULE = ()
++GOPATH=/nonexist-gopath
++GOBIN=() # Issue 14340
++GOFLAGS=()
++GO111MODULE=()
+ 
+ exec ../bin/go tool dist test -rebuild $*
+-- 
+2.27.0
+

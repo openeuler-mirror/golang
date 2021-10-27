@@ -1,0 +1,48 @@
+From ba7cac469b399b36e8d3e40ac57eb11688c53e00 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Cl=C3=A9ment=20Chigot?= <chigot.c@gmail.com>
+Date: Thu, 1 Apr 2021 10:06:05 +0200
+Subject: [PATCH 41/44] [release-branch.go1.15] runtime/pprof: skip tests for
+ AIX
+
+Most of the time, the pprof tests are passing, except
+for the builder. The reason is still unknown but I'd rather release
+the builder to avoid missing other more important bugs.
+
+Updates #45170
+
+Change-Id: I667543ee1ae309b7319c5b3676a0901b4d0ecf2e
+Reviewed-on: https://go-review.googlesource.com/c/go/+/306489
+Run-TryBot: Tobias Klauser <tobias.klauser@gmail.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Cherry Zhang <cherryyz@google.com>
+Trust: Lynn Boger <laboger@linux.vnet.ibm.com>
+(cherry picked from commit 7bfd681c2f11918c6245ad2906b2efc12eda2914)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/317369
+Reviewed-by: Heschi Kreinick <heschi@google.com>
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/ba7cac469b399b36e8d3e40ac57eb11688c53e00
+
+---
+ src/runtime/pprof/pprof_test.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/runtime/pprof/pprof_test.go b/src/runtime/pprof/pprof_test.go
+index 7149bfb31f..9c1c097206 100644
+--- a/src/runtime/pprof/pprof_test.go
++++ b/src/runtime/pprof/pprof_test.go
+@@ -280,7 +280,8 @@ func testCPUProfile(t *testing.T, matches matchFunc, need []string, avoid []stri
+ 
+ 	broken := false
+ 	switch runtime.GOOS {
+-	case "darwin", "dragonfly", "netbsd", "illumos", "solaris":
++	// See https://golang.org/issue/45170 for AIX.
++	case "darwin", "dragonfly", "netbsd", "illumos", "solaris", "aix":
+ 		broken = true
+ 	case "openbsd":
+ 		if runtime.GOARCH == "arm" || runtime.GOARCH == "arm64" {
+-- 
+2.27.0
+

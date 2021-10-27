@@ -1,7 +1,7 @@
 From 91062c2e4cbbf78a108919f6ed3ded1173937cf3 Mon Sep 17 00:00:00 2001
 From: Katie Hockman <katie@golang.org>
 Date: Mon, 1 Mar 2021 09:54:00 -0500
-Subject: [PATCH] [release-branch.go1.15-security] encoding/xml: prevent
+Subject: [PATCH 21/44] [release-branch.go1.15-security] encoding/xml: prevent
  infinite loop while decoding
 
 This change properly handles a TokenReader which
@@ -19,6 +19,10 @@ Reviewed-by: Roland Shoemaker <bracewell@google.com>
 Reviewed-by: Filippo Valsorda <valsorda@google.com>
 (cherry picked from commit e7ce1f6746223ec7b4caa3b1ece25d9be3864710)
 Reviewed-on: https://team-review.git.corp.google.com/c/golang/go-private/+/1014236
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/91062c2e4cbbf78a108919f6ed3ded1173937cf3
+
 ---
  src/encoding/xml/xml.go      |  19 ++++---
  src/encoding/xml/xml_test.go | 104 +++++++++++++++++++++++++++--------
