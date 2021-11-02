@@ -1,0 +1,97 @@
+From a69dc2bbc96ffea5f90aa0fa64cdccc6226f70b3 Mon Sep 17 00:00:00 2001
+From: chenjiankun <chenjiankun1@huawei.com>
+Date: Fri, 2 Jul 2021 17:19:00 +0800
+Subject: [PATCH] [PATCH 38/44] [release-branch.go1.15] std: update
+ golang.org/x/net to 20210428183841-261fb518b1ed
+
+Steps:
+  go get -d golang.org/x/net@release-branch.go1.15
+  go mod tidy
+  go mod vendor
+
+This http2 bundle does not need to be updated.
+
+Fixes #45711
+
+Change-Id: I085ca592dfc8d5d9c328a7979142e88e7130a813
+Reviewed-on: https://go-review.googlesource.com/c/go/+/314790
+Trust: Katie Hockman <katie@golang.org>
+Run-TryBot: Katie Hockman <katie@golang.org>
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/5aed4ce3c854bdbbb6dd5c1ccfa15c23d4b6c989
+---
+ src/go.mod                                           |  2 +-
+ src/go.sum                                           |  4 ++--
+ src/vendor/golang.org/x/net/http/httpguts/httplex.go | 11 +++++++----
+ src/vendor/modules.txt                               |  2 +-
+ 4 files changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/src/go.mod b/src/go.mod
+index 9c9026f..979f88e 100644
+--- a/src/go.mod
++++ b/src/go.mod
+@@ -4,7 +4,7 @@ go 1.12
+ 
+ require (
+ 	golang.org/x/crypto v0.0.0-20200124225646-8b5121be2f68
+-	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
++	golang.org/x/net v0.0.0-20210428183841-261fb518b1ed
+ 	golang.org/x/sys v0.0.0-20190529130038-5219a1e1c5f8 // indirect
+ 	golang.org/x/text v0.3.2 // indirect
+ )
+diff --git a/src/go.sum b/src/go.sum
+index e408f66..8bdf9ee 100644
+--- a/src/go.sum
++++ b/src/go.sum
+@@ -2,8 +2,8 @@ golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACk
+ golang.org/x/crypto v0.0.0-20200124225646-8b5121be2f68 h1:WPLCzSEbawp58wezcvLvLnvhiDJAai54ESbc41NdXS0=
+ golang.org/x/crypto v0.0.0-20200124225646-8b5121be2f68/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
+ golang.org/x/net v0.0.0-20190404232315-eb5bcb51f2a3/go.mod h1:t9HGtf8HONx5eT2rtn7q6eTqICYqUVnKs3thJo3Qplg=
+-golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7 h1:fHDIZ2oxGnUZRN6WgWFCbYBjH9uqVPRCUVUDhs0wnbA=
+-golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7/go.mod h1:z5CRVTTTmAJ677TzLLGU+0bjPO0LkuOLi4/5GtJWs/s=
++golang.org/x/net v0.0.0-20210428183841-261fb518b1ed h1:aunM0N/jnRHvQgZo3kYkfaAGet2kIMFOPIbopG5BhYw=
++golang.org/x/net v0.0.0-20210428183841-261fb518b1ed/go.mod h1:/O7V0waA8r7cgGh81Ro3o1hOxt32SMVPicZroKQ2sZA=
+ golang.org/x/sys v0.0.0-20190215142949-d0b11bdaac8a/go.mod h1:STP8DvDyc/dI5b8T5hshtkjS+E42TnysNCUPdjciGhY=
+ golang.org/x/sys v0.0.0-20190412213103-97732733099d/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+ golang.org/x/sys v0.0.0-20190529130038-5219a1e1c5f8 h1:2WjIC11WRITGlVWmyLXKjzIVj1ZwoWZ//tadeUUV6/o=
+diff --git a/src/vendor/golang.org/x/net/http/httpguts/httplex.go b/src/vendor/golang.org/x/net/http/httpguts/httplex.go
+index e7de24e..54e1102 100644
+--- a/src/vendor/golang.org/x/net/http/httpguts/httplex.go
++++ b/src/vendor/golang.org/x/net/http/httpguts/httplex.go
+@@ -137,11 +137,14 @@ func trimOWS(x string) string {
+ // contains token amongst its comma-separated tokens, ASCII
+ // case-insensitively.
+ func headerValueContainsToken(v string, token string) bool {
+-	v = trimOWS(v)
+-	if comma := strings.IndexByte(v, ','); comma != -1 {
+-		return tokenEqual(trimOWS(v[:comma]), token) || headerValueContainsToken(v[comma+1:], token)
++
++	for comma := strings.IndexByte(v, ','); comma != -1; comma = strings.IndexByte(v, ',') {
++		if tokenEqual(trimOWS(v[:comma]), token) {
++			return true
++		}
++		v = v[comma+1:]
+ 	}
+-	return tokenEqual(v, token)
++	return tokenEqual(trimOWS(v), token)
+ }
+ 
+ // lowerASCII returns the ASCII lowercase version of b.
+diff --git a/src/vendor/modules.txt b/src/vendor/modules.txt
+index cff8acd..b665ce0 100644
+--- a/src/vendor/modules.txt
++++ b/src/vendor/modules.txt
+@@ -7,7 +7,7 @@ golang.org/x/crypto/hkdf
+ golang.org/x/crypto/internal/chacha20
+ golang.org/x/crypto/internal/subtle
+ golang.org/x/crypto/poly1305
+-# golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
++# golang.org/x/net v0.0.0-20210428183841-261fb518b1ed
+ golang.org/x/net/dns/dnsmessage
+ golang.org/x/net/http/httpguts
+ golang.org/x/net/http/httpproxy
+-- 
+2.27.0
+

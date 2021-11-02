@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13.15
-Release:        5
+Release:        6
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -164,6 +164,17 @@ Patch6022:       0022-fix-CVE-2020-29509-CVE-2020-29511.patch
 Patch6023:       0023-fix-CVE-2020-29510.patch
 Patch6024:       0024-crypto-elliptic-fix-P-224-field-reduction.patch
 Patch6025:       0025-fix-CVE-2021-27918.patch
+Patch6026:       0026-net-http-fix-hijack-hang-at-abortPendingRead.patch
+Patch6027:       0027-release-branch.go1.15-std-update-golang.org-x-net-to.patch
+Patch6028:       0028-release-branch.go1.15-net-verify-results-from-Lookup.patch
+Patch6029:       0029-archive-zip-remove-unused-special-case.patch
+Patch6030:       0030-release-branch.go1.15-archive-zip-only-preallocate-F.patch
+Patch6031:       0031-release-branch.go1.15-net-http-httputil-always-remov.patch
+Patch6032:       0032-release-branch.go1.15-math-big-check-for-excessive-e.patch
+Patch6033:       0033-release-branch.go1.15-crypto-tls-test-key-type-when-.patch
+Patch6034:       0034-net-reject-leading-zeros-in-IP-address-parsers.patch
+Patch6035:       0035-release-branch.go1.16-misc-wasm-cmd-link-do-not-let-.patch
+Patch6036:       0036-net-http-httputil-close-incoming-ReverseProxy-reques.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -397,6 +408,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Nov 2 2021 chenjiankun<chenjiankun1@huawei.com> - 1.13.15-6
+- fix hijack, CVE-2021-31525,CVE-2021-33195,CVE-2021-33196,CVE-2021-33197,CVE-2021-33198,CVE-2021-34558,CVE-2021-29923,CVE-2021-38297,CVE-2021-36221
+
 * Thu Apr 17 2021 chenjiankun<chenjiankun1@huawei.com> - 1.13.15-5
 - fix CVE-2021-27918
 
