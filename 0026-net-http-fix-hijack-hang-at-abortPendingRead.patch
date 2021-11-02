@@ -1,0 +1,59 @@
+From 78770c121e8c2315d7bdf9e66870abffdaedbe9b Mon Sep 17 00:00:00 2001
+From: jingrui <jingrui@huawei.com>
+Date: Thu, 20 May 2021 09:18:27 +0800
+Subject: [PATCH] net/http: fix hijack hang at abortPendingRead
+
+When concurrent many http requests which need hijack the connenction,
+hijack may hang at abortPendingRead() on cr.cond.Wait().
+
+The read can be from readRequest() from conn.serve() or
+w.conn.r.startBackgroundRead(). especially in startBackgroundRead()
+which always set the deadline time.Time{}.
+
+This problem seems easy reproduce on arm.
+
+Signed-off-by: jingrui <jingrui@huawei.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/pull/46278/commits/78770c121e8c2315d7bdf9e66870abffdaedbe9b
+
+---
+ src/net/http/server.go | 22 +++++++++++++++++++---
+ 1 file changed, 19 insertions(+), 3 deletions(-)
+
+diff --git a/src/net/http/server.go b/src/net/http/server.go
+index 4e73508973..01e7e10011 100644
+--- a/src/net/http/server.go
++++ b/src/net/http/server.go
+@@ -736,9 +736,25 @@ func (cr *connReader) abortPendingRead() {
+ 	}
+ 	cr.aborted = true
+ 	cr.conn.rwc.SetReadDeadline(aLongTimeAgo)
+-	for cr.inRead {
+-		cr.cond.Wait()
+-	}
++	done := make(chan struct{})
++	go func() {
++		for cr.inRead {
++			cr.cond.Wait()
++		}
++		close(done)
++	}()
++
++	func() {
++		for {
++			select {
++			case <-done:
++				return
++			case <-time.After(100*time.Millisecond):
++				cr.conn.rwc.SetReadDeadline(aLongTimeAgo)
++			}
++		}
++	}()
++
+ 	cr.conn.rwc.SetReadDeadline(time.Time{})
+ }
+ 
+-- 
+2.27.0
+

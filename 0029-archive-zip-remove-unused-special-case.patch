@@ -1,0 +1,81 @@
+From 483d6d99256b3c486e0c99106e232b4909938328 Mon Sep 17 00:00:00 2001
+From: Andrew Gerrand <adg@golang.org>
+Date: Fri, 31 May 2019 22:00:42 +1000
+Subject: [PATCH] archive/zip: remove unused special case
+
+This removes a special case that was added to fix issue #10956, but that
+was never actually effective. The code in the test case still fails to
+read, so perhaps the zip64 support added in CL 6463050 inadvertently
+caught this particular case.
+
+It's possible that the original theorized bug still exists, but I'm not
+convinced it was ever fixed.
+
+Update #28700
+
+Change-Id: I4854de616364510f64a6def30b308686563f8dbb
+Reviewed-on: https://go-review.googlesource.com/c/go/+/179757
+Run-TryBot: Brad Fitzpatrick <bradfitz@golang.org>
+TryBot-Result: Gobot Gobot <gobot@golang.org>
+Reviewed-by: Brad Fitzpatrick <bradfitz@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/483d6d99256b3c486e0c99106e232b4909938328
+
+---
+ src/archive/zip/reader.go      |  4 ----
+ src/archive/zip/reader_test.go | 12 +++++++-----
+ 2 files changed, 7 insertions(+), 9 deletions(-)
+
+diff --git a/src/archive/zip/reader.go b/src/archive/zip/reader.go
+index 2260b398c3..13ff9ddcf4 100644
+--- a/src/archive/zip/reader.go
++++ b/src/archive/zip/reader.go
+@@ -8,7 +8,6 @@ import (
+ 	"bufio"
+ 	"encoding/binary"
+ 	"errors"
+-	"fmt"
+ 	"hash"
+ 	"hash/crc32"
+ 	"io"
+@@ -84,9 +83,6 @@ func (z *Reader) init(r io.ReaderAt, size int64) error {
+ 	if err != nil {
+ 		return err
+ 	}
+-	if end.directoryRecords > uint64(size)/fileHeaderLen {
+-		return fmt.Errorf("archive/zip: TOC declares impossible %d files in %d byte zip", end.directoryRecords, size)
+-	}
+ 	z.r = r
+ 	z.File = make([]*File, 0, end.directoryRecords)
+ 	z.Comment = end.comment
+diff --git a/src/archive/zip/reader_test.go b/src/archive/zip/reader_test.go
+index 6b3f2f33bb..328559cc7d 100644
+--- a/src/archive/zip/reader_test.go
++++ b/src/archive/zip/reader_test.go
+@@ -981,15 +981,17 @@ func TestIssue10957(t *testing.T) {
+ 	}
+ }
+ 
+-// Verify the number of files is sane.
++// Verify that this particular malformed zip file is rejected.
+ func TestIssue10956(t *testing.T) {
+ 	data := []byte("PK\x06\x06PK\x06\a0000\x00\x00\x00\x00\x00\x00\x00\x00" +
+ 		"0000PK\x05\x06000000000000" +
+ 		"0000\v\x00000\x00\x00\x00\x00\x00\x00\x000")
+-	_, err := NewReader(bytes.NewReader(data), int64(len(data)))
+-	const want = "TOC declares impossible 3472328296227680304 files in 57 byte"
+-	if err == nil && !strings.Contains(err.Error(), want) {
+-		t.Errorf("error = %v; want %q", err, want)
++	r, err := NewReader(bytes.NewReader(data), int64(len(data)))
++	if err == nil {
++		t.Errorf("got nil error, want ErrFormat")
++	}
++	if r != nil {
++		t.Errorf("got non-nil Reader, want nil")
+ 	}
+ }
+ 
+-- 
+2.27.0
+
