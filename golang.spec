@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.13.15
-Release:        6
+Release:        7
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -175,6 +175,7 @@ Patch6033:       0033-release-branch.go1.15-crypto-tls-test-key-type-when-.patch
 Patch6034:       0034-net-reject-leading-zeros-in-IP-address-parsers.patch
 Patch6035:       0035-release-branch.go1.16-misc-wasm-cmd-link-do-not-let-.patch
 Patch6036:       0036-net-http-httputil-close-incoming-ReverseProxy-reques.patch
+Patch6037:       0037-release-branch.go1.16-debug-macho-fail-on-invalid-dy.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -408,6 +409,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Nov 16 2021 chenjiankun<chenjiankun1@huawei.com> - 1.13.15-7
+- fix CVE-2021-41771
+
 * Thu Nov 2 2021 chenjiankun<chenjiankun1@huawei.com> - 1.13.15-6
 - fix hijack, CVE-2021-31525,CVE-2021-33195,CVE-2021-33196,CVE-2021-33197,CVE-2021-33198,CVE-2021-34558,CVE-2021-29923,CVE-2021-38297,CVE-2021-36221
 
