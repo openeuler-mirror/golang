@@ -1,0 +1,172 @@
+From 5055314a5749664ab66a24beed8158552e276959 Mon Sep 17 00:00:00 2001
+From: Quim Muntal <quimmuntal@gmail.com>
+Date: Thu, 15 Oct 2020 23:12:49 +0200
+Subject: [PATCH 33/44] [release-branch.go1.15] cmd/cgo: avoid exporting all
+ symbols on windows buildmode=c-shared
+
+Disable default symbol auto-export behaviour by marking exported
+function with the __declspec(dllexport) attribute. Old behaviour can
+still be used by setting -extldflags=-Wl,--export-all-symbols.
+
+See https://sourceware.org/binutils/docs/ld/WIN32.html for more info.
+
+This change cuts 50kb of a "hello world" dll.
+
+Updates #6853.
+Updates #30674.
+Fixes #43591.
+
+Change-Id: I9c7fb09c677cc760f24d0f7d199740ae73981413
+Reviewed-on: https://go-review.googlesource.com/c/go/+/262797
+Run-TryBot: Ian Lance Taylor <iant@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Ian Lance Taylor <iant@golang.org>
+Reviewed-by: Alex Brainman <alex.brainman@gmail.com>
+Trust: Alex Brainman <alex.brainman@gmail.com>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/300693
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+Reviewed-by: David Chase <drchase@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/5055314a5749664ab66a24beed8158552e276959
+
+---
+ misc/cgo/testcshared/cshared_test.go | 96 ++++++++++++++++++++++++++++
+ src/cmd/cgo/out.go                   |  6 +-
+ 2 files changed, 101 insertions(+), 1 deletion(-)
+
+diff --git a/misc/cgo/testcshared/cshared_test.go b/misc/cgo/testcshared/cshared_test.go
+index bd4d341820..d717b4dfb3 100644
+--- a/misc/cgo/testcshared/cshared_test.go
++++ b/misc/cgo/testcshared/cshared_test.go
+@@ -7,6 +7,8 @@ package cshared_test
+ import (
+ 	"bytes"
+ 	"debug/elf"
++	"debug/pe"
++	"encoding/binary"
+ 	"flag"
+ 	"fmt"
+ 	"io/ioutil"
+@@ -355,6 +357,100 @@ func TestExportedSymbols(t *testing.T) {
+ 	}
+ }
+ 
++func checkNumberOfExportedFunctionsWindows(t *testing.T, exportAllSymbols bool) {
++	const prog = `
++package main
++
++import "C"
++
++//export GoFunc
++func GoFunc() {
++	println(42)
++}
++
++//export GoFunc2
++func GoFunc2() {
++	println(24)
++}
++
++func main() {
++}
++`
++
++	tmpdir := t.TempDir()
++
++	srcfile := filepath.Join(tmpdir, "test.go")
++	objfile := filepath.Join(tmpdir, "test.dll")
++	if err := ioutil.WriteFile(srcfile, []byte(prog), 0666); err != nil {
++		t.Fatal(err)
++	}
++	argv := []string{"build", "-buildmode=c-shared"}
++	if exportAllSymbols {
++		argv = append(argv, "-ldflags", "-extldflags=-Wl,--export-all-symbols")
++	}
++	argv = append(argv, "-o", objfile, srcfile)
++	out, err := exec.Command("go", argv...).CombinedOutput()
++	if err != nil {
++		t.Fatalf("build failure: %s\n%s\n", err, string(out))
++	}
++
++	f, err := pe.Open(objfile)
++	if err != nil {
++		t.Fatalf("pe.Open failed: %v", err)
++	}
++	defer f.Close()
++	section := f.Section(".edata")
++	if section == nil {
++		t.Error(".edata section is not present")
++	}
++
++	// TODO: deduplicate this struct from cmd/link/internal/ld/pe.go
++	type IMAGE_EXPORT_DIRECTORY struct {
++		_                 [2]uint32
++		_                 [2]uint16
++		_                 [2]uint32
++		NumberOfFunctions uint32
++		NumberOfNames     uint32
++		_                 [3]uint32
++	}
++	var e IMAGE_EXPORT_DIRECTORY
++	if err := binary.Read(section.Open(), binary.LittleEndian, &e); err != nil {
++		t.Fatalf("binary.Read failed: %v", err)
++	}
++
++	expectedNumber := uint32(2)
++
++	if exportAllSymbols {
++		if e.NumberOfFunctions <= expectedNumber {
++			t.Fatalf("missing exported functions: %v", e.NumberOfFunctions)
++		}
++		if e.NumberOfNames <= expectedNumber {
++			t.Fatalf("missing exported names: %v", e.NumberOfNames)
++		}
++	} else {
++		if e.NumberOfFunctions != expectedNumber {
++			t.Fatalf("too many exported functions: %v", e.NumberOfFunctions)
++		}
++		if e.NumberOfNames != expectedNumber {
++			t.Fatalf("too many exported names: %v", e.NumberOfNames)
++		}
++	}
++}
++
++func TestNumberOfExportedFunctions(t *testing.T) {
++	if GOOS != "windows" {
++		t.Skip("skipping windows only test")
++	}
++	t.Parallel()
++
++	t.Run("OnlyExported", func(t *testing.T) {
++		checkNumberOfExportedFunctionsWindows(t, false)
++	})
++	t.Run("All", func(t *testing.T) {
++		checkNumberOfExportedFunctionsWindows(t, true)
++	})
++}
++
+ // test1: shared library can be dynamically loaded and exported symbols are accessible.
+ func TestExportedSymbolsWithDynamicLoad(t *testing.T) {
+ 	t.Parallel()
+diff --git a/src/cmd/cgo/out.go b/src/cmd/cgo/out.go
+index b9043efbf7..ee1c563495 100644
+--- a/src/cmd/cgo/out.go
++++ b/src/cmd/cgo/out.go
+@@ -961,7 +961,11 @@ func (p *Package) writeExports(fgo2, fm, fgcc, fgcch io.Writer) {
+ 		}
+ 
+ 		// Build the wrapper function compiled by gcc.
+-		s := fmt.Sprintf("%s %s(", gccResult, exp.ExpName)
++		gccExport := ""
++		if goos == "windows" {
++			gccExport = "__declspec(dllexport)"
++		}
++		s := fmt.Sprintf("%s %s %s(", gccExport, gccResult, exp.ExpName)
+ 		if fn.Recv != nil {
+ 			s += p.cgoType(fn.Recv.List[0].Type).C.String()
+ 			s += " recv"
+-- 
+2.27.0
+

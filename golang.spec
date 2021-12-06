@@ -2,8 +2,8 @@
 %global _binaries_in_noarch_packages_terminate_build 0
 %global golibdir %{_libdir}/golang
 %global goroot /usr/lib/%{name}
-%global go_api 1.13
-%global go_version 1.13
+%global go_api 1.15
+%global go_version 1.15
 %global __spec_install_post /usr/lib/rpm/check-rpaths /usr/lib/rpm/check-buildroot /usr/lib/rpm/brp-compress
 %global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
 %global __strip /bin/true
@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        2
+Release:        5
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -150,6 +150,57 @@ Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
 ExclusiveArch:  %{golang_arches}
+
+Patch6001:       0001-release-branch.go1.15-doc-go1.15-mention-1.15.3-cgo-.patch
+Patch6002:       0002-release-branch.go1.15-cmd-go-fix-mod_get_fallback-te.patch
+Patch6003:       0003-release-branch.go1.15-internal-execabs-only-run-test.patch
+Patch6004:       0004-release-branch.go1.15-cmd-compile-don-t-short-circui.patch
+Patch6005:       0005-release-branch.go1.15-cmd-go-fix-get_update_unknown_.patch
+Patch6006:       0006-release-branch.go1.15-net-http-update-bundled-x-net-.patch
+Patch6007:       0007-release-branch.go1.15-cmd-go-don-t-lookup-the-path-f.patch
+Patch6008:       0008-release-branch.go1.15-cmd-link-internal-ld-pe-fix-se.patch
+Patch6009:       0009-release-branch.go1.15-cmd-internal-goobj2-fix-buglet.patch
+Patch6010:       0010-release-branch.go1.15-runtime-don-t-adjust-timer-pp-.patch
+Patch6011:       0011-release-branch.go1.15-runtime-cgo-fix-Android-build-.patch
+Patch6013:       0013-release-branch.go1.15-internal-poll-if-copy_file_ran.patch
+Patch6014:       0014-release-branch.go1.15-internal-poll-netpollcheckerr-.patch
+Patch6015:       0015-release-branch.go1.15-cmd-compile-do-not-assume-TST-.patch
+Patch6016:       0016-release-branch.go1.15-syscall-do-not-overflow-key-me.patch
+Patch6017:       0017-release-branch.go1.15-time-correct-unusual-extension.patch
+Patch6018:       0018-release-branch.go1.15-cmd-compile-fix-escape-analysi.patch
+Patch6019:       0019-release-branch.go1.15-net-http-ignore-connection-clo.patch
+Patch6020:       0020-release-branch.go1.15-net-http-add-connections-back-.patch
+Patch6021:       0021-release-branch.go1.15-security-encoding-xml-prevent-.patch
+Patch6023:       0023-release-branch.go1.15-cmd-go-don-t-report-missing-st.patch
+Patch6025:       0025-release-branch.go1.15-cmd-go-internal-modfetch-detec.patch
+Patch6026:       0026-release-branch.go1.15-cmd-link-generate-trampoline-f.patch
+Patch6027:       0027-release-branch.go1.15-net-http-update-bundled-x-net-.patch
+Patch6028:       0028-release-branch.go1.15-net-http-fix-detection-of-Roun.patch
+Patch6029:       0029-release-branch.go1.15-build-set-GOPATH-consistently-.patch
+Patch6030:       0030-release-branch.go1.15-database-sql-fix-tx-stmt-deadl.patch
+Patch6031:       0031-release-branch.go1.15-cmd-compile-disable-shortcircu.patch
+Patch6032:       0032-release-branch.go1.15-runtime-non-strict-InlTreeInde.patch
+Patch6033:       0033-release-branch.go1.15-cmd-cgo-avoid-exporting-all-sy.patch
+Patch6034:       0034-release-branch.go1.15-cmd-link-avoid-exporting-all-s.patch
+Patch6035:       0035-release-branch.go1.15-cmd-cgo-remove-unnecessary-spa.patch
+Patch6037:       0037-release-branch.go1.15-time-use-offset-and-isDST-when.patch
+Patch6038:       0038-release-branch.go1.15-std-update-golang.org-x-net-to.patch
+Patch6039:       0039-release-branch.go1.15-runtime-time-disable-preemptio.patch
+Patch6040:       0040-release-branch.go1.15-runtime-non-strict-InlTreeInde.patch
+Patch6041:       0041-release-branch.go1.15-runtime-pprof-skip-tests-for-A.patch
+Patch6043:       0043-release-branch.go1.15-math-big-fix-TestShiftOverlap-.patch
+Patch6044:       0044-release-branch.go1.15-math-big-remove-the-s390x-asse.patch
+Patch6045:       0045-net-http-fix-hijack-hang-at-abortPendingRead.patch
+Patch6046:       0046-release-branch.go1.15-net-verify-results-from-Lookup.patch
+Patch6047:       0047-release-branch.go1.15-archive-zip-only-preallocate-F.patch
+Patch6048:       0048-release-branch.go1.15-net-http-httputil-always-remov.patch
+Patch6049:       0049-release-branch.go1.15-math-big-check-for-excessive-e.patch
+Patch6050:       0050-release-branch.go1.15-crypto-tls-test-key-type-when-.patch
+Patch6051:       0051-net-reject-leading-zeros-in-IP-address-parsers.patch
+Patch6052:       0052-release-branch.go1.16-misc-wasm-cmd-link-do-not-let-.patch
+Patch6053:       0053-net-http-httputil-close-incoming-ReverseProxy-reques.patch
+
+Patch9001:       0001-drop-hard-code-cert.patch
 
 
 %description
@@ -381,6 +432,15 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Wed Oct 27 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-5
+- fix CVE-2021-33195,CVE-2021-33196,CVE-2021-33197,CVE-2021-33198,CVE-2021-34558,CVE-2021-29923,CVE-2021-38297,CVE-2021-36221
+
+* Fri Jun 18 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-4
+- batch synchronization
+
+* Fri Apr 23 2021 chenjiankun <chenjiankun1@huawei.com> - 1.15.7-3
+- fix CVE-2021-27918
+
 * Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
 - speed up build progress
 

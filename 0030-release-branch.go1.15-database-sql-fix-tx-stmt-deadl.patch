@@ -1,0 +1,134 @@
+From c77418f4cac41c42566ca90921a1f928995cfba2 Mon Sep 17 00:00:00 2001
+From: Emmanuel T Odeke <emmanuel@orijtech.com>
+Date: Mon, 18 Jan 2021 16:18:11 -0800
+Subject: [PATCH 30/44] [release-branch.go1.15] database/sql: fix tx stmt
+ deadlock when rollback
+
+Tx acquires tx.closemu W-lock and then acquires stmt.closemu.W-lock
+to fully close the transaction and associated prepared statement.
+Stmt query and execution run in reverse ways - acquires
+stmt.closemu.R-lock and then acquires tx.closemu.R-lock to grab tx
+connection, which may cause deadlock.
+
+Prevent the lock is held around tx.closePrepared to ensure no
+deadlock happens.
+
+Includes a test fix from CL 266097.
+Fixes #42884
+Updates #40985
+Updates #42259
+
+Change-Id: Id52737660ada3cebdfff6efc23366cdc3224b8e8
+Reviewed-on: https://go-review.googlesource.com/c/go/+/250178
+Run-TryBot: Emmanuel Odeke <emmanuel@orijtech.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Daniel Theophanes <kardianos@gmail.com>
+Trust: Emmanuel Odeke <emmanuel@orijtech.com>
+(cherry picked from commit d4c1ad882973e407ff85b977f4ce5b9435451190)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/284513
+Reviewed-by: Dmitri Shuralyov <dmitshur@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/c77418f4cac41c42566ca90921a1f928995cfba2
+
+---
+ src/database/sql/sql.go      | 14 +++++++-------
+ src/database/sql/sql_test.go | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 35 insertions(+), 7 deletions(-)
+
+diff --git a/src/database/sql/sql.go b/src/database/sql/sql.go
+index b3d0653f5c..3d1367d28f 100644
+--- a/src/database/sql/sql.go
++++ b/src/database/sql/sql.go
+@@ -2080,10 +2080,10 @@ func (tx *Tx) isDone() bool {
+ // that has already been committed or rolled back.
+ var ErrTxDone = errors.New("sql: transaction has already been committed or rolled back")
+ 
+-// closeLocked returns the connection to the pool and
++// close returns the connection to the pool and
+ // must only be called by Tx.rollback or Tx.Commit while
+-// closemu is Locked and tx already canceled.
+-func (tx *Tx) closeLocked(err error) {
++// tx is already canceled and won't be executed concurrently.
++func (tx *Tx) close(err error) {
+ 	tx.releaseConn(err)
+ 	tx.dc = nil
+ 	tx.txi = nil
+@@ -2157,7 +2157,7 @@ func (tx *Tx) Commit() error {
+ 	// to ensure no other connection has an active query.
+ 	tx.cancel()
+ 	tx.closemu.Lock()
+-	defer tx.closemu.Unlock()
++	tx.closemu.Unlock()
+ 
+ 	var err error
+ 	withLock(tx.dc, func() {
+@@ -2166,7 +2166,7 @@ func (tx *Tx) Commit() error {
+ 	if err != driver.ErrBadConn {
+ 		tx.closePrepared()
+ 	}
+-	tx.closeLocked(err)
++	tx.close(err)
+ 	return err
+ }
+ 
+@@ -2189,7 +2189,7 @@ func (tx *Tx) rollback(discardConn bool) error {
+ 	// to ensure no other connection has an active query.
+ 	tx.cancel()
+ 	tx.closemu.Lock()
+-	defer tx.closemu.Unlock()
++	tx.closemu.Unlock()
+ 
+ 	var err error
+ 	withLock(tx.dc, func() {
+@@ -2201,7 +2201,7 @@ func (tx *Tx) rollback(discardConn bool) error {
+ 	if discardConn {
+ 		err = driver.ErrBadConn
+ 	}
+-	tx.closeLocked(err)
++	tx.close(err)
+ 	return err
+ }
+ 
+diff --git a/src/database/sql/sql_test.go b/src/database/sql/sql_test.go
+index 5727f0d8aa..d7d4642608 100644
+--- a/src/database/sql/sql_test.go
++++ b/src/database/sql/sql_test.go
+@@ -2810,6 +2810,34 @@ func TestTxCannotCommitAfterRollback(t *testing.T) {
+ 	}
+ }
+ 
++// Issue 40985 transaction statement deadlock while context cancel.
++func TestTxStmtDeadlock(t *testing.T) {
++	db := newTestDB(t, "people")
++	defer closeDB(t, db)
++
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
++	defer cancel()
++	tx, err := db.BeginTx(ctx, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++
++	stmt, err := tx.Prepare("SELECT|people|name,age|age=?")
++	if err != nil {
++		t.Fatal(err)
++	}
++	// Run number of stmt queries to reproduce deadlock from context cancel
++	for i := 0; i < 1e3; i++ {
++		// Encounter any close related errors (e.g.. ErrTxDone, stmt is closed)
++		// is expected due to context cancel.
++		_, err = stmt.Query(1)
++		if err != nil {
++			break
++		}
++	}
++	_ = tx.Rollback()
++}
++
+ // Issue32530 encounters an issue where a connection may
+ // expire right after it comes out of a used connection pool
+ // even when a new connection is requested.
+-- 
+2.27.0
+

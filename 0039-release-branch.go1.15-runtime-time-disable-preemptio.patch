@@ -1,0 +1,95 @@
+From 72ccabc99449b2cb5bb1438eb90244d55f7b02f5 Mon Sep 17 00:00:00 2001
+From: Michael Pratt <mpratt@google.com>
+Date: Wed, 10 Mar 2021 16:06:47 -0500
+Subject: [PATCH 39/44] [release-branch.go1.15] runtime, time: disable
+ preemption in addtimer
+
+The timerpMask optimization updates a mask of Ps (potentially)
+containing timers in pidleget / pidleput. For correctness, it depends on
+the assumption that new timers can only be added to a P's own heap.
+
+addtimer violates this assumption if it is preempted after computing pp.
+That G may then run on a different P, but adding a timer to the original
+P's heap.
+
+Avoid this by disabling preemption while pp is in use.
+
+Other uses of doaddtimer should be OK:
+
+* moveTimers: always moves to the current P's heap
+* modtimer, cleantimers, addAdjustedTimers, runtimer: does not add net
+  new timers to the heap while locked
+
+For #44868
+Fixes #45731
+
+Change-Id: I4a5d080865e854931d0a3a09a51ca36879101d72
+Reviewed-on: https://go-review.googlesource.com/c/go/+/300610
+Trust: Michael Pratt <mpratt@google.com>
+Run-TryBot: Michael Pratt <mpratt@google.com>
+Reviewed-by: Michael Knyszek <mknyszek@google.com>
+Reviewed-by: Ian Lance Taylor <iant@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/313129
+Trust: Ian Lance Taylor <iant@golang.org>
+Run-TryBot: Ian Lance Taylor <iant@golang.org>
+Reviewed-by: Michael Pratt <mpratt@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/72ccabc99449b2cb5bb1438eb90244d55f7b02f5
+
+---
+ src/runtime/time.go    |  5 +++++
+ src/time/sleep_test.go | 16 ++++++++++++++++
+ 2 files changed, 21 insertions(+)
+
+diff --git a/src/runtime/time.go b/src/runtime/time.go
+index ec3eae9cca..de7468d129 100644
+--- a/src/runtime/time.go
++++ b/src/runtime/time.go
+@@ -254,6 +254,9 @@ func addtimer(t *timer) {
+ 
+ 	when := t.when
+ 
++	// Disable preemption while using pp to avoid changing another P's heap.
++	mp := acquirem()
++
+ 	pp := getg().m.p.ptr()
+ 	lock(&pp.timersLock)
+ 	cleantimers(pp)
+@@ -261,6 +264,8 @@ func addtimer(t *timer) {
+ 	unlock(&pp.timersLock)
+ 
+ 	wakeNetPoller(when)
++
++	releasem(mp)
+ }
+ 
+ // doaddtimer adds t to the current P's heap.
+diff --git a/src/time/sleep_test.go b/src/time/sleep_test.go
+index f5678020b9..ea253f8709 100644
+--- a/src/time/sleep_test.go
++++ b/src/time/sleep_test.go
+@@ -501,3 +501,19 @@ func TestZeroTimerStopPanics(t *testing.T) {
+ 	var tr Timer
+ 	tr.Stop()
+ }
++
++// Test that zero duration timers aren't missed by the scheduler. Regression test for issue 44868.
++func TestZeroTimer(t *testing.T) {
++	if testing.Short() {
++		t.Skip("-short")
++	}
++
++	for i := 0; i < 1000000; i++ {
++		s := Now()
++		ti := NewTimer(0)
++		<-ti.C
++		if diff := Since(s); diff > 2*Second {
++			t.Errorf("Expected time to get value from Timer channel in less than 2 sec, took %v", diff)
++		}
++	}
++}
+-- 
+2.27.0
+

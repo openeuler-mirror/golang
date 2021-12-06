@@ -1,0 +1,124 @@
+From 5de8d3bfcb060bbc61b9b9c945055fd3fb5b9607 Mon Sep 17 00:00:00 2001
+From: Michael Fraenkel <michael.fraenkel@gmail.com>
+Date: Sat, 26 Sep 2020 09:20:16 -0600
+Subject: [PATCH 19/44] [release-branch.go1.15] net/http: ignore connection
+ closes once done with the connection
+
+Once the connection is put back into the idle pool, the request should
+not take any action if the connection is closed.
+
+For #42935.
+Updates #41600.
+
+Change-Id: I5e4ddcdc03cd44f5197ecfbe324638604961de84
+Reviewed-on: https://go-review.googlesource.com/c/go/+/257818
+Reviewed-by: Brad Fitzpatrick <bradfitz@golang.org>
+Trust: Damien Neil <dneil@google.com>
+(cherry picked from commit 212d385a2f723a8dd5e7d2e83efb478ddd139349)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/297909
+Trust: Dmitri Shuralyov <dmitshur@golang.org>
+Run-TryBot: Dmitri Shuralyov <dmitshur@golang.org>
+Reviewed-by: Damien Neil <dneil@google.com>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/5de8d3bfcb060bbc61b9b9c945055fd3fb5b9607
+
+---
+ src/net/http/transport.go      | 13 ++++++---
+ src/net/http/transport_test.go | 51 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+), 4 deletions(-)
+
+diff --git a/src/net/http/transport.go b/src/net/http/transport.go
+index d37b52b13d..6fb2ea5663 100644
+--- a/src/net/http/transport.go
++++ b/src/net/http/transport.go
+@@ -2560,6 +2560,7 @@ func (pc *persistConn) roundTrip(req *transportRequest) (resp *Response, err err
+ 	var respHeaderTimer <-chan time.Time
+ 	cancelChan := req.Request.Cancel
+ 	ctxDoneChan := req.Context().Done()
++	pcClosed := pc.closech
+ 	for {
+ 		testHookWaitResLoop()
+ 		select {
+@@ -2579,11 +2580,15 @@ func (pc *persistConn) roundTrip(req *transportRequest) (resp *Response, err err
+ 				defer timer.Stop() // prevent leaks
+ 				respHeaderTimer = timer.C
+ 			}
+-		case <-pc.closech:
+-			if debugRoundTrip {
+-				req.logf("closech recv: %T %#v", pc.closed, pc.closed)
++		case <-pcClosed:
++			pcClosed = nil
++			// check if we are still using the connection
++			if pc.t.replaceReqCanceler(req.cancelKey, nil) {
++				if debugRoundTrip {
++					req.logf("closech recv: %T %#v", pc.closed, pc.closed)
++				}
++				return nil, pc.mapRoundTripError(req, startBytesWritten, pc.closed)
+ 			}
+-			return nil, pc.mapRoundTripError(req, startBytesWritten, pc.closed)
+ 		case <-respHeaderTimer:
+ 			if debugRoundTrip {
+ 				req.logf("timeout waiting for response headers.")
+diff --git a/src/net/http/transport_test.go b/src/net/http/transport_test.go
+index 0a47687d9a..3c7b9eb4de 100644
+--- a/src/net/http/transport_test.go
++++ b/src/net/http/transport_test.go
+@@ -6289,3 +6289,54 @@ func TestTransportRejectsSignInContentLength(t *testing.T) {
+ 		t.Fatalf("Error mismatch\nGot: %q\nWanted substring: %q", got, want)
+ 	}
+ }
++
++// Issue 41600
++// Test that a new request which uses the connection of an active request
++// cannot cause it to be canceled as well.
++func TestCancelRequestWhenSharingConnection(t *testing.T) {
++	if testing.Short() {
++		t.Skip("skipping in short mode")
++	}
++	ts := httptest.NewServer(HandlerFunc(func(w ResponseWriter, req *Request) {
++		w.Header().Add("Content-Length", "0")
++	}))
++	defer ts.Close()
++
++	client := ts.Client()
++	transport := client.Transport.(*Transport)
++	transport.MaxIdleConns = 1
++	transport.MaxConnsPerHost = 1
++
++	var wg sync.WaitGroup
++
++	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
++
++	for i := 0; i < 10; i++ {
++		wg.Add(1)
++		go func() {
++			defer wg.Done()
++			for ctx.Err() == nil {
++				reqctx, reqcancel := context.WithCancel(ctx)
++				go reqcancel()
++				req, _ := NewRequestWithContext(reqctx, "GET", ts.URL, nil)
++				res, err := client.Do(req)
++				if err == nil {
++					res.Body.Close()
++				}
++			}
++		}()
++	}
++
++	for ctx.Err() == nil {
++		req, _ := NewRequest("GET", ts.URL, nil)
++		if res, err := client.Do(req); err != nil {
++			t.Errorf("unexpected: %p %v", req, err)
++			break
++		} else {
++			res.Body.Close()
++		}
++	}
++
++	cancel()
++	wg.Wait()
++}
+-- 
+2.27.0
+

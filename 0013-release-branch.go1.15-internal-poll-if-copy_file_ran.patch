@@ -1,0 +1,102 @@
+From 023c46676db26e75d244b1d38ccc4a4b8bfe3eef Mon Sep 17 00:00:00 2001
+From: Ian Lance Taylor <iant@golang.org>
+Date: Sun, 14 Feb 2021 17:14:41 -0800
+Subject: [PATCH 13/44] [release-branch.go1.15] internal/poll: if
+ copy_file_range returns 0, assume it failed
+
+On current Linux kernels copy_file_range does not correctly handle
+files in certain special file systems, such as /proc. For those file
+systems it fails to copy any data and returns zero. This breaks Go's
+io.Copy for those files.
+
+Fix the problem by assuming that if copy_file_range returns 0 the
+first time it is called on a file, that that file is not supported.
+In that case fall back to just using read. This will force an extra
+system call when using io.Copy to copy a zero-sized normal file,
+but at least it will work correctly.
+
+For #36817
+For #44272
+Fixes #44273
+
+Change-Id: I02e81872cb70fda0ce5485e2ea712f219132e614
+Reviewed-on: https://go-review.googlesource.com/c/go/+/291989
+Trust: Ian Lance Taylor <iant@golang.org>
+Run-TryBot: Ian Lance Taylor <iant@golang.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Russ Cox <rsc@golang.org>
+(cherry picked from commit 30641e36aa5b547eee48565caa3078b0a2e7c185)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/292289
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/023c46676db26e75d244b1d38ccc4a4b8bfe3eef
+
+---
+ src/internal/poll/copy_file_range_linux.go | 10 ++++++-
+ src/os/readfrom_linux_test.go              | 32 ++++++++++++++++++++++
+ 2 files changed, 41 insertions(+), 1 deletion(-)
+
+diff --git a/src/internal/poll/copy_file_range_linux.go b/src/internal/poll/copy_file_range_linux.go
+index fc34aef4cb..01b242a4ea 100644
+--- a/src/internal/poll/copy_file_range_linux.go
++++ b/src/internal/poll/copy_file_range_linux.go
+@@ -112,7 +112,15 @@ func CopyFileRange(dst, src *FD, remain int64) (written int64, handled bool, err
+ 			return 0, false, nil
+ 		case nil:
+ 			if n == 0 {
+-				// src is at EOF, which means we are done.
++				// If we did not read any bytes at all,
++				// then this file may be in a file system
++				// where copy_file_range silently fails.
++				// https://lore.kernel.org/linux-fsdevel/20210126233840.GG4626@dread.disaster.area/T/#m05753578c7f7882f6e9ffe01f981bc223edef2b0
++				if written == 0 {
++					return 0, false, nil
++				}
++				// Otherwise src is at EOF, which means
++				// we are done.
+ 				return written, true, nil
+ 			}
+ 			remain -= n
+diff --git a/src/os/readfrom_linux_test.go b/src/os/readfrom_linux_test.go
+index 00faf39fe5..aa3f050667 100644
+--- a/src/os/readfrom_linux_test.go
++++ b/src/os/readfrom_linux_test.go
+@@ -361,3 +361,35 @@ func (h *copyFileRangeHook) install() {
+ func (h *copyFileRangeHook) uninstall() {
+ 	*PollCopyFileRangeP = h.original
+ }
++
++// On some kernels copy_file_range fails on files in /proc.
++func TestProcCopy(t *testing.T) {
++	const cmdlineFile = "/proc/self/cmdline"
++	cmdline, err := ioutil.ReadFile(cmdlineFile)
++	if err != nil {
++		t.Skipf("can't read /proc file: %v", err)
++	}
++	in, err := Open(cmdlineFile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer in.Close()
++	outFile := filepath.Join(t.TempDir(), "cmdline")
++	out, err := Create(outFile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err := io.Copy(out, in); err != nil {
++		t.Fatal(err)
++	}
++	if err := out.Close(); err != nil {
++		t.Fatal(err)
++	}
++	copy, err := ioutil.ReadFile(outFile)
++	if err != nil {
++		t.Fatal(err)
++	}
++	if !bytes.Equal(cmdline, copy) {
++		t.Errorf("copy of %q got %q want %q\n", cmdlineFile, copy, cmdline)
++	}
++}
+-- 
+2.27.0
+
