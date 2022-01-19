@@ -1,0 +1,50 @@
+From 97b9a8c1e595e2527654e8e4124e4ebc048548a2 Mon Sep 17 00:00:00 2001
+From: Filippo Valsorda <filippo@golang.org>
+Date: Wed, 19 Jan 2022 11:31:33 +0800
+Subject: [PATCH] [release-branch.go1.16] net/http: update bundled
+ golang.org/x/net/http2
+
+Pull in security fix
+
+	a5309b3 http2: cap the size of the server's canonical header cache
+
+Updates #50058
+Fixes CVE-2021-44716
+
+Change-Id: Ifdd13f97fce168de5fb4b2e74ef2060d059800b9
+Reviewed-on: https://go-review.googlesource.com/c/go/+/370575
+Trust: Filippo Valsorda <filippo@golang.org>
+Run-TryBot: Filippo Valsorda <filippo@golang.org>
+Reviewed-by: Alex Rakoczy <alex@golang.org>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+
+Conflict:NA
+Reference:https://github.com/golang/go/commit/d0aebe3e74fe14799f97ddd3f01129697c6a290a
+---
+ src/net/http/h2_bundle.go | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/src/net/http/h2_bundle.go b/src/net/http/h2_bundle.go
+index 3d83084..06f8808 100644
+--- a/src/net/http/h2_bundle.go
++++ b/src/net/http/h2_bundle.go
+@@ -4289,7 +4289,15 @@ func (sc *http2serverConn) canonicalHeader(v string) string {
+ 		sc.canonHeader = make(map[string]string)
+ 	}
+ 	cv = CanonicalHeaderKey(v)
+-	sc.canonHeader[v] = cv
++	// maxCachedCanonicalHeaders is an arbitrarily-chosen limit on the number of
++	// entries in the canonHeader cache. This should be larger than the number
++	// of unique, uncommon header keys likely to be sent by the peer, while not
++	// so high as to permit unreaasonable memory usage if the peer sends an unbounded
++	// number of unique header keys.
++	const maxCachedCanonicalHeaders = 32
++	if len(sc.canonHeader) < maxCachedCanonicalHeaders {
++		sc.canonHeader[v] = cv
++	}
+ 	return cv
+ }
+ 
+-- 
+2.30.0
+
