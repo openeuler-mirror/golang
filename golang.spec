@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        8
+Release:        9
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -202,6 +202,8 @@ Patch6053:       0053-net-http-httputil-close-incoming-ReverseProxy-reques.patch
 Patch6054:       0054-release-branch.go1.16-net-http-update-bundled-golang.patch
 Patch6055:       0055-release-branch.go1.16-archive-zip-prevent-preallocat.patch
 Patch6056:       0056-release-branch.go1.16-debug-macho-fail-on-invalid-dy.patch
+Patch6057:       0057-release-branch.go1.16-math-big-prevent-overflow-in-R.patch
+Patch6058:       0058-release-branch.go1.16-crypto-elliptic-make-IsOnCurve.patch
 
 Patch9001:       0001-drop-hard-code-cert.patch
 
@@ -435,6 +437,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Mar 4 2022 hanchao<hanchao47@huawei.com> - 1.15.7-9
+- fix CVE-2022-23772  CVE-2022-23806
+
 * Wed Mar 2 2022 hanchao<hanchao47@huawei.com> - 1.15.7-8
 - fix CVE-2021-41771
 
