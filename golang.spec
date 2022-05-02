@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -155,7 +155,7 @@ Requires:       openEuler-rpm-config
 
 ExclusiveArch:  %{golang_arches}
 
-
+Patch0:         Backport_386474.patch
 
 %description
 %{summary}.
@@ -388,6 +388,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon May 02 2022 Jingwiw <wangjingwei@iscas.ac.cn> - 1.17.3-2
+- fix bug #51199: https://go-review.googlesource.com/c/go/+/386474
+
 * Mon Nov 29 2021 chenjiankun <chenjiankun1@huawei.com> - 1.17.3-1
 - upgrade to 1.17.3
 
