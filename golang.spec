@@ -2,8 +2,8 @@
 %global _binaries_in_noarch_packages_terminate_build 0
 %global golibdir %{_libdir}/golang
 %global goroot /usr/lib/%{name}
-%global go_api 1.15
-%global go_version 1.15
+%global go_api 1.17
+%global go_version 1.17
 %global __spec_install_post /usr/lib/rpm/check-rpaths /usr/lib/rpm/check-buildroot /usr/lib/rpm/brp-compress
 %global __requires_exclude_from ^(%{_datadir}|/usr/lib)/%{name}/(doc|src)/.*$
 %global __strip /bin/true
@@ -65,12 +65,12 @@
 
 
 Name:           golang
-Version:        1.15.7
+Version:        1.17.3
 Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
-Source0:        https://dl.google.com/go/go1.15.7.src.tar.gz
+Source0:        https://dl.google.com/go/go1.17.3.src.tar.gz
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -155,13 +155,7 @@ Requires:       openEuler-rpm-config
 
 ExclusiveArch:  %{golang_arches}
 
-Patch1:		riscv-support-external-linking.patch
-Patch2:		riscv-TLS-support.patch
-Patch3:		riscv-cmd-internal-move-rigisrter.patch
-Patch4:		riscv-go-runtime-add-support-cgo.patch
-Patch5:		riscv-enable-build-modes.patch
-
-
+Patch0:         Backport_386474.patch
 
 %description
 %{summary}.
@@ -257,7 +251,7 @@ rm -rf pkg/obj/go-build/*
 mkdir -p %{buildroot}%{_bindir}
 mkdir -p %{buildroot}%{goroot}
 
-cp -apv api bin doc favicon.ico lib pkg robots.txt src misc test VERSION \
+cp -apv api bin doc lib pkg src misc test VERSION \
    %{buildroot}%{goroot}
 
 # bz1099206
@@ -394,6 +388,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon May 02 2022 Jingwiw <wangjingwei@iscas.ac.cn> - 1.17.3-2
+- fix bug #51199: https://go-review.googlesource.com/c/go/+/386474
+
+* Mon Nov 29 2021 chenjiankun <chenjiankun1@huawei.com> - 1.17.3-1
+- upgrade to 1.17.3
+
 * Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
 - speed up build progress
 

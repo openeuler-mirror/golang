@@ -1,0 +1,127 @@
+From 7d8fa657893f93dd04071bb164166d12fbdeb8a5 Mon Sep 17 00:00:00 2001
+From: Cherry Mui <cherryyz@google.com>
+Date: Mon, 14 Feb 2022 12:43:27 -0500
+Subject: [PATCH] [release-branch.go1.17] cmd/compile: correct type of pointer difference on RISCV64
+
+Pointer comparison is lowered to the following on RISCV64
+
+(EqPtr x y) => (SEQZ (SUB <x.Type> x y))
+
+The difference of two pointers (the SUB) should not be pointer
+type. Otherwise it can cause the GC to find a bad pointer.
+
+Updates #51101.
+Fixes #51199.
+
+Change-Id: I7e73c2155c36ff403c032981a9aa9cccbfdf0f64
+Reviewed-on: https://go-review.googlesource.com/c/go/+/385655
+Trust: Cherry Mui <cherryyz@google.com>
+Run-TryBot: Cherry Mui <cherryyz@google.com>
+Reviewed-by: Keith Randall <khr@golang.org>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+(cherry picked from commit 1ed30ca537a05b887f8479027b6363a03f957610)
+Reviewed-on: https://go-review.googlesource.com/c/go/+/386474
+---
+
+diff --git a/src/cmd/compile/internal/ssa/gen/RISCV64.rules b/src/cmd/compile/internal/ssa/gen/RISCV64.rules
+index 9cdd62e..1afd394 100644
+--- a/src/cmd/compile/internal/ssa/gen/RISCV64.rules
++++ b/src/cmd/compile/internal/ssa/gen/RISCV64.rules
+@@ -250,7 +250,7 @@
+ (Leq64F ...) => (FLED ...)
+ (Leq32F ...) => (FLES ...)
+ 
+-(EqPtr x y) => (SEQZ (SUB <x.Type> x y))
++(EqPtr x y) => (SEQZ (SUB <typ.Uintptr> x y))
+ (Eq64  x y) => (SEQZ (SUB <x.Type> x y))
+ (Eq32  x y) => (SEQZ (SUB <x.Type> (ZeroExt32to64 x) (ZeroExt32to64 y)))
+ (Eq16  x y) => (SEQZ (SUB <x.Type> (ZeroExt16to64 x) (ZeroExt16to64 y)))
+@@ -258,7 +258,7 @@
+ (Eq64F ...) => (FEQD ...)
+ (Eq32F ...) => (FEQS ...)
+ 
+-(NeqPtr x y) => (SNEZ (SUB <x.Type> x y))
++(NeqPtr x y) => (SNEZ (SUB <typ.Uintptr> x y))
+ (Neq64  x y) => (SNEZ (SUB <x.Type> x y))
+ (Neq32  x y) => (SNEZ (SUB <x.Type> (ZeroExt32to64 x) (ZeroExt32to64 y)))
+ (Neq16  x y) => (SNEZ (SUB <x.Type> (ZeroExt16to64 x) (ZeroExt16to64 y)))
+diff --git a/src/cmd/compile/internal/ssa/rewriteRISCV64.go b/src/cmd/compile/internal/ssa/rewriteRISCV64.go
+index 431fb1a..c1299bf 100644
+--- a/src/cmd/compile/internal/ssa/rewriteRISCV64.go
++++ b/src/cmd/compile/internal/ssa/rewriteRISCV64.go
+@@ -1080,13 +1080,14 @@
+ 	v_1 := v.Args[1]
+ 	v_0 := v.Args[0]
+ 	b := v.Block
++	typ := &b.Func.Config.Types
+ 	// match: (EqPtr x y)
+-	// result: (SEQZ (SUB <x.Type> x y))
++	// result: (SEQZ (SUB <typ.Uintptr> x y))
+ 	for {
+ 		x := v_0
+ 		y := v_1
+ 		v.reset(OpRISCV64SEQZ)
+-		v0 := b.NewValue0(v.Pos, OpRISCV64SUB, x.Type)
++		v0 := b.NewValue0(v.Pos, OpRISCV64SUB, typ.Uintptr)
+ 		v0.AddArg2(x, y)
+ 		v.AddArg(v0)
+ 		return true
+@@ -2629,13 +2630,14 @@
+ 	v_1 := v.Args[1]
+ 	v_0 := v.Args[0]
+ 	b := v.Block
++	typ := &b.Func.Config.Types
+ 	// match: (NeqPtr x y)
+-	// result: (SNEZ (SUB <x.Type> x y))
++	// result: (SNEZ (SUB <typ.Uintptr> x y))
+ 	for {
+ 		x := v_0
+ 		y := v_1
+ 		v.reset(OpRISCV64SNEZ)
+-		v0 := b.NewValue0(v.Pos, OpRISCV64SUB, x.Type)
++		v0 := b.NewValue0(v.Pos, OpRISCV64SUB, typ.Uintptr)
+ 		v0.AddArg2(x, y)
+ 		v.AddArg(v0)
+ 		return true
+diff --git a/test/fixedbugs/issue51101.go b/test/fixedbugs/issue51101.go
+new file mode 100644
+index 0000000..a390e50
+--- /dev/null
++++ b/test/fixedbugs/issue51101.go
+@@ -0,0 +1,36 @@
++// run
++
++// Copyright 2022 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Issue 51101: on RISCV64, difference of two pointers
++// was marked as pointer and crashes GC.
++
++package main
++
++var a, b int
++
++func main() {
++	F(&b, &a)
++}
++
++//go:noinline
++func F(a, b *int) bool {
++	x := a == b
++	G(x)
++	y := a != b
++	return y
++}
++
++//go:noinline
++func G(bool) {
++	grow([1000]int{20})
++}
++
++func grow(x [1000]int) {
++	if x[0] != 0 {
++		x[0]--
++		grow(x)
++	}
++}
