@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -153,9 +153,10 @@ Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
+Patch6001:      0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
+Patch6002:      0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
+
 ExclusiveArch:  %{golang_arches}
-
-
 
 %description
 %{summary}.
@@ -388,50 +389,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-2
+- Type:CVE
+- CVE:CVE-2022-28327,CVE-2022-24675
+- SUG:NA
+- DESC:fix CVE-2022-28327,CVE-2022-24675
+- fix CVE-2022-28327 CVE-2022-24675
+
 * Mon Nov 29 2021 chenjiankun <chenjiankun1@huawei.com> - 1.17.3-1
 - upgrade to 1.17.3
-
-* Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
-- speed up build progress
-
-* Thu Jan 28 2021 xingweizheng <xingweizheng@huawei.com> - 1.15.7-1
-- upgrade to 1.15.7
-
-* Mon Dec 7 2020 yangyanchao <yangyanchao6@huawei.com> - 1.15.5-3
-- Enable Cgo for RISC-V
-
-* Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
-- Adate for RISC-V
-
-* Wed Nov 18 2020 liuzekun <liuzekun@huawei.com> - 1.15.5-1
-- upgrade to 1.15.5
-
-* Tue Aug 18 2020 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
-- upgrade to 1.13.15
-
-* Fri Jul 31 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
-- add yaml file
-
-* Thu Jul 30 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
-- upgrade to 1.13.14
-
-* Thu Jul 23 2020 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
-- bump to 1.13.4
-
-* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
-- rename tar name and make it same with upstream
-
-* Tue Mar 24 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
-- drop hard code cert
-
-* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
-- fix CVE-2020-7919
-
-* Thu Feb 20 2020 openEuler Buildteam <buildteam@openeuler.org> - 1.13-3.2
-- requires remove mercurial
-
-* Tue Dec 10 2019 jingrui<jingrui@huawei.com> - 1.13-3.1
-- upgrade to golang 1.13.3
-
-* Tue Sep 03 2019 leizhongkai<leizhongkai@huawei.com> - 1.11-1
-- backport fix CVE-2019-9512 and CVE-2019-9514
