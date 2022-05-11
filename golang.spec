@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        11
+Release:        12
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -206,6 +206,9 @@ Patch6057:       0057-release-branch.go1.16-math-big-prevent-overflow-in-R.patch
 Patch6058:       0058-release-branch.go1.16-crypto-elliptic-make-IsOnCurve.patch
 Patch6059:       0059-release-branch.go1.16-regexp-syntax-reject-very-deep.patch
 Patch6060:       0060-cmd-go-internal-modfetch-do-not-short-circuit-canoni.patch
+Patch6061:       0061-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
+Patch6062:       0062-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
+
 
 Patch9001:       0001-drop-hard-code-cert.patch
 Patch9002:       0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
@@ -440,6 +443,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Wed May 11 2022 hanchao<hanchao47@huawei.com> - 1.15.7-12
+- fix CVE-2022-28327 CVE-2022-24675
+
 * Thu Mar 24 2022 hanchao<hanchao47@huawei.com> - 1.15.7-11
 - fix CVE-2022-23773
 
