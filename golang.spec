@@ -390,7 +390,7 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-2
+* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-3
 - Type:CVE
 - CVE:CVE-2021-44717
 - SUG:NA
