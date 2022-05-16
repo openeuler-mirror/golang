@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -155,6 +155,7 @@ Requires:       openEuler-rpm-config
 
 Patch6001:      0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
 Patch6002:      0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
+Patch6003:      0003-release-branch.go1.17-syscall-fix-ForkLock-spurious-.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -389,6 +390,13 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-3
+- Type:CVE
+- CVE:CVE-2021-44717
+- SUG:NA
+- DESC:fix CVE-2021-44717
+- fix CVE-2021-44717
+
 * Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-2
 - Type:CVE
 - CVE:CVE-2022-28327,CVE-2022-24675
