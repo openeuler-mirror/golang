@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        2
+Release:        3
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -156,6 +156,7 @@ Requires:       openEuler-rpm-config
 ExclusiveArch:  %{golang_arches}
 
 Patch0:         Backport_386474.patch
+Patch1:		0001-enable-go-plugin-support-for-riscv64.patch
 
 %description
 %{summary}.
@@ -388,6 +389,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon May 23 2022 yangjinghua <yjhdandan@163.com> - 1.17.3-3
+- enable go plugin support for riscv64
+
 * Mon May 02 2022 Jingwiw <wangjingwei@iscas.ac.cn> - 1.17.3-2
 - fix bug #51199: https://go-review.googlesource.com/c/go/+/386474
 

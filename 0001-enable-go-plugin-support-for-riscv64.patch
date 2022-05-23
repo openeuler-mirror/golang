@@ -1,0 +1,53 @@
+From 4bf7854970874dea8441d8b85b924fea1673813a Mon Sep 17 00:00:00 2001
+From: SEmmmer <yjhdandan@163.com>
+Date: Sun, 22 May 2022 22:03:26 +0800
+Subject: [PATCH] enable go plugin support for riscv64
+
+---
+ src/cmd/compile/internal/ssa/regalloc.go | 2 ++
+ src/cmd/internal/sys/supported.go        | 2 +-
+ src/cmd/link/internal/ld/config.go       | 2 +-
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/compile/internal/ssa/regalloc.go b/src/cmd/compile/internal/ssa/regalloc.go
+index 3b90b87..a2ab594 100644
+--- a/src/cmd/compile/internal/ssa/regalloc.go
++++ b/src/cmd/compile/internal/ssa/regalloc.go
+@@ -628,6 +628,8 @@ func (s *regAllocState) init(f *Func) {
+ 			// nothing to do
+ 		case "arm64":
+ 			// nothing to do?
++		case "riscv64":
++			// nothing to do?
+ 		case "386":
+ 			// nothing to do.
+ 			// Note that for Flag_shared (position independent code)
+diff --git a/src/cmd/internal/sys/supported.go b/src/cmd/internal/sys/supported.go
+index 0d2bad9..d9393b9 100644
+--- a/src/cmd/internal/sys/supported.go
++++ b/src/cmd/internal/sys/supported.go
+@@ -107,7 +107,7 @@ func BuildModeSupported(compiler, buildmode, goos, goarch string) bool {
+ 
+ 	case "plugin":
+ 		switch platform {
+-		case "linux/amd64", "linux/arm", "linux/arm64", "linux/386", "linux/s390x", "linux/ppc64le",
++		case "linux/amd64", "linux/arm", "linux/arm64", "linux/riscv64", "linux/386", "linux/s390x", "linux/ppc64le",
+ 			"android/amd64", "android/arm", "android/arm64", "android/386",
+ 			"darwin/amd64", "darwin/arm64",
+ 			"freebsd/amd64":
+diff --git a/src/cmd/link/internal/ld/config.go b/src/cmd/link/internal/ld/config.go
+index 20f1d0b..a47f5f9 100644
+--- a/src/cmd/link/internal/ld/config.go
++++ b/src/cmd/link/internal/ld/config.go
+@@ -95,7 +95,7 @@ func (mode *BuildMode) Set(s string) error {
+ 		switch buildcfg.GOOS {
+ 		case "linux":
+ 			switch buildcfg.GOARCH {
+-			case "386", "amd64", "arm", "arm64", "s390x", "ppc64le":
++			case "386", "amd64", "arm", "arm64", "riscv64", "s390x", "ppc64le":
+ 			default:
+ 				return badmode()
+ 			}
+-- 
+2.30.2
+
