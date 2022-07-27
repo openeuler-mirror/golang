@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        4
+Release:        5
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -157,6 +157,17 @@ Patch6001:      0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
 Patch6002:      0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
 Patch6003:      0003-release-branch.go1.17-syscall-fix-ForkLock-spurious-.patch
 Patch6004:      0004-backport-cmd-link-mark-unexported-methods-for-plugins.patch
+Patch6005:	0005-release-branch.go1.17-net-http-preserve-nil-values-i.patch
+Patch6006:	0006-release-branch.go1.17-go-parser-limit-recursion-dept.patch
+Patch6007:	0007-release-branch.go1.17-net-http-don-t-strip-whitespac.patch
+Patch6008:	0008-release-branch.go1.17-encoding-xml-limit-depth-of-ne.patch
+Patch6009:	0009-release-branch.go1.17-encoding-gob-add-a-depth-limit.patch
+Patch6010:	0010-release-branch.go1.17-io-fs-fix-stack-exhaustion-in-.patch
+Patch6011:	0011-release-branch.go1.17-path-filepath-fix-stack-exhaus.patch
+Patch6012:	0012-release-branch.go1.17-encoding-xml-use-iterative-Ski.patch
+Patch6013:	0013-release-branch.go1.17-compress-gzip-fix-stack-exhaus.patch
+Patch6014:	0014-release-branch.go1.17-crypto-tls-randomly-generate-t.patch
+Patch6015:	0015-release-branch.go1.17-crypto-rand-properly-handle-la.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -391,6 +402,14 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Jul 26 2022 hanchao <hanchao47@huawei.com> - 1.17.3-5
+- Type:CVE
+- CVE:NA
+- SUG:NA
+- DESC: fix CVE-2022-32148,CVE-2022-1962,CVE-2022-1705,CVE-2022-30633,
+	CVE-2022-30635,CVE-2022-30630,CVE-2022-30632,CVE-2022-28131,
+	CVE-2022-30631,CVE-2022-30629,CVE-2022-30634
+
 * Tue Jun 28 2022 Bin Hu <hubin73@huawei.com> - 1.17.3-4
 - Type:bugfix
 - CVE:NA
