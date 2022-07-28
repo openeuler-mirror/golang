@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        13
+Release:        14
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -209,11 +209,20 @@ Patch6060:       0060-cmd-go-internal-modfetch-do-not-short-circuit-canoni.patch
 Patch6061:       0061-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
 Patch6062:       0062-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
 Patch6063:       0063-release-branch.go1.16-syscall-fix-ForkLock-spurious-.patch
+Patch6064:	     0064-release-branch.go1.17-net-http-preserve-nil-values-i.patch
+Patch6065:	     0065-release-branch.go1.17-go-parser-limit-recursion-dept.patch
+Patch6066:	     0066-release-branch.go1.17-net-http-don-t-strip-whitespac.patch
+Patch6067:	     0067-release-branch.go1.17-encoding-xml-limit-depth-of-ne.patch
+Patch6068:	     0068-release-branch.go1.17-encoding-gob-add-a-depth-limit.patch
+Patch6069:	     0069-release-branch.go1.17-path-filepath-fix-stack-exhaus.patch
+Patch6070:	     0070-release-branch.go1.17-encoding-xml-use-iterative-Ski.patch
+Patch6071:	     0071-release-branch.go1.17-compress-gzip-fix-stack-exhaus.patch
+Patch6072:	     0072-release-branch.go1.17-crypto-tls-randomly-generate-t.patch
+Patch6073:	     0073-release-branch.go1.17-crypto-rand-properly-handle-la.patch
 
 
 Patch9001:       0001-drop-hard-code-cert.patch
 Patch9002:       0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
-
 
 %description
 %{summary}.
@@ -444,6 +453,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+
+* Thu Jul 26 2022 hanchao<hanchao47@huawei.com> - 1.15.7-14
+- fix CVE-2022-32148,CVE-2022-1962,CVE-2022-1705,CVE-2022-30633,
+  CVE-2022-30635,CVE-2022-30632,CVE-2022-28131,
+  CVE-2022-30631,CVE-2022-30629,CVE-2022-30634
+
 * Thu May 12 2022 hanchao<hanchao47@huawei.com> - 1.15.7-13
 - fix CVE-2021-44717
 
