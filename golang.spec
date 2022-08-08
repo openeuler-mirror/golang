@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        14
+Release:        15
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -219,6 +219,7 @@ Patch6070:	0070-release-branch.go1.17-encoding-xml-use-iterative-Ski.patch
 Patch6071:	0071-release-branch.go1.17-compress-gzip-fix-stack-exhaus.patch
 Patch6072:	0072-release-branch.go1.17-crypto-tls-randomly-generate-t.patch
 Patch6073:	0073-release-branch.go1.17-crypto-rand-properly-handle-la.patch
+Patch6074:	0074-release-branch.go1.17-math-big-check-buffer-lengths-.patch
 
 
 Patch9001:       0001-drop-hard-code-cert.patch
@@ -453,6 +454,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+
+* Mon Aug 8 2022 hanchao<hanchao47@huawei.com> - 1.15.7-15
+- fix CVE-2022-32189
 
 * Thu Jul 26 2022 hanchao<hanchao47@huawei.com> - 1.15.7-14
 - fix CVE-2022-32148,CVE-2022-1962,CVE-2022-1705,CVE-2022-30633,
