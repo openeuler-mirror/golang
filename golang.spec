@@ -41,11 +41,7 @@
 %global fail_on_tests 1
 %endif
 
-%ifarch x86_64 aarch64
-%global shared 1
-%else
 %global shared 0
-%endif
 
 %ifarch x86_64
 %global race 1
@@ -62,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        16
+Release:        17
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -431,7 +427,12 @@ if [ $1 = 0 ]; then
     %{_sbindir}/update-alternatives --remove go %{goroot}/bin/go
 fi
 
+%if %{shared}
+%files -f go-pkg.list -f go-shared.list
+%else
 %files -f go-pkg.list
+%endif
+
 %doc AUTHORS CONTRIBUTORS LICENSE PATENTS
 %doc %{goroot}/VERSION
 %dir %{goroot}/doc
@@ -441,6 +442,7 @@ fi
 %exclude %{goroot}/doc/
 %exclude %{goroot}/misc/
 %exclude %{goroot}/test/
+%exclude %goroot}/lib/
 %{goroot}/*
 %dir %{gopath}
 %dir %{gopath}/src
@@ -451,11 +453,18 @@ fi
 %dir %{gopath}/src/golang.org
 %dir %{gopath}/src/golang.org/x
 
-%files help -f go-docs.list -f go-shared.list
+%files help -f go-docs.list
 
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+
+* Tue Aug 30 2022 hanchao<hanchao47@huawei.com> - 1.15.7-17
+- Type:bugfix
+- CVE:NA
+- SUG:NA
+- DESC: golang: modify the golang.spec to remove unnecessary files
+	from golang-help package
 
 * Tue Aug 18 2022 hanchao<hanchao47@huawei.com> - 1.15.7-16
 - fix CVE-2022-29804,CVE-2022-29526
