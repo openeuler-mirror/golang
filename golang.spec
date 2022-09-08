@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        1
+Release:        7
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -153,9 +153,26 @@ Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
+Patch6001:      0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
+Patch6002:      0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
+Patch6003:      0003-release-branch.go1.17-syscall-fix-ForkLock-spurious-.patch
+Patch6004:      0004-backport-cmd-link-mark-unexported-methods-for-plugins.patch
+Patch6005:	0005-release-branch.go1.17-net-http-preserve-nil-values-i.patch
+Patch6006:	0006-release-branch.go1.17-go-parser-limit-recursion-dept.patch
+Patch6007:	0007-release-branch.go1.17-net-http-don-t-strip-whitespac.patch
+Patch6008:	0008-release-branch.go1.17-encoding-xml-limit-depth-of-ne.patch
+Patch6009:	0009-release-branch.go1.17-encoding-gob-add-a-depth-limit.patch
+Patch6010:	0010-release-branch.go1.17-io-fs-fix-stack-exhaustion-in-.patch
+Patch6011:	0011-release-branch.go1.17-path-filepath-fix-stack-exhaus.patch
+Patch6012:	0012-release-branch.go1.17-encoding-xml-use-iterative-Ski.patch
+Patch6013:	0013-release-branch.go1.17-compress-gzip-fix-stack-exhaus.patch
+Patch6014:	0014-release-branch.go1.17-crypto-tls-randomly-generate-t.patch
+Patch6015:	0015-release-branch.go1.17-crypto-rand-properly-handle-la.patch
+Patch6016:	0016-release-branch.go1.17-math-big-check-buffer-lengths-.patch
+Patch6017:	0017-path-filepath-do-not-remove-prefix-.-when-following-.patch
+Patch6018:	0018-release-branch.go1.17-syscall-check-correct-group-in.patch
+
 ExclusiveArch:  %{golang_arches}
-
-
 
 %description
 %{summary}.
@@ -388,50 +405,45 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Aug 18 2022 hanchao <hanchao47@huawei.com> - 1.17.3-7
+- Type:CVE
+- CVE:CVE-2022-29804,CVE-2022-29526
+- SUG:NA
+- DESC: fix CVE-2022-29804,CVE-2022-29526
+
+* Mon Aug 8 2022 hanchao <hanchao47@huawei.com> - 1.17.3-6
+- Type:CVE
+- CVE:NA
+- SUG:NA
+- DESC: fix CVE-2022-32189
+
+* Tue Jul 26 2022 hanchao <hanchao47@huawei.com> - 1.17.3-5
+- Type:CVE
+- CVE:NA
+- SUG:NA
+- DESC: fix CVE-2022-32148,CVE-2022-1962,CVE-2022-1705,CVE-2022-30633,
+	CVE-2022-30635,CVE-2022-30630,CVE-2022-30632,CVE-2022-28131,
+	CVE-2022-30631,CVE-2022-30629,CVE-2022-30634
+
+* Tue Jun 28 2022 Bin Hu <hubin73@huawei.com> - 1.17.3-4
+- Type:bugfix
+- CVE:NA
+- SUG:NA
+- DESC:backport patch to fix bug of golang plugin mode
+
+* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-3
+- Type:CVE
+- CVE:CVE-2021-44717
+- SUG:NA
+- DESC:fix CVE-2021-44717
+- fix CVE-2021-44717
+
+* Fri May 6 2022 hanchao <hanchao47@huawei.com> - 1.17.3-2
+- Type:CVE
+- CVE:CVE-2022-28327,CVE-2022-24675
+- SUG:NA
+- DESC:fix CVE-2022-28327,CVE-2022-24675
+- fix CVE-2022-28327 CVE-2022-24675
+
 * Mon Nov 29 2021 chenjiankun <chenjiankun1@huawei.com> - 1.17.3-1
 - upgrade to 1.17.3
-
-* Thu Apr 15 2021 lixiang <lixiang172@huawei.com> - 1.15.7-2
-- speed up build progress
-
-* Thu Jan 28 2021 xingweizheng <xingweizheng@huawei.com> - 1.15.7-1
-- upgrade to 1.15.7
-
-* Mon Dec 7 2020 yangyanchao <yangyanchao6@huawei.com> - 1.15.5-3
-- Enable Cgo for RISC-V
-
-* Sat Nov 28 2020 whoisxxx <zhangxuzhou4@huawei.com> - 1.15.5-2
-- Adate for RISC-V
-
-* Wed Nov 18 2020 liuzekun <liuzekun@huawei.com> - 1.15.5-1
-- upgrade to 1.15.5
-
-* Tue Aug 18 2020 xiadanni <xiadanni1@huawei.com> - 1.13.15-1
-- upgrade to 1.13.15
-
-* Fri Jul 31 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-2
-- add yaml file
-
-* Thu Jul 30 2020 xiadanni <xiadanni1@huawei.com> - 1.13.14-1
-- upgrade to 1.13.14
-
-* Thu Jul 23 2020 xiadanni <xiadanni1@huawei.com> - 1.13-4.1
-- bump to 1.13.4
-
-* Tue May 12 2020 lixiang <lixiang172@huawei.com> - 1.13-3.6
-- rename tar name and make it same with upstream
-
-* Tue Mar 24 2020 jingrui <jingrui@huawei.com> - 1.13-3.5
-- drop hard code cert
-
-* Mon Mar 23 2020 jingrui <jingrui@huawei.com> - 1.13-3.4
-- fix CVE-2020-7919
-
-* Thu Feb 20 2020 openEuler Buildteam <buildteam@openeuler.org> - 1.13-3.2
-- requires remove mercurial
-
-* Tue Dec 10 2019 jingrui<jingrui@huawei.com> - 1.13-3.1
-- upgrade to golang 1.13.3
-
-* Tue Sep 03 2019 leizhongkai<leizhongkai@huawei.com> - 1.11-1
-- backport fix CVE-2019-9512 and CVE-2019-9514
