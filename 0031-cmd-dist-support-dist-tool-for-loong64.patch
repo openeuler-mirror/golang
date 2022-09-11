@@ -1,0 +1,88 @@
+From cb7dde9f85d6f3045434e1267d65736c9551a603 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 15:53:05 +0800
+Subject: [PATCH 31/75] cmd/dist: support dist tool for loong64
+
+Change-Id: I61dca43680d8e5bd3198a38577450a53f405a987
+---
+ src/cmd/dist/build.go | 2 ++
+ src/cmd/dist/main.go  | 4 +++-
+ src/cmd/dist/test.go  | 6 +++---
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/cmd/dist/build.go b/src/cmd/dist/build.go
+index bec1769..c18ca75 100644
+--- a/src/cmd/dist/build.go
++++ b/src/cmd/dist/build.go
+@@ -65,6 +65,7 @@ var okgoarch = []string{
+ 	"amd64",
+ 	"arm",
+ 	"arm64",
++	"loong64",
+ 	"mips",
+ 	"mipsle",
+ 	"mips64",
+@@ -1571,6 +1572,7 @@ var cgoEnabled = map[string]bool{
+ 	"linux/amd64":     true,
+ 	"linux/arm":       true,
+ 	"linux/arm64":     true,
++	"linux/loong64":   true,
+ 	"linux/ppc64":     false,
+ 	"linux/ppc64le":   true,
+ 	"linux/mips":      true,
+diff --git a/src/cmd/dist/main.go b/src/cmd/dist/main.go
+index 37de1ac..f8ef99f 100644
+--- a/src/cmd/dist/main.go
++++ b/src/cmd/dist/main.go
+@@ -125,6 +125,8 @@ func main() {
+ 			if elfIsLittleEndian(os.Args[0]) {
+ 				gohostarch = "mipsle"
+ 			}
++		case strings.Contains(out, "loongarch64"):
++			gohostarch = "loong64"
+ 		case strings.Contains(out, "riscv64"):
+ 			gohostarch = "riscv64"
+ 		case strings.Contains(out, "s390x"):
+@@ -142,7 +144,7 @@ func main() {
+ 		}
+ 	}
+ 
+-	if gohostarch == "arm" || gohostarch == "mips64" || gohostarch == "mips64le" {
++	if gohostarch == "arm" || gohostarch == "mips64" || gohostarch == "mips64le" || gohostarch == "loong64" {
+ 		maxbg = min(maxbg, runtime.NumCPU())
+ 	}
+ 	bginit()
+diff --git a/src/cmd/dist/test.go b/src/cmd/dist/test.go
+index f40fa92..485fe6b 100644
+--- a/src/cmd/dist/test.go
++++ b/src/cmd/dist/test.go
+@@ -166,7 +166,7 @@ func (t *tester) run() {
+ 	switch goarch {
+ 	case "arm":
+ 		t.timeoutScale = 2
+-	case "mips", "mipsle", "mips64", "mips64le":
++	case "loong64", "mips", "mipsle", "mips64", "mips64le":
+ 		t.timeoutScale = 4
+ 	}
+ 	if s := os.Getenv("GO_TEST_TIMEOUT_SCALE"); s != "" {
+@@ -983,7 +983,7 @@ func (t *tester) extLink() bool {
+ 		"darwin-amd64", "darwin-arm64",
+ 		"dragonfly-amd64",
+ 		"freebsd-386", "freebsd-amd64", "freebsd-arm",
+-		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-mips64", "linux-mips64le", "linux-mips", "linux-mipsle", "linux-riscv64", "linux-s390x",
++		"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-loong64", "linux-ppc64le", "linux-mips64", "linux-mips64le", "linux-mips", "linux-mipsle", "linux-riscv64", "linux-s390x",
+ 		"netbsd-386", "netbsd-amd64",
+ 		"openbsd-386", "openbsd-amd64",
+ 		"windows-386", "windows-amd64":
+@@ -1014,7 +1014,7 @@ func (t *tester) internalLink() bool {
+ 	// Internally linking cgo is incomplete on some architectures.
+ 	// https://golang.org/issue/10373
+ 	// https://golang.org/issue/14449
+-	if goarch == "mips64" || goarch == "mips64le" || goarch == "mips" || goarch == "mipsle" || goarch == "riscv64" {
++	if goarch == "loong64" || goarch == "mips64" || goarch == "mips64le" || goarch == "mips" || goarch == "mipsle" || goarch == "riscv64" {
+ 		return false
+ 	}
+ 	if goos == "aix" {
+-- 
+2.37.1
+

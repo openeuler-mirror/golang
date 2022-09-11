@@ -1,0 +1,55 @@
+From 1bf97bd4ecffc164164cd01dfab228d85bd727fd Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 24 Aug 2022 02:44:22 +0800
+Subject: [PATCH 65/75] runtime: fix runtime.usleep() on linux/loong64
+
+fix usleep by correctly setting nanoseconds parameter
+
+Change-Id: Ia4cfdea3df8834e6260527ce8e6e894a0547070f
+---
+ src/runtime/sys_linux_loong64.s | 27 +++++++++++++++------------
+ 1 file changed, 15 insertions(+), 12 deletions(-)
+
+diff --git a/src/runtime/sys_linux_loong64.s b/src/runtime/sys_linux_loong64.s
+index 1496d92..1abc5b6 100644
+--- a/src/runtime/sys_linux_loong64.s
++++ b/src/runtime/sys_linux_loong64.s
+@@ -126,20 +126,23 @@ TEXT runtime·pipe2(SB),NOSPLIT|NOFRAME,$0-20
+ 	RET
+ 
+ TEXT runtime·usleep(SB),NOSPLIT,$16-4
+-	MOVWU	usec+0(FP), R6
+-	MOVV	R6, R5
+-	MOVW	$1000000, R4
+-	DIVVU	R4, R6, R6
+-	MOVV	R6, 8(R3)
+-	MOVW	$1000, R4
+-	MULVU	R6, R4, R4
+-	SUBVU	R4, R5
+-	MOVV	R5, 16(R3)
++	MOVWU   usec+0(FP), R6
++	MOVV    $1000, R4
++	MULVU   R4, R6, R6
++	MOVV    $1000000000, R4
++
++	// ts->tv_sec
++	DIVVU   R4, R6, R5
++	MOVV    R5, 8(R3)
++
++	// ts->tv_nsec
++	REMVU   R4, R6, R5
++	MOVV    R5, 16(R3)
+ 
+ 	// nanosleep(&ts, 0)
+-	ADDV	$8, R3, R4
+-	MOVW	$0, R5
+-	MOVV	$SYS_nanosleep, R11
++	ADDV    $8, R3, R4
++	MOVV    R0, R5
++	MOVV    $SYS_nanosleep, R11
+ 	SYSCALL
+ 	RET
+ 
+-- 
+2.37.1
+

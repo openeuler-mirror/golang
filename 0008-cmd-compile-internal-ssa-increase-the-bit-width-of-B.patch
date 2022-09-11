@@ -1,0 +1,27 @@
+From aecf1dc0480bc75a37fd183e21caff143a552fe2 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 24 Nov 2021 17:53:07 +0800
+Subject: [PATCH 08/75] cmd/compile/internal/ssa: increase the bit width of
+ BlockKind type
+
+Change-Id: I246d9c22334d0ea9e1440d29df05c9ec2d472b30
+---
+ src/cmd/compile/internal/ssa/block.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/cmd/compile/internal/ssa/block.go b/src/cmd/compile/internal/ssa/block.go
+index 71ca774..2e93304 100644
+--- a/src/cmd/compile/internal/ssa/block.go
++++ b/src/cmd/compile/internal/ssa/block.go
+@@ -111,7 +111,7 @@ func (e Edge) String() string {
+ //    Plain                []            [next]
+ //       If   [boolean Value]      [then, else]
+ //    Defer             [mem]  [nopanic, panic]  (control opcode should be OpStaticCall to runtime.deferproc)
+-type BlockKind int8
++type BlockKind int16
+ 
+ // short form print
+ func (b *Block) String() string {
+-- 
+2.37.1
+

@@ -1,0 +1,264 @@
+From ddb01f57597b209cdddf9d5aaf8f519153a86bbd Mon Sep 17 00:00:00 2001
+From: limeidan <limeidan@loongson.cn>
+Date: Mon, 22 Aug 2022 20:26:59 +0800
+Subject: [PATCH 73/75] cmd/link: add support for --buildmode=c-shared on
+ loong64
+
+Signed-off-by: limeidan <limeidan@loongson.cn>
+Change-Id: I0eef9d7451159b422a54408a9ab169af301d1d2a
+---
+ src/cmd/link/internal/ld/config.go   |   2 +-
+ src/cmd/link/internal/ld/lib.go      |   2 +-
+ src/cmd/link/internal/loong64/asm.go | 177 ++++++++++++++++++++++++++-
+ 3 files changed, 175 insertions(+), 6 deletions(-)
+
+diff --git a/src/cmd/link/internal/ld/config.go b/src/cmd/link/internal/ld/config.go
+index c15aac8..09e032b 100644
+--- a/src/cmd/link/internal/ld/config.go
++++ b/src/cmd/link/internal/ld/config.go
+@@ -74,7 +74,7 @@ func (mode *BuildMode) Set(s string) error {
+ 		*mode = BuildModeCArchive
+ 	case "c-shared":
+ 		switch buildcfg.GOARCH {
+-		case "386", "amd64", "arm", "arm64", "ppc64le", "s390x":
++		case "386", "amd64", "arm", "arm64", "loong64", "ppc64le", "s390x":
+ 		default:
+ 			return badmode()
+ 		}
+diff --git a/src/cmd/link/internal/ld/lib.go b/src/cmd/link/internal/ld/lib.go
+index 7bd6193..074c07d 100644
+--- a/src/cmd/link/internal/ld/lib.go
++++ b/src/cmd/link/internal/ld/lib.go
+@@ -794,7 +794,7 @@ func (ctxt *Link) linksetup() {
+ 	ctxt.loader.SetAttrReachable(moduledata, true)
+ 	ctxt.Moduledata = moduledata
+ 
+-	if ctxt.Arch == sys.Arch386 && ctxt.HeadType != objabi.Hwindows {
++	if (ctxt.Arch == sys.Arch386 || ctxt.Arch == sys.ArchLoong64) && ctxt.HeadType != objabi.Hwindows {
+ 		if (ctxt.BuildMode == BuildModeCArchive && ctxt.IsELF) || ctxt.BuildMode == BuildModeCShared || ctxt.BuildMode == BuildModePIE || ctxt.DynlinkingGo() {
+ 			got := ctxt.loader.LookupOrCreateSym("_GLOBAL_OFFSET_TABLE_", 0)
+ 			sb := ctxt.loader.MakeSymbolUpdater(got)
+diff --git a/src/cmd/link/internal/loong64/asm.go b/src/cmd/link/internal/loong64/asm.go
+index 9c26431..c45971d 100644
+--- a/src/cmd/link/internal/loong64/asm.go
++++ b/src/cmd/link/internal/loong64/asm.go
+@@ -11,14 +11,12 @@ import (
+ 	"cmd/link/internal/loader"
+ 	"cmd/link/internal/sym"
+ 	"debug/elf"
+-	"log"
+ )
+ 
+ func gentext(ctxt *ld.Link, ldr *loader.Loader) {}
+ 
+ func adddynrel(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, s loader.Sym, r loader.Reloc, rIdx int) bool {
+-	log.Fatalf("adddynrel not implemented")
+-	return false
++	return true
+ }
+ 
+ func elfreloc1(ctxt *ld.Link, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym, r loader.ExtReloc, ri int, sectoff int64) bool {
+@@ -87,6 +85,167 @@ func elfreloc1(ctxt *ld.Link, out *ld.OutBuf, ldr *loader.Loader, s loader.Sym,
+ 		out.Write64(uint64(elf.R_LARCH_SOP_POP_32_S_0_10_10_16_S2))
+ 		out.Write64(uint64(0x0))
+ 
++	case objabi.R_LOONG64_TLS_GD_PCREL_HI:
++		symgot := ld.ElfSymForReloc(ctxt, ldr.LookupOrCreateSym("_GLOBAL_OFFSET_TABLE_", 0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x800))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_TLS_GD) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SR))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_POP_32_S_5_20))
++		out.Write64(uint64(0x0))
++
++	case objabi.R_LOONG64_TLS_GD_PCREL_LO:
++		symgot := ld.ElfSymForReloc(ctxt, ldr.LookupOrCreateSym("_GLOBAL_OFFSET_TABLE_", 0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x4))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_TLS_GD) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x804))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_TLS_GD) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SR))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SL))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SUB))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_POP_32_S_10_12))
++		out.Write64(uint64(0x0))
++
++	case objabi.R_LOONG64_GOTPCREL_HI:
++		symgot := ld.ElfSymForReloc(ctxt, ldr.LookupOrCreateSym("_GLOBAL_OFFSET_TABLE_", 0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x800))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_GPREL) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SR))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_POP_32_S_5_20))
++		out.Write64(uint64(0x0))
++
++	case objabi.R_LOONG64_GOTPCREL_LO:
++		symgot := ld.ElfSymForReloc(ctxt, ldr.LookupOrCreateSym("_GLOBAL_OFFSET_TABLE_", 0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x4))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_GPREL) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(symgot)<<32)
++		out.Write64(uint64(0x804))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_GPREL) | uint64(elfsym)<<32)
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_ADD))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SR))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_ABSOLUTE))
++		out.Write64(uint64(0xc))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SL))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_SUB))
++		out.Write64(uint64(0x0))
++
++		out.Write64(uint64(sectoff))
++		out.Write64(uint64(elf.R_LARCH_SOP_POP_32_S_10_12))
++		out.Write64(uint64(0x0))
++
++	// The pcaddu12i + addi.d instructions is used to obtain address of a symbol on Loong64.
++	// The low 12-bit of the symbol address need to be added. The addi.d instruction have
++	// signed 12-bit immediate operand. The 0x800 (addr+U12 <=> addr+0x800+S12) is introduced
++	// to do sign extending from 12 bits. The 0x804 is 0x800 + 4, 4 is instruction bit
++	// width on Loong64 and is used to correct the PC of the addi.d instruction.
+ 	case objabi.R_ADDRLOONG64:
+ 		out.Write64(uint64(sectoff))
+ 		out.Write64(uint64(elf.R_LARCH_SOP_PUSH_PCREL) | uint64(elfsym)<<32)
+@@ -179,6 +338,12 @@ func archreloc(target *ld.Target, ldr *loader.Loader, syms *ld.ArchSyms, r loade
+ 				nExtReloc = 2
+ 			}
+ 			return val, nExtReloc, true
++		case objabi.R_LOONG64_TLS_GD_PCREL_HI,
++			objabi.R_LOONG64_GOTPCREL_HI:
++			return val, 6, true
++		case objabi.R_LOONG64_TLS_GD_PCREL_LO,
++			objabi.R_LOONG64_GOTPCREL_LO:
++			return val, 12, true
+ 		}
+ 	}
+ 
+@@ -222,6 +387,8 @@ func archrelocvariant(*ld.Target, *loader.Loader, loader.Reloc, sym.RelocVariant
+ func extreloc(target *ld.Target, ldr *loader.Loader, r loader.Reloc, s loader.Sym) (loader.ExtReloc, bool) {
+ 	switch r.Type() {
+ 	case objabi.R_ADDRLOONG64,
++		objabi.R_LOONG64_GOTPCREL_HI,
++		objabi.R_LOONG64_GOTPCREL_LO,
+ 		objabi.R_ADDRLOONG64U:
+ 		return ld.ExtrelocViaOuterSym(ldr, r, s), true
+ 
+@@ -230,7 +397,9 @@ func extreloc(target *ld.Target, ldr *loader.Loader, r loader.Reloc, s loader.Sy
+ 		objabi.R_CONST,
+ 		objabi.R_GOTOFF,
+ 		objabi.R_CALLLOONG64,
+-		objabi.R_JMPLOONG64:
++		objabi.R_JMPLOONG64,
++		objabi.R_LOONG64_TLS_GD_PCREL_HI,
++		objabi.R_LOONG64_TLS_GD_PCREL_LO:
+ 		return ld.ExtrelocSimple(ldr, r), true
+ 	}
+ 	return loader.ExtReloc{}, false
+-- 
+2.37.1
+

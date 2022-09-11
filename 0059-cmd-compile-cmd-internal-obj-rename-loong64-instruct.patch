@@ -1,0 +1,208 @@
+From 99bb53cd65f0839ed423623b403ce381139eae2d Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Tue, 2 Aug 2022 19:35:45 +0800
+Subject: [PATCH 59/75] cmd/compile,cmd/internal/obj: rename loong64
+ instructions SQRT{F,D} to FSQRT{S,D}
+
+The SQRT{F,D} instructions were misleading because they correspond to the mnemonic
+FSQRT{S,D} as defined in the LoongArch Architecture Reference Manual. This changes
+the assembler to use the same mnemonic as the GNU assembler and the manual.
+
+LoongArch Architecture Reference Manual:
+    https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html
+
+Change-Id: Iaa0b2cd4681f9659f21305fadbbfe4a5f8b9dfc4
+---
+ src/cmd/asm/internal/asm/testdata/loong64enc1.s |  4 ++--
+ src/cmd/compile/internal/loong64/ssa.go         |  4 ++--
+ src/cmd/compile/internal/ssa/gen/LOONG64.rules  |  4 ++--
+ src/cmd/compile/internal/ssa/gen/LOONG64Ops.go  | 10 +++++-----
+ src/cmd/compile/internal/ssa/opGen.go           | 12 ++++++------
+ src/cmd/compile/internal/ssa/rewriteLOONG64.go  |  4 ++--
+ src/cmd/internal/obj/loong64/a.out.go           |  4 ++--
+ src/cmd/internal/obj/loong64/anames.go          |  4 ++--
+ src/cmd/internal/obj/loong64/asm.go             |  8 ++++----
+ 9 files changed, 27 insertions(+), 27 deletions(-)
+
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc1.s b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+index c724cf9..b483fac 100644
+--- a/src/cmd/asm/internal/asm/testdata/loong64enc1.s
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+@@ -191,8 +191,8 @@ lable2:
+ 	ABSD	F4, F5			// 85081401
+ 	TRUNCDW	F4, F5			// 85881a01
+ 	TRUNCFW	F4, F5			// 85841a01
+-	SQRTF	F4, F5			// 85441401
+-	SQRTD	F4, F5			// 85481401
++	FSQRTS	F4, F5			// 85441401
++	FSQRTD	F4, F5			// 85481401
+ 
+ 	DBAR	 			// 00007238
+ 	NOOP	 			// 00004003
+diff --git a/src/cmd/compile/internal/loong64/ssa.go b/src/cmd/compile/internal/loong64/ssa.go
+index 2478963..cb27389 100644
+--- a/src/cmd/compile/internal/loong64/ssa.go
++++ b/src/cmd/compile/internal/loong64/ssa.go
+@@ -370,8 +370,8 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
+ 		ssa.OpLOONG64MOVDF,
+ 		ssa.OpLOONG64NEGF,
+ 		ssa.OpLOONG64NEGD,
+-		ssa.OpLOONG64SQRTD,
+-		ssa.OpLOONG64SQRTF:
++		ssa.OpLOONG64FSQRTD,
++		ssa.OpLOONG64FSQRTS:
+ 		p := s.Prog(v.Op.Asm())
+ 		p.From.Type = obj.TYPE_REG
+ 		p.From.Reg = v.Args[0].Reg()
+diff --git a/src/cmd/compile/internal/ssa/gen/LOONG64.rules b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+index 4237aea..bde427d 100644
+--- a/src/cmd/compile/internal/ssa/gen/LOONG64.rules
++++ b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+@@ -120,8 +120,8 @@
+ 
+ (Com(64|32|16|8) x) => (NOR (MOVVconst [0]) x)
+ 
+-(Sqrt ...) => (SQRTD ...)
+-(Sqrt32 ...) => (SQRTF ...)
++(Sqrt ...) => (FSQRTD ...)
++(Sqrt32 ...) => (FSQRTS ...)
+ 
+ // boolean ops -- booleans are represented with 0=false, 1=true
+ (AndB ...) => (AND ...)
+diff --git a/src/cmd/compile/internal/ssa/gen/LOONG64Ops.go b/src/cmd/compile/internal/ssa/gen/LOONG64Ops.go
+index 1f0fec7..fbc751b 100644
+--- a/src/cmd/compile/internal/ssa/gen/LOONG64Ops.go
++++ b/src/cmd/compile/internal/ssa/gen/LOONG64Ops.go
+@@ -235,11 +235,11 @@ func init() {
+ 		{name: "NOR", argLength: 2, reg: gp21, asm: "NOR", commutative: true},                // ^(arg0 | arg1)
+ 		{name: "NORconst", argLength: 1, reg: gp11, asm: "NOR", aux: "Int64"},                // ^(arg0 | auxInt)
+ 
+-		{name: "NEGV", argLength: 1, reg: gp11},                // -arg0
+-		{name: "NEGF", argLength: 1, reg: fp11, asm: "NEGF"},   // -arg0, float32
+-		{name: "NEGD", argLength: 1, reg: fp11, asm: "NEGD"},   // -arg0, float64
+-		{name: "SQRTD", argLength: 1, reg: fp11, asm: "SQRTD"}, // sqrt(arg0), float64
+-		{name: "SQRTF", argLength: 1, reg: fp11, asm: "SQRTF"}, // sqrt(arg0), float32
++		{name: "NEGV", argLength: 1, reg: gp11},                  // -arg0
++		{name: "NEGF", argLength: 1, reg: fp11, asm: "NEGF"},     // -arg0, float32
++		{name: "NEGD", argLength: 1, reg: fp11, asm: "NEGD"},     // -arg0, float64
++		{name: "FSQRTD", argLength: 1, reg: fp11, asm: "FSQRTD"}, // sqrt(arg0), float64
++		{name: "FSQRTS", argLength: 1, reg: fp11, asm: "FSQRTS"}, // sqrt(arg0), float32
+ 
+ 		// shifts
+ 		{name: "SLLV", argLength: 2, reg: gp21, asm: "SLLV"},                    // arg0 << arg1, shift amount is mod 64
+diff --git a/src/cmd/compile/internal/ssa/opGen.go b/src/cmd/compile/internal/ssa/opGen.go
+index 5aa0f52..71e080d 100644
+--- a/src/cmd/compile/internal/ssa/opGen.go
++++ b/src/cmd/compile/internal/ssa/opGen.go
+@@ -1657,8 +1657,8 @@ const (
+ 	OpLOONG64NEGV
+ 	OpLOONG64NEGF
+ 	OpLOONG64NEGD
+-	OpLOONG64SQRTD
+-	OpLOONG64SQRTF
++	OpLOONG64FSQRTD
++	OpLOONG64FSQRTS
+ 	OpLOONG64SLLV
+ 	OpLOONG64SLLVconst
+ 	OpLOONG64SRLV
+@@ -21977,9 +21977,9 @@ var opcodeTable = [...]opInfo{
+ 		},
+ 	},
+ 	{
+-		name:   "SQRTD",
++		name:   "FSQRTD",
+ 		argLen: 1,
+-		asm:    loong64.ASQRTD,
++		asm:    loong64.AFSQRTD,
+ 		reg: regInfo{
+ 			inputs: []inputInfo{
+ 				{0, 4611686017353646080}, // F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 F31
+@@ -21990,9 +21990,9 @@ var opcodeTable = [...]opInfo{
+ 		},
+ 	},
+ 	{
+-		name:   "SQRTF",
++		name:   "FSQRTS",
+ 		argLen: 1,
+-		asm:    loong64.ASQRTF,
++		asm:    loong64.AFSQRTS,
+ 		reg: regInfo{
+ 			inputs: []inputInfo{
+ 				{0, 4611686017353646080}, // F0 F1 F2 F3 F4 F5 F6 F7 F8 F9 F10 F11 F12 F13 F14 F15 F16 F17 F18 F19 F20 F21 F22 F23 F24 F25 F26 F27 F28 F29 F30 F31
+diff --git a/src/cmd/compile/internal/ssa/rewriteLOONG64.go b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+index e0f0df0..8f3c823 100644
+--- a/src/cmd/compile/internal/ssa/rewriteLOONG64.go
++++ b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+@@ -592,10 +592,10 @@ func rewriteValueLOONG64(v *Value) bool {
+ 	case OpSlicemask:
+ 		return rewriteValueLOONG64_OpSlicemask(v)
+ 	case OpSqrt:
+-		v.Op = OpLOONG64SQRTD
++		v.Op = OpLOONG64FSQRTD
+ 		return true
+ 	case OpSqrt32:
+-		v.Op = OpLOONG64SQRTF
++		v.Op = OpLOONG64FSQRTS
+ 		return true
+ 	case OpStaticCall:
+ 		v.Op = OpLOONG64CALLstatic
+diff --git a/src/cmd/internal/obj/loong64/a.out.go b/src/cmd/internal/obj/loong64/a.out.go
+index e3857ea..9846bc9 100644
+--- a/src/cmd/internal/obj/loong64/a.out.go
++++ b/src/cmd/internal/obj/loong64/a.out.go
+@@ -331,8 +331,8 @@ const (
+ 	ASGTU
+ 
+ 	ASLL
+-	ASQRTD
+-	ASQRTF
++	AFSQRTD
++	AFSQRTS
+ 	ASRA
+ 	ASRL
+ 	ASUB
+diff --git a/src/cmd/internal/obj/loong64/anames.go b/src/cmd/internal/obj/loong64/anames.go
+index 48d8a78..715f03a 100644
+--- a/src/cmd/internal/obj/loong64/anames.go
++++ b/src/cmd/internal/obj/loong64/anames.go
+@@ -84,8 +84,8 @@ var Anames = []string{
+ 	"SGT",
+ 	"SGTU",
+ 	"SLL",
+-	"SQRTD",
+-	"SQRTF",
++	"FSQRTD",
++	"FSQRTS",
+ 	"SRA",
+ 	"SRL",
+ 	"SUB",
+diff --git a/src/cmd/internal/obj/loong64/asm.go b/src/cmd/internal/obj/loong64/asm.go
+index 072fc1d..02e0f36 100644
+--- a/src/cmd/internal/obj/loong64/asm.go
++++ b/src/cmd/internal/obj/loong64/asm.go
+@@ -906,8 +906,8 @@ func buildop(ctxt *obj.Link) {
+ 			opset(AABSD, r0)
+ 			opset(ATRUNCDW, r0)
+ 			opset(ATRUNCFW, r0)
+-			opset(ASQRTF, r0)
+-			opset(ASQRTD, r0)
++			opset(AFSQRTS, r0)
++			opset(AFSQRTD, r0)
+ 
+ 		case AMOVVF:
+ 			opset(AMOVVD, r0)
+@@ -1768,9 +1768,9 @@ func (c *ctxt0) oprrr(a obj.As) uint32 {
+ 	case ACMPGTF:
+ 		return 0x0c1<<20 | 0x3<<15 // FCMP.SLT.S
+ 
+-	case ASQRTF:
++	case AFSQRTS:
+ 		return 0x4511 << 10
+-	case ASQRTD:
++	case AFSQRTD:
+ 		return 0x4512 << 10
+ 
+ 	case ADBAR:
+-- 
+2.37.1
+

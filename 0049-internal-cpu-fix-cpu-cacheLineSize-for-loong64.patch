@@ -1,0 +1,36 @@
+From 60174ceb5af45f0b5a538e332d45418e6f716f9e Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 26 May 2022 19:38:02 +0800
+Subject: [PATCH 49/75] internal/cpu: fix cpu cacheLineSize for loong64
+
+We choose 64 because the L1 Dcache of Loongson 3A5000 CPU is
+4-way 256-line 64-byte-per-line.
+
+Change-Id: Ifb9a9f993dd6f75b5adb4ff6e4d93e945b1b2a98
+Reviewed-on: https://go-review.googlesource.com/c/go/+/408854
+Run-TryBot: Ian Lance Taylor <iant@google.com>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Auto-Submit: Ian Lance Taylor <iant@google.com>
+Reviewed-by: Alex Rakoczy <alex@golang.org>
+Reviewed-by: Ian Lance Taylor <iant@google.com>
+---
+ src/internal/cpu/cpu_loong64.go | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/src/internal/cpu/cpu_loong64.go b/src/internal/cpu/cpu_loong64.go
+index d0ff934..7e7701d 100644
+--- a/src/internal/cpu/cpu_loong64.go
++++ b/src/internal/cpu/cpu_loong64.go
+@@ -7,6 +7,8 @@
+ 
+ package cpu
+ 
+-const CacheLinePadSize = 32
++// CacheLinePadSize is used to prevent false sharing of cache lines.
++// We choose 64 because Loongson 3A5000 the L1 Dcache is 4-way 256-line 64-byte-per-line.
++const CacheLinePadSize = 64
+ 
+ func doinit() {}
+-- 
+2.37.1
+

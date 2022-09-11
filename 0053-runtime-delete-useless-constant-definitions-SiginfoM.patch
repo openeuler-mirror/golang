@@ -1,0 +1,29 @@
+From e922490b47f01589668200fa8f29438a75f8bdde Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 30 Jun 2022 10:17:21 +0800
+Subject: [PATCH 53/75] runtime: delete useless constant definitions
+ SiginfoMaxSize and SigeventMaxSize
+
+Change-Id: I082668bb428148fc192caeb02d551741d926e1b9
+(cherry picked from commit 7d97849d56a19040dc38c24acec404c7e2463a6b)
+---
+ src/runtime/export_linux_test.go | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/runtime/export_linux_test.go b/src/runtime/export_linux_test.go
+index 057f4b6..b7c901f 100644
+--- a/src/runtime/export_linux_test.go
++++ b/src/runtime/export_linux_test.go
+@@ -8,9 +8,6 @@ package runtime
+ 
+ import "unsafe"
+ 
+-const SiginfoMaxSize = _si_max_size
+-const SigeventMaxSize = _sigev_max_size
+-
+ var NewOSProc0 = newosproc0
+ var Mincore = mincore
+ var Add = add
+-- 
+2.37.1
+

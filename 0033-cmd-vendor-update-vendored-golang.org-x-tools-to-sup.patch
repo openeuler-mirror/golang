@@ -1,0 +1,52 @@
+From 82fafb7a224f3fac2d455e869a2478276212fc0a Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Tue, 19 Oct 2021 15:37:32 +0800
+Subject: [PATCH 33/75] cmd/vendor: update vendored golang.org/x/tools to
+ support loong64
+
+Change-Id: I3501138fb0b37f0b4872596dd317f8e51af63b28
+---
+ .../x/tools/go/analysis/passes/asmdecl/asmdecl.go   | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/src/cmd/vendor/golang.org/x/tools/go/analysis/passes/asmdecl/asmdecl.go b/src/cmd/vendor/golang.org/x/tools/go/analysis/passes/asmdecl/asmdecl.go
+index eb0016b..8f8da98 100644
+--- a/src/cmd/vendor/golang.org/x/tools/go/analysis/passes/asmdecl/asmdecl.go
++++ b/src/cmd/vendor/golang.org/x/tools/go/analysis/passes/asmdecl/asmdecl.go
+@@ -81,6 +81,7 @@ var (
+ 	asmArchArm      = asmArch{name: "arm", bigEndian: false, stack: "R13", lr: true}
+ 	asmArchArm64    = asmArch{name: "arm64", bigEndian: false, stack: "RSP", lr: true}
+ 	asmArchAmd64    = asmArch{name: "amd64", bigEndian: false, stack: "SP", lr: false}
++	asmArchLoong64  = asmArch{name: "loong64", bigEndian: false, stack: "R3", lr: true}
+ 	asmArchMips     = asmArch{name: "mips", bigEndian: true, stack: "R29", lr: true}
+ 	asmArchMipsLE   = asmArch{name: "mipsle", bigEndian: false, stack: "R29", lr: true}
+ 	asmArchMips64   = asmArch{name: "mips64", bigEndian: true, stack: "R29", lr: true}
+@@ -96,6 +97,7 @@ var (
+ 		&asmArchArm,
+ 		&asmArchArm64,
+ 		&asmArchAmd64,
++		&asmArchLoong64,
+ 		&asmArchMips,
+ 		&asmArchMipsLE,
+ 		&asmArchMips64,
+@@ -721,6 +723,17 @@ func asmCheckVar(badf func(string, ...interface{}), fn *asmFunc, line, expr stri
+ 			case "MOVV", "MOVD":
+ 				src = 8
+ 			}
++		case "loong64":
++			switch op {
++			case "MOVB", "MOVBU":
++				src = 1
++			case "MOVH", "MOVHU":
++				src = 2
++			case "MOVW", "MOVWU", "MOVF":
++				src = 4
++			case "MOVV", "MOVD":
++				src = 8
++			}
+ 		case "s390x":
+ 			switch op {
+ 			case "MOVB", "MOVBZ":
+-- 
+2.37.1
+

@@ -1,0 +1,61 @@
+From 3a070e2ce432eb300e014c748c57f5f25666660d Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 1 Dec 2021 17:42:46 +0800
+Subject: [PATCH 25/75] runtime: add build tag for common support on
+ linux/loong64
+
+Change-Id: Ide01fb8a39fe3e890f6cbc5d28f4a1d47eb5d79b
+---
+ src/runtime/hash64.go           | 4 ++--
+ src/runtime/lfstack_64bit.go    | 4 ++--
+ src/runtime/mpagealloc_64bit.go | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/src/runtime/hash64.go b/src/runtime/hash64.go
+index 5f7d00b..62ce67a 100644
+--- a/src/runtime/hash64.go
++++ b/src/runtime/hash64.go
+@@ -5,8 +5,8 @@
+ // Hashing algorithm inspired by
+ // wyhash: https://github.com/wangyi-fudan/wyhash
+ 
+-//go:build amd64 || arm64 || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x || wasm
+-// +build amd64 arm64 mips64 mips64le ppc64 ppc64le riscv64 s390x wasm
++//go:build amd64 || arm64 || loong64 || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x || wasm
++// +build amd64 arm64 loong64 mips64 mips64le ppc64 ppc64le riscv64 s390x wasm
+ 
+ package runtime
+ 
+diff --git a/src/runtime/lfstack_64bit.go b/src/runtime/lfstack_64bit.go
+index 4812dd1..71bd2fc 100644
+--- a/src/runtime/lfstack_64bit.go
++++ b/src/runtime/lfstack_64bit.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build amd64 || arm64 || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x || wasm
+-// +build amd64 arm64 mips64 mips64le ppc64 ppc64le riscv64 s390x wasm
++//go:build amd64 || arm64 || loong64 || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x || wasm
++// +build amd64 arm64 loong64 mips64 mips64le ppc64 ppc64le riscv64 s390x wasm
+ 
+ package runtime
+ 
+diff --git a/src/runtime/mpagealloc_64bit.go b/src/runtime/mpagealloc_64bit.go
+index 1657734..1710ca9 100644
+--- a/src/runtime/mpagealloc_64bit.go
++++ b/src/runtime/mpagealloc_64bit.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build amd64 || (!ios && arm64) || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x
+-// +build amd64 !ios,arm64 mips64 mips64le ppc64 ppc64le riscv64 s390x
++//go:build amd64 || (!ios && arm64) || loong64 || mips64 || mips64le || ppc64 || ppc64le || riscv64 || s390x
++// +build amd64 !ios,arm64 loong64 mips64 mips64le ppc64 ppc64le riscv64 s390x
+ 
+ // See mpagealloc_32bit.go for why ios/arm64 is excluded here.
+ 
+-- 
+2.37.1
+

@@ -1,0 +1,142 @@
+From 87ca14ba83aa33433168cf021e9efff3a3929916 Mon Sep 17 00:00:00 2001
+From: limeidan <limeidan@loongson.cn>
+Date: Mon, 22 Aug 2022 20:22:21 +0800
+Subject: [PATCH 70/75] runtime: add support for --buildmode=c-shared on
+ loong64
+
+Signed-off-by: limeidan <limeidan@loongson.cn>
+Change-Id: I6885c7ecc3904b8917ca014b54d1b22d18b2d04d
+---
+ src/runtime/rt0_linux_loong64.s | 51 +++++++++++++++++++++++++++++++++
+ src/runtime/tls_loong64.s       | 37 ++++++++++++++++++++++--
+ 2 files changed, 86 insertions(+), 2 deletions(-)
+
+diff --git a/src/runtime/rt0_linux_loong64.s b/src/runtime/rt0_linux_loong64.s
+index 86885df..96fb4d3 100644
+--- a/src/runtime/rt0_linux_loong64.s
++++ b/src/runtime/rt0_linux_loong64.s
+@@ -6,6 +6,7 @@
+ // +build loong64
+ 
+ #include "textflag.h"
++#include "cgo/abi_loong64.h"
+ 
+ TEXT _rt0_loong64_linux(SB),NOSPLIT|NOFRAME,$0
+ 	// In a statically linked binary, the stack contains argc,
+@@ -16,6 +17,56 @@ TEXT _rt0_loong64_linux(SB),NOSPLIT|NOFRAME,$0
+ 	ADDV	$8, R3, R5	// argv
+ 	JMP	main(SB)
+ 
++// When building with -buildmode=c-shared, this symbol is called when the shared
++// library is loaded.
++TEXT _rt0_loong64_linux_lib(SB),NOSPLIT,$232
++	// Preserve callee-save registers.
++	SAVE_R22_TO_R31(24)
++	SAVE_F24_TO_F31(104)
++
++	// Initialize g as null in case of using g later e.g. sigaction in cgo_sigaction.go
++	MOVV	R0, g
++
++	MOVV	R4, _rt0_loong64_linux_lib_argc<>(SB)
++	MOVV	R5, _rt0_loong64_linux_lib_argv<>(SB)
++
++	// Synchronous initialization.
++	MOVV	$runtime·libpreinit(SB), R19
++	JAL     (R19)
++
++	// Create a new thread to do the runtime initialization and return.
++	MOVV	_cgo_sys_thread_create(SB), R19
++	BEQ     R19, nocgo
++	MOVV	$_rt0_loong64_linux_lib_go(SB), R4
++	MOVV	$0, R5
++	JAL     (R19)
++	JMP     restore
++
++nocgo:
++	MOVV	$0x800000, R4                     // stacksize = 8192KB
++	MOVV	$_rt0_loong64_linux_lib_go(SB), R5
++	MOVV	R4, 8(R3)
++	MOVV	R5, 16(R3)
++	MOVV	$runtime·newosproc0(SB), R19
++	JAL     (R19)
++
++restore:
++	// Restore callee-save registers.
++	RESTORE_R22_TO_R31(24)
++	RESTORE_F24_TO_F31(104)
++	RET
++
++TEXT _rt0_loong64_linux_lib_go(SB),NOSPLIT,$0
++	MOVV	_rt0_loong64_linux_lib_argc<>(SB), R4
++	MOVV	_rt0_loong64_linux_lib_argv<>(SB), R5
++	MOVV	$runtime·rt0_go(SB),R19
++	JMP     (R19)
++
++DATA _rt0_loong64_linux_lib_argc<>(SB)/8, $0
++GLOBL _rt0_loong64_linux_lib_argc<>(SB),NOPTR, $8
++DATA _rt0_loong64_linux_lib_argv<>(SB)/8, $0
++GLOBL _rt0_loong64_linux_lib_argv<>(SB),NOPTR, $8
++
+ TEXT main(SB),NOSPLIT|NOFRAME,$0
+ 	// in external linking, glibc jumps to main with argc in R4
+ 	// and argv in R5
+diff --git a/src/runtime/tls_loong64.s b/src/runtime/tls_loong64.s
+index 30627d8..ee3be31 100644
+--- a/src/runtime/tls_loong64.s
++++ b/src/runtime/tls_loong64.s
+@@ -12,17 +12,50 @@
+ // If !iscgo, this is a no-op.
+ //
+ // NOTE: mcall() assumes this clobbers only R30 (REGTMP).
+-TEXT runtime·save_g(SB),NOSPLIT|NOFRAME,$0-0
++TEXT runtime·save_g(SB),NOSPLIT,$0-0
+ 	MOVB	runtime·iscgo(SB), R30
+ 	BEQ	R30, nocgo
+ 
++	// here use the func __tls_get_addr to get the address of tls_g, which clobbers these regs below.
++	ADDV    $-56, R3
++	MOVV    R1, 0(R3)
++	MOVV    R4, 8(R3)
++	MOVV    R5, 16(R3)
++	MOVV    R6, 24(R3)
++	MOVV    R12, 32(R3)
++	MOVV    R13, 40(R3)
++	MOVV    R30, 48(R3)
+ 	MOVV	g, runtime·tls_g(SB)
++	MOVV    0(R3), R1
++	MOVV    8(R3), R4
++	MOVV    16(R3), R5
++	MOVV    24(R3), R6
++	MOVV    32(R3), R12
++	MOVV    40(R3), R13
++	MOVV    48(R3), R30
++	ADDV    $56, R3
+ 
+ nocgo:
+ 	RET
+ 
+-TEXT runtime·load_g(SB),NOSPLIT|NOFRAME,$0-0
++TEXT runtime·load_g(SB),NOSPLIT,$0-0
++	ADDV    $-56, R3
++	MOVV    R1, 0(R3)
++	MOVV    R4, 8(R3)
++	MOVV    R5, 16(R3)
++	MOVV    R6, 24(R3)
++	MOVV    R12, 32(R3)
++	MOVV    R13, 40(R3)
++	MOVV    R30, 48(R3)
+ 	MOVV	runtime·tls_g(SB), g
++	MOVV    0(R3), R1
++	MOVV    8(R3), R4
++	MOVV    16(R3), R5
++	MOVV    24(R3), R6
++	MOVV    32(R3), R12
++	MOVV    40(R3), R13
++	MOVV    48(R3), R30
++	ADDV    $56, R3
+ 	RET
+ 
+ GLOBL runtime·tls_g(SB), TLSBSS, $8
+-- 
+2.37.1
+
