@@ -58,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        17
+Release:        18
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -218,7 +218,7 @@ Patch6073:	0073-release-branch.go1.17-crypto-rand-properly-handle-la.patch
 Patch6074:	0074-release-branch.go1.17-math-big-check-buffer-lengths-.patch
 Patch6075:	0075-path-filepath-do-not-remove-prefix-.-when-following-.patch
 Patch6076:	0076-release-branch.go1.17-syscall-check-correct-group-in.patch
-
+Patch6077:	0077-release-branch.go1.16-runtime-consistently-access-po.patch
 
 Patch9001:       0001-drop-hard-code-cert.patch
 Patch9002:       0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
@@ -458,6 +458,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+
+* Thu Spe 8 2022 hanchao<hanchao47@huawei.com> - 1.15.7-18
+- Type:bugfix
+- CVE:NA
+- SUG:NA
+- DESC: runtime: consistently access pollDesc r/w Gs with atomics
 
 * Tue Aug 30 2022 hanchao<hanchao47@huawei.com> - 1.15.7-17
 - Type:bugfix
