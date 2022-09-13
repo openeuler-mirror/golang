@@ -1,0 +1,44 @@
+From 0dfb65f5c171d48650fec583aafd5813005c1a3a Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 25 Nov 2021 14:20:39 +0800
+Subject: [PATCH 13/75] cmd/compile/internal: fix test error on loong64
+
+Change-Id: I4ca290bf725425a9a6ac2c6767a5bf4ff2339d0e
+---
+ src/cmd/compile/internal/logopt/logopt_test.go | 2 +-
+ src/cmd/compile/internal/test/inl_test.go      | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/cmd/compile/internal/logopt/logopt_test.go b/src/cmd/compile/internal/logopt/logopt_test.go
+index 7197617..8131869 100644
+--- a/src/cmd/compile/internal/logopt/logopt_test.go
++++ b/src/cmd/compile/internal/logopt/logopt_test.go
+@@ -155,7 +155,7 @@ func s15a8(x *[15]int64) [15]int64 {
+ 		arches := []string{runtime.GOARCH}
+ 		goos0 := runtime.GOOS
+ 		if runtime.GOARCH == "amd64" { // Test many things with "linux" (wasm will get "js")
+-			arches = []string{"arm", "arm64", "386", "amd64", "mips", "mips64", "ppc64le", "riscv64", "s390x", "wasm"}
++			arches = []string{"arm", "arm64", "386", "amd64", "mips", "mips64", "loong64", "ppc64le", "riscv64", "s390x", "wasm"}
+ 			goos0 = "linux"
+ 		}
+ 
+diff --git a/src/cmd/compile/internal/test/inl_test.go b/src/cmd/compile/internal/test/inl_test.go
+index 6f10003..c919125 100644
+--- a/src/cmd/compile/internal/test/inl_test.go
++++ b/src/cmd/compile/internal/test/inl_test.go
+@@ -160,10 +160,10 @@ func TestIntendedInlining(t *testing.T) {
+ 		},
+ 	}
+ 
+-	if runtime.GOARCH != "386" && runtime.GOARCH != "mips64" && runtime.GOARCH != "mips64le" && runtime.GOARCH != "riscv64" {
++	if runtime.GOARCH != "386" && runtime.GOARCH != "loong64" && runtime.GOARCH != "mips64" && runtime.GOARCH != "mips64le" && runtime.GOARCH != "riscv64" {
+ 		// nextFreeFast calls sys.Ctz64, which on 386 is implemented in asm and is not inlinable.
+ 		// We currently don't have midstack inlining so nextFreeFast is also not inlinable on 386.
+-		// On mips64x and riscv64, Ctz64 is not intrinsified and causes nextFreeFast too expensive
++		// On loong64, mips64x and riscv64, Ctz64 is not intrinsified and causes nextFreeFast too expensive
+ 		// to inline (Issue 22239).
+ 		want["runtime"] = append(want["runtime"], "nextFreeFast")
+ 	}
+-- 
+2.37.1
+

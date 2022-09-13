@@ -1,0 +1,68 @@
+From f4556f17087e12e513e1664ccaff1f03115e9c54 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 11 May 2022 07:49:35 +0800
+Subject: [PATCH 43/75] cmd/compile: remove atomic Cas Xchg and Xadd intrinsics
+ on loong64
+
+Change-Id: Id182b0e39845d55668a92b252a36cae6b83bb018
+---
+ src/cmd/compile/internal/ssagen/ssa.go | 6 +++---
+ test/inline_sync.go                    | 2 +-
+ test/intrinsic_atomic.go               | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/src/cmd/compile/internal/ssagen/ssa.go b/src/cmd/compile/internal/ssagen/ssa.go
+index f61f1c2..7ddec84 100644
+--- a/src/cmd/compile/internal/ssagen/ssa.go
++++ b/src/cmd/compile/internal/ssagen/ssa.go
+@@ -3945,7 +3945,7 @@ func InitTables() {
+ 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
+ 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT32], v)
+ 		},
+-		sys.AMD64, sys.Loong64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
++		sys.AMD64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
+ 	addF("runtime/internal/atomic", "Xchg64",
+ 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+ 			v := s.newValue3(ssa.OpAtomicExchange64, types.NewTuple(types.Types[types.TUINT64], types.TypeMem), args[0], args[1], s.mem())
+@@ -4010,7 +4010,7 @@ func InitTables() {
+ 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
+ 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT32], v)
+ 		},
+-		sys.AMD64, sys.Loong64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
++		sys.AMD64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
+ 	addF("runtime/internal/atomic", "Xadd64",
+ 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+ 			v := s.newValue3(ssa.OpAtomicAdd64, types.NewTuple(types.Types[types.TUINT64], types.TypeMem), args[0], args[1], s.mem())
+@@ -4032,7 +4032,7 @@ func InitTables() {
+ 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
+ 			return s.newValue1(ssa.OpSelect0, types.Types[types.TBOOL], v)
+ 		},
+-		sys.AMD64, sys.Loong64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
++		sys.AMD64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
+ 	addF("runtime/internal/atomic", "Cas64",
+ 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+ 			v := s.newValue4(ssa.OpAtomicCompareAndSwap64, types.NewTuple(types.Types[types.TBOOL], types.TypeMem), args[0], args[1], args[2], s.mem())
+diff --git a/test/inline_sync.go b/test/inline_sync.go
+index 30b436a..de39343 100644
+--- a/test/inline_sync.go
++++ b/test/inline_sync.go
+@@ -1,4 +1,4 @@
+-// +build !nacl,!386,!wasm,!arm,!gcflags_noopt
++// +build !nacl,!386,!wasm,!arm,!gcflags_noopt,!loong64
+ // errorcheck -0 -m
+ 
+ // Copyright 2019 The Go Authors. All rights reserved.
+diff --git a/test/intrinsic_atomic.go b/test/intrinsic_atomic.go
+index a1004c8..61911b7 100644
+--- a/test/intrinsic_atomic.go
++++ b/test/intrinsic_atomic.go
+@@ -1,5 +1,5 @@
+ // errorcheck -0 -d=ssa/intrinsics/debug
+-// +build amd64 arm64 loong64 mips mipsle mips64 mips64le ppc64 ppc64le riscv64 s390x
++// +build amd64 arm64 mips mipsle mips64 mips64le ppc64 ppc64le riscv64 s390x
+ 
+ // Copyright 2016 The Go Authors. All rights reserved.
+ // Use of this source code is governed by a BSD-style
+-- 
+2.37.1
+

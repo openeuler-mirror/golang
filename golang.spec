@@ -11,19 +11,19 @@
 %define __find_requires %{nil}
 
 %bcond_with bootstrap
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %bcond_without ignore_tests
 %else
 %bcond_with ignore_tests
 %endif
 
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %global external_linker 1
 %else
 %global external_linker 0
 %endif
 
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %global cgo_enabled 1
 %else
 %global cgo_enabled 0
@@ -62,15 +62,95 @@
 %ifarch riscv64
 %global gohostarch riscv64
 %endif
+%ifarch loongarch64
+%global gohostarch loong64
+%endif
 
 
 Name:           golang
 Version:        1.17.3
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
 Source0:        https://dl.google.com/go/go1.17.3.src.tar.gz
+
+# Port to loongarch64 patches
+Patch000: 0001-cmd-internal-sys-declare-loong64-arch.patch
+Patch001: 0002-cmd-internal-sys-fix-placement-of-loong64-definition.patch
+Patch002: 0003-internal-add-loong64-constant-definition.patch
+Patch003: 0004-cmd-go-internal-configure-go-tool-workflow-for-loong.patch
+Patch004: 0005-cmd-compile-register-loong64.Init-function-for-compi.patch
+Patch005: 0006-cmd-compile-internal-loong64-implement-Init-function.patch
+Patch006: 0007-cmd-compile-internal-ssa-config-lower-pass-function-.patch
+Patch007: 0008-cmd-compile-internal-ssa-increase-the-bit-width-of-B.patch
+Patch008: 0009-cmd-compile-internal-ssa-gen-define-rules-and-operat.patch
+Patch009: 0010-cmd-compile-internal-ssa-inline-memmove-with-known-s.patch
+Patch010: 0011-cmd-compile-internal-ssa-add-support-on-loong64-for-.patch
+Patch011: 0012-cmd-compile-internal-ssagen-enable-intrinsic-operati.patch
+Patch012: 0013-cmd-compile-internal-fix-test-error-on-loong64.patch
+Patch013: 0014-cmd-internal-obj-instructions-and-registers-for-loon.patch
+Patch014: 0015-cmd-asm-internal-helper-function-and-end-to-end-test.patch
+Patch015: 0016-cmd-internal-objabi-cmd-link-support-linker-for-linu.patch
+Patch016: 0017-runtime-bootstrap-for-linux-loong64-and-implement-ru.patch
+Patch017: 0018-runtime-load-save-TLS-variable-g-on-loong64.patch
+Patch018: 0019-runtime-implement-signal-for-linux-loong64.patch
+Patch019: 0020-runtime-support-vdso-for-linux-loong64.patch
+Patch020: 0021-runtime-implement-duffzero-duffcopy-for-linux-loong6.patch
+Patch021: 0022-runtime-implement-asyncPreempt-for-linux-loong64.patch
+Patch022: 0023-runtime-support-memclr-memmove-for-linux-loong64.patch
+Patch023: 0024-runtime-implement-syscalls-for-runtime-bootstrap-on-.patch
+Patch024: 0025-runtime-add-build-tag-for-common-support-on-linux-lo.patch
+Patch025: 0026-runtime-fix-runtime-test-error-for-loong64.patch
+Patch026: 0027-runtime-internal-add-atomic-support-for-loong64.patch
+Patch027: 0028-cmd-cgo-configure-cgo-tool-for-loong64.patch
+Patch028: 0029-runtime-cgo-add-cgo-function-call-support-for-loong6.patch
+Patch029: 0030-cmd-nm-cmd-objdump-cmd-pprof-disassembly-is-not-supp.patch
+Patch030: 0031-cmd-dist-support-dist-tool-for-loong64.patch
+Patch031: 0032-cmd-vendor-update-vendored-golang.org-x-sys-to-suppo.patch
+Patch032: 0033-cmd-vendor-update-vendored-golang.org-x-tools-to-sup.patch
+Patch033: 0034-internal-bytealg-support-basic-byte-operation-on-loo.patch
+Patch034: 0035-debug-go-math-os-reflect-vendor-support-standard-lib.patch
+Patch035: 0036-syscall-add-syscall-support-for-linux-loong64.patch
+Patch036: 0037-internal-syscall-unix-loong64-use-generic-syscall.patch
+Patch037: 0038-misc-test-fix-test-error-for-loong64.patch
+Patch038: 0039-copyright-add-Loongson-into-AUTHORS.patch
+Patch039: 0040-api-fix-check-errors-for-loong64.patch
+Patch040: 0041-runtime-fixed-func-breakpoint-implementation-on-loon.patch
+Patch041: 0042-update-vendor-golang.org-x-sys-for-byteorder-fix.patch
+Patch042: 0043-cmd-compile-remove-atomic-Cas-Xchg-and-Xadd-intrinsi.patch
+Patch043: 0044-runtime-fix-asyncPreempt-implementation-for-errors-o.patch
+Patch044: 0045-cmd-internal-obj-add-FuncInfo-SPWRITE-flag-for-linux.patch
+Patch045: 0046-runtime-add-missing-TOPFRAME-NOFRAME-flag-for-linux-.patch
+Patch046: 0047-cmd-compile-fix-loong64-constant-folding-in-division.patch
+Patch047: 0048-runtime-fix-the-vDSO-symbol-version-on-loong64.patch
+Patch048: 0049-internal-cpu-fix-cpu-cacheLineSize-for-loong64.patch
+Patch049: 0050-syscall-runtime-internal-syscall-always-zero-the-hig.patch
+Patch050: 0051-runtime-clean-up-unused-function-gosave-on-loong64.patch
+Patch051: 0052-debug-pe-add-IMAGE_FILE_MACHINE_LOONGARCH-64-32.patch
+Patch052: 0053-runtime-delete-useless-constant-definitions-SiginfoM.patch
+Patch053: 0054-cmd-compile-remove-the-resultInArg0-register-checks-.patch
+Patch054: 0055-runtime-remove-the-fake-mstart-caller-in-systemstack.patch
+Patch055: 0056-runtime-minor-refactoring-of-_rt0_loong64_linux.patch
+Patch056: 0057-runtime-fix-gcWriteBarrier-frame-size-on-loong64-mip.patch
+Patch057: 0058-cmd-internal-obj-loong64-remove-invalid-branch-delay.patch
+Patch058: 0059-cmd-compile-cmd-internal-obj-rename-loong64-instruct.patch
+Patch059: 0060-math-implement-Sqrt-in-assembly-for-loong64.patch
+Patch060: 0061-cmd-asm-add-RDTIME-L-H-.W-RDTIME.D-support-for-loong.patch
+Patch061: 0062-runtime-use-StableCounter-implement-cputicks-on-linu.patch
+Patch062: 0063-debug-elf-add-new-style-LoongArch-reloc-types.patch
+Patch063: 0064-cmd-link-recognize-the-new-R_LARCH_32_PCREL-type-on-.patch
+Patch064: 0065-runtime-fix-runtime.usleep-on-linux-loong64.patch
+Patch065: 0066-cmd-internal-obj-remove-redundant-cnames-on-loong64.patch
+Patch066: 0067-runtime-save-fetch-g-register-during-VDSO-on-loong64.patch
+Patch067: 0068-runtime-save-restore-callee-saved-registers-in-loong.patch
+Patch068: 0069-runtime-add-comment-for-sys_linux_loong64.patch
+Patch069: 0070-runtime-add-support-for-buildmode-c-shared-on-loong6.patch
+Patch070: 0071-cmd-compile-add-support-for-buildmode-c-shared-on-lo.patch
+Patch071: 0072-cmd-internal-obj-loong64-cmd-internal-objabi-add-c-s.patch
+Patch072: 0073-cmd-link-add-support-for-buildmode-c-shared-on-loong.patch
+Patch073: 0074-cmd-internal-sys-enable-c-shared-feature-on-loong64.patch
+Patch074: 0075-cmd-dist-misc-cgo-testcshared-enable-c-shared-test-o.patch
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -388,6 +468,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Sep 8 2022 chenguoqi <chenguoqi@loongson.cn> - 1.17.3-2
+- Add loongarch64 base support
+
 * Mon Nov 29 2021 chenjiankun <chenjiankun1@huawei.com> - 1.17.3-1
 - upgrade to 1.17.3
 

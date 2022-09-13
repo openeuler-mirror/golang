@@ -1,0 +1,113 @@
+From abf0148f651f2db72ce5f1b78221c9ca613f3b0f Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Fri, 26 Aug 2022 14:01:27 +0800
+Subject: [PATCH 67/75] runtime: save/fetch g register during VDSO on loong64
+
+Change-Id: Iaffa8cce4f0ef8ef74225c355ec3c20ed238025f
+---
+ src/runtime/signal_unix.go      |  2 +-
+ src/runtime/sys_linux_loong64.s | 44 ++++++++++++++++++++++++++++++---
+ 2 files changed, 41 insertions(+), 5 deletions(-)
+
+diff --git a/src/runtime/signal_unix.go b/src/runtime/signal_unix.go
+index 6096760..29a99b7 100644
+--- a/src/runtime/signal_unix.go
++++ b/src/runtime/signal_unix.go
+@@ -382,7 +382,7 @@ func preemptM(mp *m) {
+ //go:nosplit
+ func sigFetchG(c *sigctxt) *g {
+ 	switch GOARCH {
+-	case "arm", "arm64", "ppc64", "ppc64le":
++	case "arm", "arm64", "loong64", "ppc64", "ppc64le":
+ 		if !iscgo && inVDSOPage(c.sigpc()) {
+ 			// When using cgo, we save the g on TLS and load it from there
+ 			// in sigtramp. Just use that.
+diff --git a/src/runtime/sys_linux_loong64.s b/src/runtime/sys_linux_loong64.s
+index 1abc5b6..8947797 100644
+--- a/src/runtime/sys_linux_loong64.s
++++ b/src/runtime/sys_linux_loong64.s
+@@ -13,7 +13,9 @@
+ #include "go_tls.h"
+ #include "textflag.h"
+ 
+-#define AT_FDCWD -100
++#define AT_FDCWD	-100
++#define CLOCK_REALTIME	0
++#define CLOCK_MONOTONIC	1
+ 
+ #define SYS_exit		93
+ #define SYS_read		63
+@@ -206,7 +208,7 @@ TEXT runtime·mincore(SB),NOSPLIT|NOFRAME,$0-28
+ 	RET
+ 
+ // func walltime() (sec int64, nsec int32)
+-TEXT runtime·walltime(SB),NOSPLIT,$16-12
++TEXT runtime·walltime(SB),NOSPLIT,$24-12
+ 	MOVV	R3, R23	// R23 is unchanged by C code
+ 	MOVV	R3, R25
+ 
+@@ -236,12 +238,29 @@ noswitch:
+ 	AND	$~15, R25	// Align for C code
+ 	MOVV	R25, R3
+ 
+-	MOVW	$0, R4 // CLOCK_REALTIME=0
++	MOVW	$CLOCK_REALTIME, R4
+ 	MOVV	$0(R3), R5
+ 
+ 	MOVV	runtime·vdsoClockgettimeSym(SB), R20
+ 	BEQ	R20, fallback
+ 
++	// Store g on gsignal's stack, see sys_linux_arm64.s for detail
++	MOVBU	runtime·iscgo(SB), R25
++	BNE	R0, R25, nosaveg
++
++	MOVV	m_gsignal(R24), R25	// g.m.gsignal
++	BEQ	R25, nosaveg
++	BEQ     g, R25, nosaveg
++
++	MOVV	(g_stack+stack_lo)(R25), R25	// g.m.gsignal.stack.lo
++	MOVV	g, (R25)
++
++	JAL	(R20)
++
++	MOVV	R0, (R25)
++	JMP	finish
++
++nosaveg:
+ 	JAL	(R20)
+ 
+ finish:
+@@ -298,12 +317,29 @@ noswitch:
+ 	AND	$~15, R25	// Align for C code
+ 	MOVV	R25, R3
+ 
+-	MOVW	$1, R4 // CLOCK_MONOTONIC=1
++	MOVW	$CLOCK_MONOTONIC, R4
+ 	MOVV	$0(R3), R5
+ 
+ 	MOVV	runtime·vdsoClockgettimeSym(SB), R20
+ 	BEQ	R20, fallback
+ 
++	// Store g on gsignal's stack, see sys_linux_arm64.s for detail
++	MOVBU	runtime·iscgo(SB), R25
++	BNE	R0, R25, nosaveg
++
++	MOVV	m_gsignal(R24), R25	// g.m.gsignal
++	BEQ	R25, nosaveg
++	BEQ     g, R25, nosaveg
++
++	MOVV	(g_stack+stack_lo)(R25), R25	// g.m.gsignal.stack.lo
++	MOVV	g, (R25)
++
++	JAL	(R20)
++
++	MOVV	R0, (R25)
++	JMP	finish
++
++nosaveg:
+ 	JAL	(R20)
+ 
+ finish:
+-- 
+2.37.1
+

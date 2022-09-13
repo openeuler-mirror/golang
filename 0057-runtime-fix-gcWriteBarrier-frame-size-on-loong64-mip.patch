@@ -1,0 +1,55 @@
+From 4424607885baf301398cafde39a2afe996c013b8 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Tue, 26 Jul 2022 15:43:23 +0800
+Subject: [PATCH 57/75] runtime: fix gcWriteBarrier frame size on
+ loong64,mipsx,mips64x
+
+Change-Id: I5bc7f275135f144b23a7568527fb3b465404386e
+---
+ src/runtime/asm_loong64.s | 2 +-
+ src/runtime/asm_mips64x.s | 2 +-
+ src/runtime/asm_mipsx.s   | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index 90d36a3..16332f7 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -639,7 +639,7 @@ TEXT ·checkASM(SB),NOSPLIT,$0-1
+ // The act of CALLing gcWriteBarrier will clobber R1 (LR).
+ // It does not clobber any other general-purpose registers,
+ // but may clobber others (e.g., floating point registers).
+-TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$216
++TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$224
+ 	// Save the registers clobbered by the fast path.
+ 	MOVV	R19, 208(R3)
+ 	MOVV	R13, 216(R3)
+diff --git a/src/runtime/asm_mips64x.s b/src/runtime/asm_mips64x.s
+index d4d2280..8b525db 100644
+--- a/src/runtime/asm_mips64x.s
++++ b/src/runtime/asm_mips64x.s
+@@ -648,7 +648,7 @@ TEXT ·checkASM(SB),NOSPLIT,$0-1
+ // The act of CALLing gcWriteBarrier will clobber R31 (LR).
+ // It does not clobber any other general-purpose registers,
+ // but may clobber others (e.g., floating point registers).
+-TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$192
++TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$200
+ 	// Save the registers clobbered by the fast path.
+ 	MOVV	R1, 184(R29)
+ 	MOVV	R2, 192(R29)
+diff --git a/src/runtime/asm_mipsx.s b/src/runtime/asm_mipsx.s
+index ea7edf2..39403b2 100644
+--- a/src/runtime/asm_mipsx.s
++++ b/src/runtime/asm_mipsx.s
+@@ -641,7 +641,7 @@ TEXT ·checkASM(SB),NOSPLIT,$0-1
+ // The act of CALLing gcWriteBarrier will clobber R31 (LR).
+ // It does not clobber any other general-purpose registers,
+ // but may clobber others (e.g., floating point registers).
+-TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$104
++TEXT runtime·gcWriteBarrier(SB),NOSPLIT,$108
+ 	// Save the registers clobbered by the fast path.
+ 	MOVW	R1, 100(R29)
+ 	MOVW	R2, 104(R29)
+-- 
+2.37.1
+

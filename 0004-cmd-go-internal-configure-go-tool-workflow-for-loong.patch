@@ -1,0 +1,39 @@
+From 2d92cd76743ddd96ac40f7e61a7eb61d52c1b345 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 15:57:43 +0800
+Subject: [PATCH 04/75] cmd/go/internal: configure go tool workflow for loong64
+
+Change-Id: I6b537a7d842b0683586917fe7ea7cd4d70d888de
+---
+ src/cmd/go/internal/imports/build.go | 1 +
+ src/cmd/go/internal/work/exec.go     | 2 ++
+ 2 files changed, 3 insertions(+)
+
+diff --git a/src/cmd/go/internal/imports/build.go b/src/cmd/go/internal/imports/build.go
+index ff6bea6..5d4580c 100644
+--- a/src/cmd/go/internal/imports/build.go
++++ b/src/cmd/go/internal/imports/build.go
+@@ -326,6 +326,7 @@ var KnownArch = map[string]bool{
+ 	"mips64le":    true,
+ 	"mips64p32":   true,
+ 	"mips64p32le": true,
++	"loong64":     true,
+ 	"ppc":         true,
+ 	"riscv":       true,
+ 	"riscv64":     true,
+diff --git a/src/cmd/go/internal/work/exec.go b/src/cmd/go/internal/work/exec.go
+index 5a225fb..83d4161 100644
+--- a/src/cmd/go/internal/work/exec.go
++++ b/src/cmd/go/internal/work/exec.go
+@@ -2648,6 +2648,8 @@ func (b *Builder) gccArchArgs() []string {
+ 		} else if cfg.GOMIPS == "softfloat" {
+ 			return append(args, "-msoft-float")
+ 		}
++	case "loong64":
++		return []string{"-mabi=lp64d"}
+ 	case "ppc64":
+ 		if cfg.Goos == "aix" {
+ 			return []string{"-maix64"}
+-- 
+2.37.1
+

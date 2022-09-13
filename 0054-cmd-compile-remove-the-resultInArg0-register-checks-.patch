@@ -1,0 +1,31 @@
+From 9780f0821577b32d3ba3736a498a3a161a3427c9 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 4 Jul 2022 10:16:12 +0800
+Subject: [PATCH 54/75] cmd/compile: remove the resultInArg0 register checks on
+ linux/loong64
+
+The automatic resultInArg0 register check has been implemented by CL 296010.
+
+Change-Id: Id0e085ded9aa097bd02593c359a750d938a3aaa6
+(cherry picked from commit 21c62284f81da9fa544f1b519706280f084e1410)
+---
+ src/cmd/compile/internal/loong64/ssa.go | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/src/cmd/compile/internal/loong64/ssa.go b/src/cmd/compile/internal/loong64/ssa.go
+index 4f3aa68..2478963 100644
+--- a/src/cmd/compile/internal/loong64/ssa.go
++++ b/src/cmd/compile/internal/loong64/ssa.go
+@@ -101,9 +101,6 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
+ 		p.To.Type = obj.TYPE_REG
+ 		p.To.Reg = y
+ 	case ssa.OpLOONG64MOVVnop:
+-		if v.Reg() != v.Args[0].Reg() {
+-			v.Fatalf("input[0] and output not in same register %s", v.LongString())
+-		}
+ 		// nothing to do
+ 	case ssa.OpLoadReg:
+ 		if v.Type.IsFlags() {
+-- 
+2.37.1
+

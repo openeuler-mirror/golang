@@ -1,0 +1,68 @@
+From 9c276f03128d559e497a7f0309854ceb4f933869 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Fri, 10 Jun 2022 19:08:14 +0800
+Subject: [PATCH 50/75] syscall, runtime/internal/syscall: always zero the
+ higher bits of return value on linux/loong64
+
+All loong64 syscalls return values only via R4/A0, and R5/A1 may contain unrelated
+content. Always zero the second return value.
+
+Change-Id: I62af59369bece5bd8028b937c74f4694150f7a55
+Reviewed-on: https://go-review.googlesource.com/c/go/+/411615
+Run-TryBot: Ian Lance Taylor <iant@google.com>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Auto-Submit: Ian Lance Taylor <iant@google.com>
+Reviewed-by: Ian Lance Taylor <iant@google.com>
+Reviewed-by: Austin Clements <austin@google.com>
+---
+ src/cmd/vendor/golang.org/x/sys/unix/asm_linux_loong64.s | 4 ++--
+ src/runtime/internal/syscall/asm_linux_loong64.s         | 2 +-
+ src/syscall/asm_linux_loong64.s                          | 2 +-
+ 3 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/cmd/vendor/golang.org/x/sys/unix/asm_linux_loong64.s b/src/cmd/vendor/golang.org/x/sys/unix/asm_linux_loong64.s
+index 1ccfa5d..dccf8ac 100644
+--- a/src/cmd/vendor/golang.org/x/sys/unix/asm_linux_loong64.s
++++ b/src/cmd/vendor/golang.org/x/sys/unix/asm_linux_loong64.s
+@@ -30,7 +30,7 @@ TEXT ·SyscallNoError(SB),NOSPLIT,$0-48
+ 	MOVV	trap+0(FP), R11	// syscall entry
+ 	SYSCALL
+ 	MOVV	R4, r1+32(FP)
+-	MOVV	R5, r2+40(FP)
++	MOVV    R0, r2+40(FP)   // r2 is not used. Always set to 0
+ 	JAL	runtime·exitsyscall(SB)
+ 	RET
+ 
+@@ -50,5 +50,5 @@ TEXT ·RawSyscallNoError(SB),NOSPLIT,$0-48
+ 	MOVV	trap+0(FP), R11	// syscall entry
+ 	SYSCALL
+ 	MOVV	R4, r1+32(FP)
+-	MOVV	R5, r2+40(FP)
++	MOVV    R0, r2+40(FP)   // r2 is not used. Always set to 0
+ 	RET
+diff --git a/src/runtime/internal/syscall/asm_linux_loong64.s b/src/runtime/internal/syscall/asm_linux_loong64.s
+index 39bf5b1..ccddeee 100644
+--- a/src/runtime/internal/syscall/asm_linux_loong64.s
++++ b/src/runtime/internal/syscall/asm_linux_loong64.s
+@@ -24,6 +24,6 @@ TEXT ·Syscall6(SB),NOSPLIT,$0-80
+ 	RET
+ ok:
+ 	MOVV	R4, r1+56(FP)	// r1
+-	MOVV	R5, r2+64(FP)	// r2
++	MOVV    R0, r2+64(FP)   // r2 is not used. Always set to 0.
+ 	MOVV	R0, err+72(FP)	// errno
+ 	RET
+diff --git a/src/syscall/asm_linux_loong64.s b/src/syscall/asm_linux_loong64.s
+index 09f3f97..0ec9b3d 100644
+--- a/src/syscall/asm_linux_loong64.s
++++ b/src/syscall/asm_linux_loong64.s
+@@ -143,5 +143,5 @@ TEXT ·rawSyscallNoError(SB),NOSPLIT,$0-48
+ 	MOVV	trap+0(FP), R11	// syscall entry
+ 	SYSCALL
+ 	MOVV	R4, r1+32(FP)
+-	MOVV	R5, r2+40(FP)
++	MOVV	R0, r2+40(FP)	// r2 is not used. Always set to 0.
+ 	RET
+-- 
+2.37.1
+

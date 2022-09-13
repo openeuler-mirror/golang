@@ -1,0 +1,48 @@
+From 8d046de83b555dae63a8c3fc6488d1df435a3bd4 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 3 Aug 2022 17:45:02 +0800
+Subject: [PATCH 58/75] cmd/internal/obj/loong64: remove invalid branch delay
+ slots
+
+Change-Id: I222717771019f7aefa547971b2d94ef4677a42c9
+---
+ src/cmd/internal/obj/loong64/asm.go | 3 ---
+ src/cmd/internal/obj/loong64/obj.go | 8 --------
+ 2 files changed, 11 deletions(-)
+
+diff --git a/src/cmd/internal/obj/loong64/asm.go b/src/cmd/internal/obj/loong64/asm.go
+index 345366f..072fc1d 100644
+--- a/src/cmd/internal/obj/loong64/asm.go
++++ b/src/cmd/internal/obj/loong64/asm.go
+@@ -429,9 +429,6 @@ func span0(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
+ 					q.Pos = p.Pos
+ 					q.To.Type = obj.TYPE_BRANCH
+ 					q.To.SetTarget(q.Link.Link)
+-
+-					c.addnop(p.Link)
+-					c.addnop(p)
+ 					bflag = 1
+ 				}
+ 			}
+diff --git a/src/cmd/internal/obj/loong64/obj.go b/src/cmd/internal/obj/loong64/obj.go
+index abfe67d..0f39c66 100644
+--- a/src/cmd/internal/obj/loong64/obj.go
++++ b/src/cmd/internal/obj/loong64/obj.go
+@@ -622,14 +622,6 @@ func (c *ctxt0) stacksplit(p *obj.Prog, framesize int32) *obj.Prog {
+ 	return p
+ }
+ 
+-func (c *ctxt0) addnop(p *obj.Prog) {
+-	q := c.newprog()
+-	q.As = ANOOP
+-	q.Pos = p.Pos
+-	q.Link = p.Link
+-	p.Link = q
+-}
+-
+ var Linkloong64 = obj.LinkArch{
+ 	Arch:           sys.ArchLoong64,
+ 	Init:           buildop,
+-- 
+2.37.1
+

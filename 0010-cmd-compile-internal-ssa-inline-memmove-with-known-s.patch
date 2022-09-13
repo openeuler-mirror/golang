@@ -1,0 +1,27 @@
+From e094b1bf2af1f20e50a02c20cc04f544dada2c2b Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 25 Nov 2021 10:26:47 +0800
+Subject: [PATCH 10/75] cmd/compile/internal/ssa: inline memmove with known
+ size
+
+Change-Id: I1534b66b527efaf2bbaa8e6e6ac0618aac0b5930
+---
+ src/cmd/compile/internal/ssa/rewrite.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/cmd/compile/internal/ssa/rewrite.go b/src/cmd/compile/internal/ssa/rewrite.go
+index 375c4d5..8a9cbcd 100644
+--- a/src/cmd/compile/internal/ssa/rewrite.go
++++ b/src/cmd/compile/internal/ssa/rewrite.go
+@@ -1345,7 +1345,7 @@ func isInlinableMemmove(dst, src *Value, sz int64, c *Config) bool {
+ 		return sz <= 8
+ 	case "s390x", "ppc64", "ppc64le":
+ 		return sz <= 8 || disjoint(dst, sz, src, sz)
+-	case "arm", "mips", "mips64", "mipsle", "mips64le":
++	case "arm", "loong64", "mips", "mips64", "mipsle", "mips64le":
+ 		return sz <= 4
+ 	}
+ 	return false
+-- 
+2.37.1
+

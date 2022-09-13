@@ -1,0 +1,68 @@
+From 93ba2689f6284a2a6a8c66fefc76848774c563b9 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 1 Dec 2021 15:48:53 +0800
+Subject: [PATCH 18/75] runtime: load/save TLS variable g on loong64
+
+Change-Id: I5e09759ce9201596e89a01fc4a6f7fd7e205449f
+---
+ src/runtime/stubs_loong64.go | 12 ++++++++++++
+ src/runtime/tls_loong64.s    | 28 ++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
+ create mode 100644 src/runtime/stubs_loong64.go
+ create mode 100644 src/runtime/tls_loong64.s
+
+diff --git a/src/runtime/stubs_loong64.go b/src/runtime/stubs_loong64.go
+new file mode 100644
+index 0000000..39e7520
+--- /dev/null
++++ b/src/runtime/stubs_loong64.go
+@@ -0,0 +1,12 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++//go:build loong64
++// +build loong64
++
++package runtime
++
++// Called from assembly only; declared for go vet.
++func load_g()
++func save_g()
+diff --git a/src/runtime/tls_loong64.s b/src/runtime/tls_loong64.s
+new file mode 100644
+index 0000000..30627d8
+--- /dev/null
++++ b/src/runtime/tls_loong64.s
+@@ -0,0 +1,28 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "go_asm.h"
++#include "go_tls.h"
++#include "funcdata.h"
++#include "textflag.h"
++
++// If !iscgo, this is a no-op.
++//
++// NOTE: mcall() assumes this clobbers only R30 (REGTMP).
++TEXT runtime·save_g(SB),NOSPLIT|NOFRAME,$0-0
++	MOVB	runtime·iscgo(SB), R30
++	BEQ	R30, nocgo
++
++	MOVV	g, runtime·tls_g(SB)
++
++nocgo:
++	RET
++
++TEXT runtime·load_g(SB),NOSPLIT|NOFRAME,$0-0
++	MOVV	runtime·tls_g(SB), g
++	RET
++
++GLOBL runtime·tls_g(SB), TLSBSS, $8
+-- 
+2.37.1
+

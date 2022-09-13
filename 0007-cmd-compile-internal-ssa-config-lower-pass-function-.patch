@@ -1,0 +1,36 @@
+From 000f0f787a7a2d04008af8531dfed8e255e08194 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 24 Nov 2021 17:48:09 +0800
+Subject: [PATCH 07/75] cmd/compile/internal/ssa: config lower pass function
+ and register on loong64
+
+Change-Id: I50d20eb22f2108d245513de8ac95ebe0b7e1a1dc
+---
+ src/cmd/compile/internal/ssa/config.go | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/src/cmd/compile/internal/ssa/config.go b/src/cmd/compile/internal/ssa/config.go
+index a8393a1..c18a723 100644
+--- a/src/cmd/compile/internal/ssa/config.go
++++ b/src/cmd/compile/internal/ssa/config.go
+@@ -262,6 +262,17 @@ func NewConfig(arch string, types Types, ctxt *obj.Link, optimize bool) *Config
+ 		c.FPReg = framepointerRegMIPS64
+ 		c.LinkReg = linkRegMIPS64
+ 		c.hasGReg = true
++	case "loong64":
++		c.PtrSize = 8
++		c.RegSize = 8
++		c.lowerBlock = rewriteBlockLOONG64
++		c.lowerValue = rewriteValueLOONG64
++		c.registers = registersLOONG64[:]
++		c.gpRegMask = gpRegMaskLOONG64
++		c.fpRegMask = fpRegMaskLOONG64
++		c.FPReg = framepointerRegLOONG64
++		c.LinkReg = linkRegLOONG64
++		c.hasGReg = true
+ 	case "s390x":
+ 		c.PtrSize = 8
+ 		c.RegSize = 8
+-- 
+2.37.1
+
