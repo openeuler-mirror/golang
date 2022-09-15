@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        8
+Release:        9
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -167,6 +167,7 @@ Patch6015:	0015-release-branch.go1.17-crypto-rand-properly-handle-la.patch
 Patch6016:	0016-release-branch.go1.17-math-big-check-buffer-lengths-.patch
 Patch6017:	0017-path-filepath-do-not-remove-prefix-.-when-following-.patch
 Patch6018:	0018-release-branch.go1.17-syscall-check-correct-group-in.patch
+Patch6019:	0019-release-branch.go1.18-net-http-update-bundled-golang.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -405,6 +406,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Sep 15 2022 hanchao <hanchao47@huawei.com> - 1.17.3-9
+- Type:CVE
+- CVE:CVE-2022-27664
+- SUG:NA
+- DESC: fix CVE-2022-27664
+
 * Thu Sep 8 2022 hanchao<hanchao47@huawei.com> - 1.17.3-8
 - Type:bugfix
 - CVE:NA
