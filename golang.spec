@@ -58,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        19
+Release:        20
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -443,7 +443,7 @@ fi
 %exclude %{goroot}/doc/
 %exclude %{goroot}/misc/
 %exclude %{goroot}/test/
-%exclude %goroot}/lib/
+%exclude %{goroot}/lib/
 %{goroot}/*
 %dir %{gopath}
 %dir %{gopath}/src
@@ -459,6 +459,11 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Wed Oct 05 2022 wangshuo <wangshuo@kylinos.cn> - 1.15.7-20
+- Type:bugfix
+- CVE:NA
+- SUG:NA
+- DESC:fix bad %goroot}/lib/ macro
 
 * Thu Spe 15 2022 hanchao<hanchao47@huawei.com> - 1.15.7-19
 - Type:CVE
