@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        9
+Release:        10
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -168,6 +168,9 @@ Patch6016:	0016-release-branch.go1.17-math-big-check-buffer-lengths-.patch
 Patch6017:	0017-path-filepath-do-not-remove-prefix-.-when-following-.patch
 Patch6018:	0018-release-branch.go1.17-syscall-check-correct-group-in.patch
 Patch6019:	0019-release-branch.go1.18-net-http-update-bundled-golang.patch
+Patch6020:	0020-release-branch.go1.18-regexp-limit-size-of-parsed-re.patch
+Patch6021:	0021-release-branch.go1.18-net-http-httputil-avoid-query-.patch
+Patch6022:	0022-release-branch.go1.18-archive-tar-limit-size-of-head.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -390,7 +393,7 @@ fi
 %exclude %{goroot}/doc/
 %exclude %{goroot}/misc/
 %exclude %{goroot}/test/
-%exclude %goroot}/lib/
+%exclude %{goroot}/lib/
 %{goroot}/*
 %dir %{gopath}
 %dir %{gopath}/src
@@ -406,6 +409,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon Oct 10 2022 hanchao <hanchao47@huawei.com> - 1.17.3-10
+- Type:CVE
+- CVE:CVE-2022-41715,CVE-2022-2880,CVE-2022-2879
+- SUG:NA
+- DESC: fix CVE-2022-41715,CVE-2022-2880,CVE-2022-2879
+
 * Thu Sep 15 2022 hanchao <hanchao47@huawei.com> - 1.17.3-9
 - Type:CVE
 - CVE:CVE-2022-27664
