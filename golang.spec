@@ -58,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        21
+Release:        22
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -224,6 +224,7 @@ Patch6079:	0079-release-branch.go1.18-regexp-limit-size-of-parsed-re.patch
 Patch6080:	0080-release-branch.go1.18-net-http-httputil-avoid-query-.patch
 Patch6081:	0081-release-branch.go1.18-archive-tar-limit-size-of-head.patch
 Patch6082:	0082-net-url-reject-query-values-with-semicolons.patch
+Patch6083:	0083-syscall-os-exec-reject-environment-variables-contain.patch
 
 Patch9001:       0001-drop-hard-code-cert.patch
 Patch9002:       0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
@@ -463,7 +464,13 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
-* Mon Oct 10 2022 hanchao<hanchao47@huawei.com> - 1.15.7-20
+* Thu Nov 17 2022 hanchao<hanchao47@huawei.com> - 1.15.7-22
+- Type:CVE
+- CVE:CVE-2022-41716
+- SUG:NA
+- DESC:fix CVE-2022-41716
+
+* Mon Oct 10 2022 hanchao<hanchao47@huawei.com> - 1.15.7-21
 - Type:CVE
 - CVE:CVE-2022-41715,CVE-2022-2880,CVE-2022-2879
 - SUG:NA
