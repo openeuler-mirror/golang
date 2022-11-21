@@ -62,7 +62,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        10
+Release:        11
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -149,10 +149,10 @@ Obsoletes:      %{name}-vim < 1.4
 Obsoletes:      emacs-%{name} < 1.4
 Requires:       openEuler-rpm-config
 
-Patch6001:      0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
-Patch6002:      0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
-Patch6003:      0003-release-branch.go1.17-syscall-fix-ForkLock-spurious-.patch
-Patch6004:      0004-backport-cmd-link-mark-unexported-methods-for-plugins.patch
+Patch6001:	0001-release-branch.go1.17-crypto-elliptic-tolerate-zero-.patch
+Patch6002:	0002-release-branch.go1.17-encoding-pem-fix-stack-overflo.patch
+Patch6003:	0003-release-branch.go1.17-syscall-fix-ForkLock-spurious-.patch
+Patch6004:	0004-backport-cmd-link-mark-unexported-methods-for-plugins.patch
 Patch6005:	0005-release-branch.go1.17-net-http-preserve-nil-values-i.patch
 Patch6006:	0006-release-branch.go1.17-go-parser-limit-recursion-dept.patch
 Patch6007:	0007-release-branch.go1.17-net-http-don-t-strip-whitespac.patch
@@ -171,6 +171,7 @@ Patch6019:	0019-release-branch.go1.18-net-http-update-bundled-golang.patch
 Patch6020:	0020-release-branch.go1.18-regexp-limit-size-of-parsed-re.patch
 Patch6021:	0021-release-branch.go1.18-net-http-httputil-avoid-query-.patch
 Patch6022:	0022-release-branch.go1.18-archive-tar-limit-size-of-head.patch
+Patch6023:	0023-syscall-os-exec-reject-environment-variables-contain.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -409,6 +410,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Oct 11 2022 hanchao <hanchao47@huawei.com> - 1.17.3-11
+- Type:CVE
+- CVE:CVE-2022-41716
+- SUG:NA
+- DESC: fix CVE-2022-41716
+
 * Mon Oct 10 2022 hanchao <hanchao47@huawei.com> - 1.17.3-10
 - Type:CVE
 - CVE:CVE-2022-41715,CVE-2022-2880,CVE-2022-2879
