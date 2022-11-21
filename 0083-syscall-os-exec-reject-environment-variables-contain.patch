@@ -1,0 +1,187 @@
+From 6157e640af242fd239cf2ff79f1760da81e69e32 Mon Sep 17 00:00:00 2001
+From: Damien Neil <dneil@google.com>
+Date: Mon, 17 Oct 2022 17:38:29 -0700
+Subject: [PATCH] syscall, os/exec: reject environment variables containing
+ NULs
+
+Check for and reject environment variables containing NULs.
+
+The conventions for passing environment variables to subprocesses
+cause most or all systems to interpret a NUL as a separator. The
+syscall package rejects environment variables containing a NUL
+on most systems, but erroniously did not do so on Windows. This
+causes an environment variable such as "FOO=a\x00BAR=b" to be
+interpreted as "FOO=a", "BAR=b".
+
+Check for and reject NULs in environment variables passed to
+syscall.StartProcess on Windows.
+
+Add a redundant check to os/exec as extra insurance.
+
+Fixes #56284
+Fixes CVE-2022-41716
+
+Change-Id: I2950e2b0cb14ebd26e5629be1521858f66a7d4ae
+Reviewed-on: https://team-review.git.corp.google.com/c/golang/go-private/+/1609434
+Run-TryBot: Damien Neil <dneil@google.com>
+Reviewed-by: Tatiana Bradley <tatianabradley@google.com>
+Reviewed-by: Roland Shoemaker <bracewell@google.com>
+TryBot-Result: Security TryBots <security-trybots@go-security-trybots.iam.gserviceaccount.com>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/446916
+Reviewed-by: Tatiana Bradley <tatiana@golang.org>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Run-TryBot: Matthew Dempsky <mdempsky@google.com>
+Reviewed-by: Heschi Kreinick <heschi@google.com>
+
+Reference: https://go-review.googlesource.com/c/go/+/446916
+Conflict: src/os/exec/exec.go
+---
+ src/os/exec/env_test.go  | 19 +++++++++++++------
+ src/os/exec/exec.go      | 38 +++++++++++++++++++++++++++++++++-----
+ src/os/exec/exec_test.go |  9 +++++++++
+ 3 files changed, 55 insertions(+), 11 deletions(-)
+
+diff --git a/src/os/exec/env_test.go b/src/os/exec/env_test.go
+index b5ac398..47b7c04 100644
+--- a/src/os/exec/env_test.go
++++ b/src/os/exec/env_test.go
+@@ -11,9 +11,10 @@ import (
+ 
+ func TestDedupEnv(t *testing.T) {
+ 	tests := []struct {
+-		noCase bool
+-		in     []string
+-		want   []string
++		noCase  bool
++		in      []string
++		want    []string
++		wantErr bool
+ 	}{
+ 		{
+ 			noCase: true,
+@@ -29,11 +30,17 @@ func TestDedupEnv(t *testing.T) {
+ 			in:   []string{"=a", "=b", "foo", "bar"},
+ 			want: []string{"=b", "foo", "bar"},
+ 		},
++		{
++			// Filter out entries containing NULs.
++			in:      []string{"A=a\x00b", "B=b", "C\x00C=c"},
++			want:    []string{"B=b"},
++			wantErr: true,
++		},
+ 	}
+ 	for _, tt := range tests {
+-		got := dedupEnvCase(tt.noCase, tt.in)
+-		if !reflect.DeepEqual(got, tt.want) {
+-			t.Errorf("Dedup(%v, %q) = %q; want %q", tt.noCase, tt.in, got, tt.want)
++		got, err := dedupEnvCase(tt.noCase, tt.in)
++		if !reflect.DeepEqual(got, tt.want) || (err != nil) != tt.wantErr {
++			t.Errorf("Dedup(%v, %q) = %q, %v; want %q, error:%v", tt.noCase, tt.in, got, err, tt.want, tt.wantErr)
+ 		}
+ 	}
+ }
+diff --git a/src/os/exec/exec.go b/src/os/exec/exec.go
+index 0c49575..6f5c61b 100644
+--- a/src/os/exec/exec.go
++++ b/src/os/exec/exec.go
+@@ -414,7 +414,7 @@ func (c *Cmd) Start() error {
+ 	}
+ 	c.childFiles = append(c.childFiles, c.ExtraFiles...)
+ 
+-	envv, err := c.envv()
++	env, err := c.environ()
+ 	if err != nil {
+ 		return err
+ 	}
+@@ -422,7 +422,7 @@ func (c *Cmd) Start() error {
+ 	c.Process, err = os.StartProcess(c.Path, c.argv(), &os.ProcAttr{
+ 		Dir:   c.Dir,
+ 		Files: c.childFiles,
+-		Env:   addCriticalEnv(dedupEnv(envv)),
++		Env:   env,
+ 		Sys:   c.SysProcAttr,
+ 	})
+ 	if err != nil {
+@@ -738,16 +738,21 @@ func minInt(a, b int) int {
+ // dedupEnv returns a copy of env with any duplicates removed, in favor of
+ // later values.
+ // Items not of the normal environment "key=value" form are preserved unchanged.
+-func dedupEnv(env []string) []string {
++func dedupEnv(env []string) ([]string, error) {
+ 	return dedupEnvCase(runtime.GOOS == "windows", env)
+ }
+ 
+ // dedupEnvCase is dedupEnv with a case option for testing.
+ // If caseInsensitive is true, the case of keys is ignored.
+-func dedupEnvCase(caseInsensitive bool, env []string) []string {
++func dedupEnvCase(caseInsensitive bool, env []string) ([]string, error) {
++	var err error
+ 	out := make([]string, 0, len(env))
+ 	saw := make(map[string]int, len(env)) // key => index into out
+ 	for _, kv := range env {
++		if strings.IndexByte(kv, 0) != -1 {
++			err = errors.New("exec: environment variable contains NUL")
++			continue
++		}
+ 		eq := strings.Index(kv, "=")
+ 		if eq < 0 {
+ 			out = append(out, kv)
+@@ -764,7 +769,7 @@ func dedupEnvCase(caseInsensitive bool, env []string) []string {
+ 		saw[k] = len(out)
+ 		out = append(out, kv)
+ 	}
+-	return out
++	return out, err
+ }
+ 
+ // addCriticalEnv adds any critical environment variables that are required
+@@ -787,3 +792,26 @@ func addCriticalEnv(env []string) []string {
+ 	}
+ 	return append(env, "SYSTEMROOT="+os.Getenv("SYSTEMROOT"))
+ }
++
++// environ returns a best-effort copy of the environment in which the command
++// would be run as it is currently configured. If an error occurs in computing
++// the environment, it is returned alongside the best-effort copy.
++func (c *Cmd) environ() ([]string, error) {
++	env, err := c.envv()
++	if err != nil {
++		return env, err
++	}
++	env, dedupErr := dedupEnv(env)
++	if err == nil {
++		err = dedupErr
++	}
++	return addCriticalEnv(env), err
++}
++
++// Environ returns a copy of the environment in which the command would be run
++// as it is currently configured.
++func (c *Cmd) Environ() []string {
++	//  Intentionally ignore errors: environ returns a best-effort environment no matter what.
++	env, _ := c.environ()
++	return env
++}
+diff --git a/src/os/exec/exec_test.go b/src/os/exec/exec_test.go
+index dafbc64..8cdecdb 100644
+--- a/src/os/exec/exec_test.go
++++ b/src/os/exec/exec_test.go
+@@ -1107,6 +1107,15 @@ func TestDedupEnvEcho(t *testing.T) {
+ 	}
+ }
+ 
++func TestEnvNULCharacter(t *testing.T) {
++	cmd := helperCommand(t, "echoenv", "FOO", "BAR")
++	cmd.Env = append(cmd.Environ(), "FOO=foo\x00BAR=bar")
++	out, err := cmd.CombinedOutput()
++	if err == nil {
++		t.Errorf("output = %q; want error", string(out))
++	}
++}
++
+ func TestString(t *testing.T) {
+ 	echoPath, err := exec.LookPath("echo")
+ 	if err != nil {
+-- 
+2.33.0
+
