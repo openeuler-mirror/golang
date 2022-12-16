@@ -1,0 +1,186 @@
+From e925e5f1a1dea5dbf899d25aa742c78cb22f08a6 Mon Sep 17 00:00:00 2001
+From: Wayne Zuo <wdvxdr@golangcn.org>
+Date: Tue, 6 Sep 2022 22:29:31 +0800
+Subject: [PATCH 79/82] cmd/compile: intrinsify Sub64 on loong64
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This is a follow up of CL 420095  on loong64.
+
+file                                    before    after     Δ       %
+compile/internal/ssa.a                  35649482  35653274  +3792   +0.011%
+compile/internal/ssagen.a               4099858   4098728   -1130   -0.028%
+ecdh.a                                  227896    226896    -1000   -0.439%
+internal/nistec/fiat.a                  1212254   1128184   -84070  -6.935%
+tls.a                                   3256800   3256802   +2      +0.000%
+big.a                                   1708518   1702496   -6022   -0.352%
+bits.a                                  106762    105734    -1028   -0.963%
+math.a                                  578762    577288    -1474   -0.255%
+netip.a                                 555922    555610    -312    -0.056%
+net.a                                   3286528   3286530   +2      +0.000%
+golang.org/x/crypto/internal/poly1305.a 109546    107686    -1860   -1.698%
+total                                   260392768 260299668 -93100  -0.036%
+
+Change-Id: Ieffca705aae5666501f284502d986ca179dde494
+Reviewed-on: https://go-review.googlesource.com/c/go/+/428557
+Reviewed-by: Carlos Amedee <carlos@golang.org>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Reviewed-by: David Chase <drchase@google.com>
+Run-TryBot: Wayne Zuo <wdvxdr@golangcn.org>
+---
+ .../compile/internal/ssa/gen/LOONG64.rules    |  4 ++
+ .../compile/internal/ssa/rewriteLOONG64.go    | 38 +++++++++++++++++++
+ src/cmd/compile/internal/ssagen/ssa.go        |  4 +-
+ test/codegen/mathbits.go                      |  7 ++++
+ 4 files changed, 51 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/compile/internal/ssa/gen/LOONG64.rules b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+index e0e2e0199b..20664d33c5 100644
+--- a/src/cmd/compile/internal/ssa/gen/LOONG64.rules
++++ b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+@@ -42,6 +42,10 @@
+ (Select1 <t> (Add64carry x y c)) =>
+ 	(OR (SGTU <t> x s:(ADDV <t> x y)) (SGTU <t> s (ADDV <t> s c)))
+ 
++(Select0 <t> (Sub64borrow x y c)) => (SUBV (SUBV <t> x y) c)
++(Select1 <t> (Sub64borrow x y c)) =>
++	(OR (SGTU <t> s:(SUBV <t> x y) x) (SGTU <t> (SUBV <t> s c) s))
++
+ // (x + y) / 2 with x>=y => (x - y) / 2 + y
+ (Avg64u <t> x y) => (ADDV (SRLVconst <t> (SUBV <t> x y) [1]) y)
+ 
+diff --git a/src/cmd/compile/internal/ssa/rewriteLOONG64.go b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+index 63b061eadc..daab2163a3 100644
+--- a/src/cmd/compile/internal/ssa/rewriteLOONG64.go
++++ b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+@@ -6863,6 +6863,22 @@ func rewriteValueLOONG64_OpSelect0(v *Value) bool {
+ 		v.AddArg2(v0, c)
+ 		return true
+ 	}
++	// match: (Select0 <t> (Sub64borrow x y c))
++	// result: (SUBV (SUBV <t> x y) c)
++	for {
++		t := v.Type
++		if v_0.Op != OpSub64borrow {
++			break
++		}
++		c := v_0.Args[2]
++		x := v_0.Args[0]
++		y := v_0.Args[1]
++		v.reset(OpLOONG64SUBV)
++		v0 := b.NewValue0(v.Pos, OpLOONG64SUBV, t)
++		v0.AddArg2(x, y)
++		v.AddArg2(v0, c)
++		return true
++	}
+ 	// match: (Select0 (DIVVU _ (MOVVconst [1])))
+ 	// result: (MOVVconst [0])
+ 	for {
+@@ -6997,6 +7013,28 @@ func rewriteValueLOONG64_OpSelect1(v *Value) bool {
+ 		v.AddArg2(v0, v2)
+ 		return true
+ 	}
++	// match: (Select1 <t> (Sub64borrow x y c))
++	// result: (OR (SGTU <t> s:(SUBV <t> x y) x) (SGTU <t> (SUBV <t> s c) s))
++	for {
++		t := v.Type
++		if v_0.Op != OpSub64borrow {
++			break
++		}
++		c := v_0.Args[2]
++		x := v_0.Args[0]
++		y := v_0.Args[1]
++		v.reset(OpLOONG64OR)
++		v0 := b.NewValue0(v.Pos, OpLOONG64SGTU, t)
++		s := b.NewValue0(v.Pos, OpLOONG64SUBV, t)
++		s.AddArg2(x, y)
++		v0.AddArg2(s, x)
++		v2 := b.NewValue0(v.Pos, OpLOONG64SGTU, t)
++		v3 := b.NewValue0(v.Pos, OpLOONG64SUBV, t)
++		v3.AddArg2(s, c)
++		v2.AddArg2(v3, s)
++		v.AddArg2(v0, v2)
++		return true
++	}
+ 	// match: (Select1 (MULVU x (MOVVconst [-1])))
+ 	// result: (NEGV x)
+ 	for {
+diff --git a/src/cmd/compile/internal/ssagen/ssa.go b/src/cmd/compile/internal/ssagen/ssa.go
+index 449a6cb6a8..509773f0bb 100644
+--- a/src/cmd/compile/internal/ssagen/ssa.go
++++ b/src/cmd/compile/internal/ssagen/ssa.go
+@@ -4549,8 +4549,8 @@ func InitTables() {
+ 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+ 			return s.newValue3(ssa.OpSub64borrow, types.NewTuple(types.Types[types.TUINT64], types.Types[types.TUINT64]), args[0], args[1], args[2])
+ 		},
+-		sys.AMD64, sys.ARM64, sys.S390X)
+-	alias("math/bits", "Sub", "math/bits", "Sub64", sys.ArchAMD64, sys.ArchARM64, sys.ArchS390X)
++		sys.AMD64, sys.ARM64, sys.S390X, sys.Loong64)
++	alias("math/bits", "Sub", "math/bits", "Sub64", p8...)
+ 	addF("math/bits", "Div64",
+ 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+ 			// check for divide-by-zero/overflow and panic with appropriate message
+diff --git a/test/codegen/mathbits.go b/test/codegen/mathbits.go
+index 51c8432d1e..a0b8f783cb 100644
+--- a/test/codegen/mathbits.go
++++ b/test/codegen/mathbits.go
+@@ -567,6 +567,7 @@ func Sub(x, y, ci uint) (r, co uint) {
+ func SubC(x, ci uint) (r, co uint) {
+ 	// amd64:"NEGL","SBBQ","NEGQ"
+ 	// arm64:"NEGS","SBCS","NGC","NEG",-"ADD",-"SUB",-"CMP"
++	// loong64:"SUBV","SGTU"
+ 	// s390x:"SUBE"
+ 	return bits.Sub(x, 7, ci)
+ }
+@@ -574,6 +575,7 @@ func SubC(x, ci uint) (r, co uint) {
+ func SubZ(x, y uint) (r, co uint) {
+ 	// amd64:"SUBQ","SBBQ","NEGQ",-"NEGL"
+ 	// arm64:"SUBS","NGC","NEG",-"SBCS",-"ADD",-"SUB\t",-"CMP"
++	// loong64:"SUBV","SGTU"
+ 	// s390x:"SUBC"
+ 	return bits.Sub(x, y, 0)
+ }
+@@ -581,6 +583,7 @@ func SubZ(x, y uint) (r, co uint) {
+ func SubR(x, y, ci uint) uint {
+ 	// amd64:"NEGL","SBBQ",-"NEGQ"
+ 	// arm64:"NEGS","SBCS",-"NGC",-"NEG\t",-"ADD",-"SUB",-"CMP"
++	// loong64:"SUBV",-"SGTU"
+ 	// s390x:"SUBE"
+ 	r, _ := bits.Sub(x, y, ci)
+ 	return r
+@@ -598,6 +601,7 @@ func SubM(p, q, r *[3]uint) {
+ func Sub64(x, y, ci uint64) (r, co uint64) {
+ 	// amd64:"NEGL","SBBQ","NEGQ"
+ 	// arm64:"NEGS","SBCS","NGC","NEG",-"ADD",-"SUB",-"CMP"
++	// loong64:"SUBV","SGTU"
+ 	// s390x:"SUBE"
+ 	return bits.Sub64(x, y, ci)
+ }
+@@ -605,6 +609,7 @@ func Sub64(x, y, ci uint64) (r, co uint64) {
+ func Sub64C(x, ci uint64) (r, co uint64) {
+ 	// amd64:"NEGL","SBBQ","NEGQ"
+ 	// arm64:"NEGS","SBCS","NGC","NEG",-"ADD",-"SUB",-"CMP"
++	// loong64:"SUBV","SGTU"
+ 	// s390x:"SUBE"
+ 	return bits.Sub64(x, 7, ci)
+ }
+@@ -612,6 +617,7 @@ func Sub64C(x, ci uint64) (r, co uint64) {
+ func Sub64Z(x, y uint64) (r, co uint64) {
+ 	// amd64:"SUBQ","SBBQ","NEGQ",-"NEGL"
+ 	// arm64:"SUBS","NGC","NEG",-"SBCS",-"ADD",-"SUB\t",-"CMP"
++	// loong64:"SUBV","SGTU"
+ 	// s390x:"SUBC"
+ 	return bits.Sub64(x, y, 0)
+ }
+@@ -619,6 +625,7 @@ func Sub64Z(x, y uint64) (r, co uint64) {
+ func Sub64R(x, y, ci uint64) uint64 {
+ 	// amd64:"NEGL","SBBQ",-"NEGQ"
+ 	// arm64:"NEGS","SBCS",-"NGC",-"NEG\t",-"ADD",-"SUB",-"CMP"
++	// loong64:"SUBV",-"SGTU"
+ 	// s390x:"SUBE"
+ 	r, _ := bits.Sub64(x, y, ci)
+ 	return r
+-- 
+2.38.0
+

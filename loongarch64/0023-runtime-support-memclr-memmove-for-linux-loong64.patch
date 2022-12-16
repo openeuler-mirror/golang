@@ -1,0 +1,178 @@
+From f46aec3b8089fcef6aff3ba87b8db45072d49d96 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 1 Dec 2021 17:25:19 +0800
+Subject: [PATCH 23/82] runtime: support memclr/memmove for linux/loong64
+
+Change-Id: I7c1f39670034db6714630d479bc41b6620ba2b1a
+---
+ src/runtime/memclr_loong64.s  |  43 ++++++++++++++
+ src/runtime/memmove_loong64.s | 107 ++++++++++++++++++++++++++++++++++
+ 2 files changed, 150 insertions(+)
+ create mode 100644 src/runtime/memclr_loong64.s
+ create mode 100644 src/runtime/memmove_loong64.s
+
+diff --git a/src/runtime/memclr_loong64.s b/src/runtime/memclr_loong64.s
+new file mode 100644
+index 0000000000..c486e848d3
+--- /dev/null
++++ b/src/runtime/memclr_loong64.s
+@@ -0,0 +1,43 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "go_asm.h"
++#include "textflag.h"
++
++// func memclrNoHeapPointers(ptr unsafe.Pointer, n uintptr)
++TEXT runtime·memclrNoHeapPointers(SB),NOSPLIT,$0-16
++	MOVV	ptr+0(FP), R6
++	MOVV	n+8(FP), R7
++	ADDV	R6, R7, R4
++
++	// if less than 8 bytes, do one byte at a time
++	SGTU	$8, R7, R8
++	BNE	R8, out
++
++	// do one byte at a time until 8-aligned
++	AND	$7, R6, R8
++	BEQ	R8, words
++	MOVB	R0, (R6)
++	ADDV	$1, R6
++	JMP	-4(PC)
++
++words:
++	// do 8 bytes at a time if there is room
++	ADDV	$-7, R4, R7
++
++	SGTU	R7, R6, R8
++	BEQ	R8, out
++	MOVV	R0, (R6)
++	ADDV	$8, R6
++	JMP	-4(PC)
++
++out:
++	BEQ	R6, R4, done
++	MOVB	R0, (R6)
++	ADDV	$1, R6
++	JMP	-3(PC)
++done:
++	RET
+diff --git a/src/runtime/memmove_loong64.s b/src/runtime/memmove_loong64.s
+new file mode 100644
+index 0000000000..339e83b49e
+--- /dev/null
++++ b/src/runtime/memmove_loong64.s
+@@ -0,0 +1,107 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "textflag.h"
++
++// See memmove Go doc for important implementation constraints.
++
++// func memmove(to, from unsafe.Pointer, n uintptr)
++TEXT runtime·memmove(SB), NOSPLIT|NOFRAME, $0-24
++	MOVV	to+0(FP), R4
++	MOVV	from+8(FP), R5
++	MOVV	n+16(FP), R6
++	BNE	R6, check
++	RET
++
++check:
++	SGTU	R4, R5, R7
++	BNE	R7, backward
++
++	ADDV	R4, R6, R9 // end pointer
++
++	// if the two pointers are not of same alignments, do byte copying
++	SUBVU	R5, R4, R7
++	AND	$7, R7
++	BNE	R7, out
++
++	// if less than 8 bytes, do byte copying
++	SGTU	$8, R6, R7
++	BNE	R7, out
++
++	// do one byte at a time until 8-aligned
++	AND	$7, R4, R8
++	BEQ	R8, words
++	MOVB	(R5), R7
++	ADDV	$1, R5
++	MOVB	R7, (R4)
++	ADDV	$1, R4
++	JMP	-6(PC)
++
++words:
++	// do 8 bytes at a time if there is room
++	ADDV	$-7, R9, R6 // R6 is end pointer-7
++
++	SGTU	R6, R4, R8
++	BEQ	R8, out
++	MOVV	(R5), R7
++	ADDV	$8, R5
++	MOVV	R7, (R4)
++	ADDV	$8, R4
++	JMP	-6(PC)
++
++out:
++	BEQ	R4, R9, done
++	MOVB	(R5), R7
++	ADDV	$1, R5
++	MOVB	R7, (R4)
++	ADDV	$1, R4
++	JMP	-5(PC)
++done:
++	RET
++
++backward:
++	ADDV	R6, R5 // from-end pointer
++	ADDV	R4, R6, R9 // to-end pointer
++
++	// if the two pointers are not of same alignments, do byte copying
++	SUBVU	R9, R5, R7
++	AND	$7, R7
++	BNE	R7, out1
++
++	// if less than 8 bytes, do byte copying
++	SGTU	$8, R6, R7
++	BNE	R7, out1
++
++	// do one byte at a time until 8-aligned
++	AND	$7, R9, R8
++	BEQ	R8, words1
++	ADDV	$-1, R5
++	MOVB	(R5), R7
++	ADDV	$-1, R9
++	MOVB	R7, (R9)
++	JMP	-6(PC)
++
++words1:
++	// do 8 bytes at a time if there is room
++	ADDV	$7, R4, R6 // R6 is start pointer+7
++
++	SGTU	R9, R6, R8
++	BEQ	R8, out1
++	ADDV	$-8, R5
++	MOVV	(R5), R7
++	ADDV	$-8, R9
++	MOVV	R7, (R9)
++	JMP	-6(PC)
++
++out1:
++	BEQ	R4, R9, done1
++	ADDV	$-1, R5
++	MOVB	(R5), R7
++	ADDV	$-1, R9
++	MOVB	R7, (R9)
++	JMP	-5(PC)
++done1:
++	RET
+-- 
+2.38.0
+

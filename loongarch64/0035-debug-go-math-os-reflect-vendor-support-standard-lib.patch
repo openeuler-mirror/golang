@@ -1,0 +1,390 @@
+From 670e716b86200985156237efca1e3714452f0d8e Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 17:11:14 +0800
+Subject: [PATCH 35/82] debug, go, math, os, reflect, vendor: support standard
+ library for loong64
+
+Change-Id: I2ad9ed01fc913b90e75023ac0fa70de87a9f5de1
+---
+ src/debug/elf/elf.go                          | 114 ++++++++++++++++++
+ src/debug/elf/file.go                         |  50 ++++++++
+ src/go/types/gccgosizes.go                    |   1 +
+ src/go/types/sizes.go                         |   3 +-
+ src/math/big/arith_loong64.s                  |  37 ++++++
+ src/os/endian_little.go                       |   4 +-
+ src/reflect/asm_loong64.s                     |  42 +++++++
+ .../golang.org/x/sys/cpu/cpu_loong64.go       |  14 +++
+ 8 files changed, 262 insertions(+), 3 deletions(-)
+ create mode 100644 src/math/big/arith_loong64.s
+ create mode 100644 src/reflect/asm_loong64.s
+ create mode 100644 src/vendor/golang.org/x/sys/cpu/cpu_loong64.go
+
+diff --git a/src/debug/elf/elf.go b/src/debug/elf/elf.go
+index 9f8399d4d3..972a75e1e6 100644
+--- a/src/debug/elf/elf.go
++++ b/src/debug/elf/elf.go
+@@ -384,6 +384,7 @@ const (
+ 	EM_RISCV         Machine = 243 /* RISC-V */
+ 	EM_LANAI         Machine = 244 /* Lanai 32-bit processor */
+ 	EM_BPF           Machine = 247 /* Linux BPF – in-kernel virtual machine */
++	EM_LOONGARCH     Machine = 258 /* LoongArch */
+ 
+ 	/* Non-standard or deprecated. */
+ 	EM_486         Machine = 6      /* Intel i486. */
+@@ -575,6 +576,7 @@ var machineStrings = []intName{
+ 	{243, "EM_RISCV"},
+ 	{244, "EM_LANAI"},
+ 	{247, "EM_BPF"},
++	{258, "EM_LOONGARCH"},
+ 
+ 	/* Non-standard or deprecated. */
+ 	{6, "EM_486"},
+@@ -2150,6 +2152,118 @@ var rmipsStrings = []intName{
+ func (i R_MIPS) String() string   { return stringName(uint32(i), rmipsStrings, false) }
+ func (i R_MIPS) GoString() string { return stringName(uint32(i), rmipsStrings, true) }
+ 
++// Relocation types for LARCH.
++type R_LARCH int
++
++const (
++	R_LARCH_NONE                       R_LARCH = 0
++	R_LARCH_32                         R_LARCH = 1
++	R_LARCH_64                         R_LARCH = 2
++	R_LARCH_RELATIVE                   R_LARCH = 3
++	R_LARCH_COPY                       R_LARCH = 4
++	R_LARCH_JUMP_SLOT                  R_LARCH = 5
++	R_LARCH_TLS_DTPMOD32               R_LARCH = 6
++	R_LARCH_TLS_DTPMOD64               R_LARCH = 7
++	R_LARCH_TLS_DTPREL32               R_LARCH = 8
++	R_LARCH_TLS_DTPREL64               R_LARCH = 9
++	R_LARCH_TLS_TPREL32                R_LARCH = 10
++	R_LARCH_TLS_TPREL64                R_LARCH = 11
++	R_LARCH_IRELATIVE                  R_LARCH = 12
++	R_LARCH_MARK_LA                    R_LARCH = 20
++	R_LARCH_MARK_PCREL                 R_LARCH = 21
++	R_LARCH_SOP_PUSH_PCREL             R_LARCH = 22
++	R_LARCH_SOP_PUSH_ABSOLUTE          R_LARCH = 23
++	R_LARCH_SOP_PUSH_DUP               R_LARCH = 24
++	R_LARCH_SOP_PUSH_GPREL             R_LARCH = 25
++	R_LARCH_SOP_PUSH_TLS_TPREL         R_LARCH = 26
++	R_LARCH_SOP_PUSH_TLS_GOT           R_LARCH = 27
++	R_LARCH_SOP_PUSH_TLS_GD            R_LARCH = 28
++	R_LARCH_SOP_PUSH_PLT_PCREL         R_LARCH = 29
++	R_LARCH_SOP_ASSERT                 R_LARCH = 30
++	R_LARCH_SOP_NOT                    R_LARCH = 31
++	R_LARCH_SOP_SUB                    R_LARCH = 32
++	R_LARCH_SOP_SL                     R_LARCH = 33
++	R_LARCH_SOP_SR                     R_LARCH = 34
++	R_LARCH_SOP_ADD                    R_LARCH = 35
++	R_LARCH_SOP_AND                    R_LARCH = 36
++	R_LARCH_SOP_IF_ELSE                R_LARCH = 37
++	R_LARCH_SOP_POP_32_S_10_5          R_LARCH = 38
++	R_LARCH_SOP_POP_32_U_10_12         R_LARCH = 39
++	R_LARCH_SOP_POP_32_S_10_12         R_LARCH = 40
++	R_LARCH_SOP_POP_32_S_10_16         R_LARCH = 41
++	R_LARCH_SOP_POP_32_S_10_16_S2      R_LARCH = 42
++	R_LARCH_SOP_POP_32_S_5_20          R_LARCH = 43
++	R_LARCH_SOP_POP_32_S_0_5_10_16_S2  R_LARCH = 44
++	R_LARCH_SOP_POP_32_S_0_10_10_16_S2 R_LARCH = 45
++	R_LARCH_SOP_POP_32_U               R_LARCH = 46
++	R_LARCH_ADD8                       R_LARCH = 47
++	R_LARCH_ADD16                      R_LARCH = 48
++	R_LARCH_ADD24                      R_LARCH = 49
++	R_LARCH_ADD32                      R_LARCH = 50
++	R_LARCH_ADD64                      R_LARCH = 51
++	R_LARCH_SUB8                       R_LARCH = 52
++	R_LARCH_SUB16                      R_LARCH = 53
++	R_LARCH_SUB24                      R_LARCH = 54
++	R_LARCH_SUB32                      R_LARCH = 55
++	R_LARCH_SUB64                      R_LARCH = 56
++)
++
++var rlarchStrings = []intName{
++	{0, "R_LARCH_NONE"},
++	{1, "R_LARCH_32"},
++	{2, "R_LARCH_64"},
++	{3, "R_LARCH_RELATIVE"},
++	{4, "R_LARCH_COPY"},
++	{5, "R_LARCH_JUMP_SLOT"},
++	{6, "R_LARCH_TLS_DTPMOD32"},
++	{7, "R_LARCH_TLS_DTPMOD64"},
++	{8, "R_LARCH_TLS_DTPREL32"},
++	{9, "R_LARCH_TLS_DTPREL64"},
++	{10, "R_LARCH_TLS_TPREL32"},
++	{11, "R_LARCH_TLS_TPREL64"},
++	{12, "R_LARCH_IRELATIVE"},
++	{20, "R_LARCH_MARK_LA"},
++	{21, "R_LARCH_MARK_PCREL"},
++	{22, "R_LARCH_SOP_PUSH_PCREL"},
++	{23, "R_LARCH_SOP_PUSH_ABSOLUTE"},
++	{24, "R_LARCH_SOP_PUSH_DUP"},
++	{25, "R_LARCH_SOP_PUSH_GPREL"},
++	{26, "R_LARCH_SOP_PUSH_TLS_TPREL"},
++	{27, "R_LARCH_SOP_PUSH_TLS_GOT"},
++	{28, "R_LARCH_SOP_PUSH_TLS_GD"},
++	{29, "R_LARCH_SOP_PUSH_PLT_PCREL"},
++	{30, "R_LARCH_SOP_ASSERT"},
++	{31, "R_LARCH_SOP_NOT"},
++	{32, "R_LARCH_SOP_SUB"},
++	{33, "R_LARCH_SOP_SL"},
++	{34, "R_LARCH_SOP_SR"},
++	{35, "R_LARCH_SOP_ADD"},
++	{36, "R_LARCH_SOP_AND"},
++	{37, "R_LARCH_SOP_IF_ELSE"},
++	{38, "R_LARCH_SOP_POP_32_S_10_5"},
++	{39, "R_LARCH_SOP_POP_32_U_10_12"},
++	{40, "R_LARCH_SOP_POP_32_S_10_12"},
++	{41, "R_LARCH_SOP_POP_32_S_10_16"},
++	{42, "R_LARCH_SOP_POP_32_S_10_16_S2"},
++	{43, "R_LARCH_SOP_POP_32_S_5_20"},
++	{44, "R_LARCH_SOP_POP_32_S_0_5_10_16_S2"},
++	{45, "R_LARCH_SOP_POP_32_S_0_10_10_16_S2"},
++	{46, "R_LARCH_SOP_POP_32_U"},
++	{47, "R_LARCH_ADD8"},
++	{48, "R_LARCH_ADD16"},
++	{49, "R_LARCH_ADD24"},
++	{50, "R_LARCH_ADD32"},
++	{51, "R_LARCH_ADD64"},
++	{52, "R_LARCH_SUB8"},
++	{53, "R_LARCH_SUB16"},
++	{54, "R_LARCH_SUB24"},
++	{55, "R_LARCH_SUB32"},
++	{56, "R_LARCH_SUB64"},
++}
++
++func (i R_LARCH) String() string   { return stringName(uint32(i), rlarchStrings, false) }
++func (i R_LARCH) GoString() string { return stringName(uint32(i), rlarchStrings, true) }
++
+ // Relocation types for PowerPC.
+ //
+ // Values that are shared by both R_PPC and R_PPC64 are prefixed with
+diff --git a/src/debug/elf/file.go b/src/debug/elf/file.go
+index b25d8209e3..37739fbcf2 100644
+--- a/src/debug/elf/file.go
++++ b/src/debug/elf/file.go
+@@ -617,6 +617,8 @@ func (f *File) applyRelocations(dst []byte, rels []byte) error {
+ 		return f.applyRelocationsMIPS(dst, rels)
+ 	case f.Class == ELFCLASS64 && f.Machine == EM_MIPS:
+ 		return f.applyRelocationsMIPS64(dst, rels)
++	case f.Class == ELFCLASS64 && f.Machine == EM_LOONGARCH:
++		return f.applyRelocationsLOONG64(dst, rels)
+ 	case f.Class == ELFCLASS64 && f.Machine == EM_RISCV:
+ 		return f.applyRelocationsRISCV64(dst, rels)
+ 	case f.Class == ELFCLASS64 && f.Machine == EM_S390:
+@@ -990,6 +992,54 @@ func (f *File) applyRelocationsMIPS64(dst []byte, rels []byte) error {
+ 	return nil
+ }
+ 
++func (f *File) applyRelocationsLOONG64(dst []byte, rels []byte) error {
++	// 24 is the size of Rela64.
++	if len(rels)%24 != 0 {
++		return errors.New("length of relocation section is not a multiple of 24")
++	}
++
++	symbols, _, err := f.getSymbols(SHT_SYMTAB)
++	if err != nil {
++		return err
++	}
++
++	b := bytes.NewReader(rels)
++	var rela Rela64
++
++	for b.Len() > 0 {
++		binary.Read(b, f.ByteOrder, &rela)
++		var symNo uint64
++		var t R_LARCH
++		symNo = rela.Info >> 32
++		t = R_LARCH(rela.Info & 0xffff)
++
++		if symNo == 0 || symNo > uint64(len(symbols)) {
++			continue
++		}
++		sym := &symbols[symNo-1]
++		if !canApplyRelocation(sym) {
++			continue
++		}
++
++		switch t {
++		case R_LARCH_64:
++			if rela.Off+8 >= uint64(len(dst)) || rela.Addend < 0 {
++				continue
++			}
++			val64 := sym.Value + uint64(rela.Addend)
++			f.ByteOrder.PutUint64(dst[rela.Off:rela.Off+8], val64)
++		case R_LARCH_32:
++			if rela.Off+4 >= uint64(len(dst)) || rela.Addend < 0 {
++				continue
++			}
++			val32 := uint32(sym.Value) + uint32(rela.Addend)
++			f.ByteOrder.PutUint32(dst[rela.Off:rela.Off+4], val32)
++		}
++	}
++
++	return nil
++}
++
+ func (f *File) applyRelocationsRISCV64(dst []byte, rels []byte) error {
+ 	// 24 is the size of Rela64.
+ 	if len(rels)%24 != 0 {
+diff --git a/src/go/types/gccgosizes.go b/src/go/types/gccgosizes.go
+index d5c92c6d1d..9d077cc5a6 100644
+--- a/src/go/types/gccgosizes.go
++++ b/src/go/types/gccgosizes.go
+@@ -17,6 +17,7 @@ var gccgoArchSizes = map[string]*StdSizes{
+ 	"arm64":       {8, 8},
+ 	"arm64be":     {8, 8},
+ 	"ia64":        {8, 8},
++	"loong64":     {8, 8},
+ 	"m68k":        {4, 2},
+ 	"mips":        {4, 8},
+ 	"mipsle":      {4, 8},
+diff --git a/src/go/types/sizes.go b/src/go/types/sizes.go
+index 67052bb816..9d6cabf158 100644
+--- a/src/go/types/sizes.go
++++ b/src/go/types/sizes.go
+@@ -163,6 +163,7 @@ var gcArchSizes = map[string]*StdSizes{
+ 	"arm64":    {8, 8},
+ 	"amd64":    {8, 8},
+ 	"amd64p32": {4, 8},
++	"loong64":  {8, 8},
+ 	"mips":     {4, 4},
+ 	"mipsle":   {4, 4},
+ 	"mips64":   {8, 8},
+@@ -181,7 +182,7 @@ var gcArchSizes = map[string]*StdSizes{
+ // The result is nil if a compiler/architecture pair is not known.
+ //
+ // Supported architectures for compiler "gc":
+-// "386", "arm", "arm64", "amd64", "amd64p32", "mips", "mipsle",
++// "386", "arm", "arm64", "amd64", "amd64p32", "loong64", "mips", "mipsle",
+ // "mips64", "mips64le", "ppc64", "ppc64le", "riscv64", "s390x", "sparc64", "wasm".
+ func SizesFor(compiler, arch string) Sizes {
+ 	var m map[string]*StdSizes
+diff --git a/src/math/big/arith_loong64.s b/src/math/big/arith_loong64.s
+new file mode 100644
+index 0000000000..fdc31bfdd0
+--- /dev/null
++++ b/src/math/big/arith_loong64.s
+@@ -0,0 +1,37 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build !math_big_pure_go,loong64
++
++#include "textflag.h"
++
++// This file provides fast assembly versions for the elementary
++// arithmetic operations on vectors implemented in arith.go.
++
++TEXT ·mulWW(SB),NOSPLIT,$0
++	JMP ·mulWW_g(SB)
++
++TEXT ·addVV(SB),NOSPLIT,$0
++	JMP ·addVV_g(SB)
++
++TEXT ·subVV(SB),NOSPLIT,$0
++	JMP ·subVV_g(SB)
++
++TEXT ·addVW(SB),NOSPLIT,$0
++	JMP ·addVW_g(SB)
++
++TEXT ·subVW(SB),NOSPLIT,$0
++	JMP ·subVW_g(SB)
++
++TEXT ·shlVU(SB),NOSPLIT,$0
++	JMP ·shlVU_g(SB)
++
++TEXT ·shrVU(SB),NOSPLIT,$0
++	JMP ·shrVU_g(SB)
++
++TEXT ·mulAddVWW(SB),NOSPLIT,$0
++	JMP ·mulAddVWW_g(SB)
++
++TEXT ·addMulVVW(SB),NOSPLIT,$0
++	JMP ·addMulVVW_g(SB)
+diff --git a/src/os/endian_little.go b/src/os/endian_little.go
+index 6be6020f53..e38a42e14c 100644
+--- a/src/os/endian_little.go
++++ b/src/os/endian_little.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ //
+-//go:build 386 || amd64 || arm || arm64 || ppc64le || mips64le || mipsle || riscv64 || wasm
+-// +build 386 amd64 arm arm64 ppc64le mips64le mipsle riscv64 wasm
++//go:build 386 || amd64 || arm || arm64 || ppc64le || mips64le || mipsle || riscv64 || wasm || loong64
++// +build 386 amd64 arm arm64 ppc64le mips64le mipsle riscv64 wasm loong64
+ 
+ package os
+ 
+diff --git a/src/reflect/asm_loong64.s b/src/reflect/asm_loong64.s
+new file mode 100644
+index 0000000000..e2bb861689
+--- /dev/null
++++ b/src/reflect/asm_loong64.s
+@@ -0,0 +1,42 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "textflag.h"
++#include "funcdata.h"
++
++#define	REGCTXT	R29
++
++// makeFuncStub is the code half of the function returned by MakeFunc.
++// See the comment on the declaration of makeFuncStub in makefunc.go
++// for more details.
++// No arg size here, runtime pulls arg map out of the func value.
++TEXT ·makeFuncStub(SB),(NOSPLIT|WRAPPER),$40
++	NO_LOCAL_POINTERS
++	MOVV	REGCTXT, 8(R3)
++	MOVV	$argframe+0(FP), R19
++	MOVV	R19, 16(R3)
++	MOVB	R0, 40(R3)
++	ADDV	$40, R3, R19
++	MOVV	R19, 24(R3)
++	MOVV	R0, 32(R3)
++	JAL	·callReflect(SB)
++	RET
++
++// methodValueCall is the code half of the function returned by makeMethodValue.
++// See the comment on the declaration of methodValueCall in makefunc.go
++// for more details.
++// No arg size here; runtime pulls arg map out of the func value.
++TEXT ·methodValueCall(SB),(NOSPLIT|WRAPPER),$40
++	NO_LOCAL_POINTERS
++	MOVV	REGCTXT, 8(R3)
++	MOVV	$argframe+0(FP), R19
++	MOVV	R19, 16(R3)
++	MOVB	R0, 40(R3)
++	ADDV	$40, R3, R19
++	MOVV	R19, 24(R3)
++	MOVV	R0, 32(R3)
++	JAL	·callMethod(SB)
++	RET
+diff --git a/src/vendor/golang.org/x/sys/cpu/cpu_loong64.go b/src/vendor/golang.org/x/sys/cpu/cpu_loong64.go
+new file mode 100644
+index 0000000000..e39ecae08c
+--- /dev/null
++++ b/src/vendor/golang.org/x/sys/cpu/cpu_loong64.go
+@@ -0,0 +1,14 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++//go:build loong64
++// +build loong64
++
++package cpu
++
++const cacheLineSize = 64
++
++func initOptions() {
++	options = []option{}
++}
+-- 
+2.38.0
+

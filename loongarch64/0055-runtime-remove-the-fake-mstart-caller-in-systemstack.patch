@@ -1,0 +1,39 @@
+From 4fec6e075b13ba02f3be102ee6b081843e9738ed Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 4 Jul 2022 14:29:52 +0800
+Subject: [PATCH 55/82] runtime: remove the fake mstart caller in systemstack
+ on linux/loong64
+
+ref. CL 288799
+
+Change-Id: I0841e75fd515cf6a0d98abe4cffc3f63fc275e0e
+---
+ src/runtime/asm_loong64.s | 5 -----
+ 1 file changed, 5 deletions(-)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index 0cb1c412ef..90d36a3e01 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -142,7 +142,6 @@ TEXT runtime·mcall(SB), NOSPLIT|NOFRAME, $0-8
+ 	MOVV	R3, (g_sched+gobuf_sp)(g)
+ 	MOVV	R1, (g_sched+gobuf_pc)(g)
+ 	MOVV	R0, (g_sched+gobuf_lr)(g)
+-	MOVV	g, (g_sched+gobuf_g)(g)
+ 
+ 	// Switch to m->g0 & its stack, call fn.
+ 	MOVV	g, R19
+@@ -200,10 +199,6 @@ switch:
+ 	MOVV	R5, g
+ 	JAL	runtime·save_g(SB)
+ 	MOVV	(g_sched+gobuf_sp)(g), R19
+-	// make it look like mstart called systemstack on g0, to stop traceback
+-	ADDV	$-8, R19
+-	MOVV	$runtime·mstart(SB), R6
+-	MOVV	R6, 0(R19)
+ 	MOVV	R19, R3
+ 
+ 	// call target function
+-- 
+2.38.0
+

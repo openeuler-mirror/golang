@@ -1,0 +1,114 @@
+From 02470a2c86eb3dfb4f8c1918f389a0abf541078c Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 4 Aug 2022 18:13:59 +0800
+Subject: [PATCH 61/82] cmd/asm: add RDTIME{L,H}.W, RDTIME.D support for
+ loong64
+
+Instruction formats: rdtimeX rd, rj
+
+The rdtimex instructions are used to read constant frequency timer information,
+the stable counter value is written into the general register rd, and the counter
+id information is written into the general register rj.
+
+Ref: https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html
+
+Change-Id: Ida5bbb28316ef70b5f616dac3e6fa6f2e77875b5
+---
+ src/cmd/asm/internal/asm/testdata/loong64enc1.s |  4 ++++
+ src/cmd/internal/obj/loong64/a.out.go           |  5 +++++
+ src/cmd/internal/obj/loong64/anames.go          |  3 +++
+ src/cmd/internal/obj/loong64/asm.go             | 16 ++++++++++++++++
+ 4 files changed, 28 insertions(+)
+
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc1.s b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+index b483facee3..1eced6b4df 100644
+--- a/src/cmd/asm/internal/asm/testdata/loong64enc1.s
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+@@ -207,3 +207,7 @@ lable2:
+ 	CMPGEF	F4, R5			// a090130c
+ 	CMPGED	F4, R5			// a090230c
+ 	CMPEQD	F4, R5			// a010220c
++
++	RDTIMELW R4, R0			// 80600000
++	RDTIMEHW R4, R0			// 80640000
++	RDTIMED	 R4, R5			// 85680000
+diff --git a/src/cmd/internal/obj/loong64/a.out.go b/src/cmd/internal/obj/loong64/a.out.go
+index 9846bc9297..c2825108e5 100644
+--- a/src/cmd/internal/obj/loong64/a.out.go
++++ b/src/cmd/internal/obj/loong64/a.out.go
+@@ -386,6 +386,11 @@ const (
+ 	AMOVVF
+ 	AMOVVD
+ 
++	// 2.2.10. Other Miscellaneous Instructions
++	ARDTIMELW
++	ARDTIMEHW
++	ARDTIMED
++
+ 	ALAST
+ 
+ 	// aliases
+diff --git a/src/cmd/internal/obj/loong64/anames.go b/src/cmd/internal/obj/loong64/anames.go
+index 715f03a538..10555af6df 100644
+--- a/src/cmd/internal/obj/loong64/anames.go
++++ b/src/cmd/internal/obj/loong64/anames.go
+@@ -126,5 +126,8 @@ var Anames = []string{
+ 	"MOVDV",
+ 	"MOVVF",
+ 	"MOVVD",
++	"RDTIMELW",
++	"RDTIMEHW",
++	"RDTIMED",
+ 	"LAST",
+ }
+diff --git a/src/cmd/internal/obj/loong64/asm.go b/src/cmd/internal/obj/loong64/asm.go
+index 02e0f362d6..66265690e3 100644
+--- a/src/cmd/internal/obj/loong64/asm.go
++++ b/src/cmd/internal/obj/loong64/asm.go
+@@ -336,6 +336,10 @@ var optab = []Optab{
+ 	{ABREAK, C_REG, C_NONE, C_SOREG, 7, 4, REGZERO, sys.Loong64, 0},
+ 	{ABREAK, C_NONE, C_NONE, C_NONE, 5, 4, 0, 0, 0},
+ 
++	{ARDTIMELW, C_REG, C_NONE, C_REG, 62, 4, 0, 0, 0},
++	{ARDTIMEHW, C_REG, C_NONE, C_REG, 62, 4, 0, 0, 0},
++	{ARDTIMED, C_REG, C_NONE, C_REG, 62, 4, 0, 0, 0},
++
+ 	{obj.AUNDEF, C_NONE, C_NONE, C_NONE, 49, 4, 0, 0, 0},
+ 	{obj.APCDATA, C_LCON, C_NONE, C_LCON, 0, 0, 0, 0, 0},
+ 	{obj.APCDATA, C_DCON, C_NONE, C_DCON, 0, 0, 0, 0, 0},
+@@ -1024,6 +1028,9 @@ func buildop(ctxt *obj.Link) {
+ 			ANEGW,
+ 			ANEGV,
+ 			AWORD,
++			ARDTIMELW,
++			ARDTIMEHW,
++			ARDTIMED,
+ 			obj.ANOP,
+ 			obj.ATEXT,
+ 			obj.AUNDEF,
+@@ -1595,6 +1602,9 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
+ 	case 61: // word C_DCON
+ 		o1 = uint32(c.vregoff(&p.From))
+ 		o2 = uint32(c.vregoff(&p.From) >> 32)
++
++	case 62: // rdtimex rd, rj
++		o1 = OP_RR(c.oprr(p.As), uint32(p.From.Reg), uint32(p.To.Reg))
+ 	}
+ 
+ 	out[0] = o1
+@@ -1794,6 +1804,12 @@ func (c *ctxt0) oprr(a obj.As) uint32 {
+ 		return 0x4 << 10
+ 	case ACLZ:
+ 		return 0x5 << 10
++	case ARDTIMELW:
++		return 0x18 << 10 // rdtimel.w
++	case ARDTIMEHW:
++		return 0x19 << 10 // rdtimeh.w
++	case ARDTIMED:
++		return 0x1a << 10 // rdtimed
+ 	}
+ 
+ 	c.ctxt.Diag("bad rr opcode %v", a)
+-- 
+2.38.0
+

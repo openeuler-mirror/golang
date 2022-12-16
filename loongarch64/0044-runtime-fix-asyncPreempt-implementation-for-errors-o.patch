@@ -1,0 +1,101 @@
+From b3686dfc9bdef9f12694f8c3156d55de9f47a2cb Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 19 May 2022 10:26:36 +0800
+Subject: [PATCH 44/82] runtime: fix asyncPreempt implementation for errors on
+ loong64
+
+Change-Id: If93ff18167adec2783503cf428e07da121b1c918
+---
+ src/runtime/mkpreempt.go | 28 ++++++++++------------------
+ src/runtime/preempt.go   |  2 +-
+ 2 files changed, 11 insertions(+), 19 deletions(-)
+
+diff --git a/src/runtime/mkpreempt.go b/src/runtime/mkpreempt.go
+index 1bad20d60b..7f74d54289 100644
+--- a/src/runtime/mkpreempt.go
++++ b/src/runtime/mkpreempt.go
+@@ -81,7 +81,7 @@ var arches = map[string]func(){
+ 	"amd64":   genAMD64,
+ 	"arm":     genARM,
+ 	"arm64":   genARM64,
+-	"loong64": genLOONG64,
++	"loong64": genLoong64,
+ 	"mips64x": func() { genMIPS(true) },
+ 	"mipsx":   func() { genMIPS(false) },
+ 	"ppc64x":  genPPC64,
+@@ -450,7 +450,7 @@ func genMIPS(_64bit bool) {
+ 	p("JMP (R23)")
+ }
+ 
+-func genLOONG64() {
++func genLoong64() {
+ 	mov := "MOVV"
+ 	movf := "MOVD"
+ 	add := "ADDV"
+@@ -459,42 +459,34 @@ func genLOONG64() {
+ 	regsize := 8
+ 
+ 	// Add integer registers r4-r21 r23-r29 r31
+-	// R0 (zero), R30 (REGTMP), R2(tp),R3 (SP), R22 (g), R1 (LR) are special,
++	// R0 (zero), R30 (REGTMP), R2 (tp), R3 (SP), R22 (g), R1 (LR) are special,
+ 	var l = layout{sp: "R3", stack: regsize} // add slot to save PC of interrupted instruction (in LR)
+ 	for i := 4; i <= 29; i++ {
+ 		if i == 22 {
+-			continue //R3 is REGSP  R22 is g
++			continue // R3 is REGSP  R22 is g
+ 		}
+ 		reg := fmt.Sprintf("R%d", i)
+ 		l.add(mov, reg, regsize)
+ 	}
+ 	l.add(mov, r31, regsize)
+ 
+-	// Add floating point control/status register FCR31 (FCR0-FCR30 are irrelevant)
+-	var lfp = layout{sp: "R3", stack: l.stack}
+-	//	lfp.addSpecial(
+-	//		mov+" FCR31, R1\n"+mov+" R1, %d(R29)",
+-	//		mov+" %d(R29), R1\n"+mov+" R1, FCR31",
+-	//		regsize)
+ 	// Add floating point registers F0-F31.
+ 	for i := 0; i <= 31; i++ {
+ 		reg := fmt.Sprintf("F%d", i)
+-		lfp.add(movf, reg, regsize)
++		l.add(movf, reg, regsize)
+ 	}
+ 
+ 	// allocate frame, save PC of interrupted instruction (in LR)
+-	p(mov+" R1, -%d(R3)", lfp.stack)
+-	p(sub+" $%d, R3", lfp.stack)
++	p(mov+" R1, -%d(R3)", l.stack)
++	p(sub+" $%d, R3", l.stack)
+ 
+ 	l.save()
+-	lfp.save()
+ 	p("CALL ·asyncPreempt2(SB)")
+-	lfp.restore()
+ 	l.restore()
+ 
+-	p(mov+" %d(R3), R1", lfp.stack)      // sigctxt.pushCall has pushed LR (at interrupt) on stack, restore it
+-	p(mov + " (R3), R30")                // load PC to REGTMP
+-	p(add+" $%d, R3", lfp.stack+regsize) // pop frame (including the space pushed by sigctxt.pushCall)
++	p(mov+" %d(R3), R1", l.stack)      // sigctxt.pushCall has pushed LR (at interrupt) on stack, restore it
++	p(mov + " (R3), R30")              // load PC to REGTMP
++	p(add+" $%d, R3", l.stack+regsize) // pop frame (including the space pushed by sigctxt.pushCall)
+ 	p("JMP (R30)")
+ }
+ 
+diff --git a/src/runtime/preempt.go b/src/runtime/preempt.go
+index 92a05d227d..1d5aae1363 100644
+--- a/src/runtime/preempt.go
++++ b/src/runtime/preempt.go
+@@ -386,7 +386,7 @@ func isAsyncSafePoint(gp *g, pc, sp, lr uintptr) (bool, uintptr) {
+ 		// Not Go code.
+ 		return false, 0
+ 	}
+-	if (GOARCH == "loong64" || GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "mips64" || GOARCH == "mips64le") && lr == pc+8 && funcspdelta(f, pc, nil) == 0 {
++	if (GOARCH == "mips" || GOARCH == "mipsle" || GOARCH == "mips64" || GOARCH == "mips64le") && lr == pc+8 && funcspdelta(f, pc, nil) == 0 {
+ 		// We probably stopped at a half-executed CALL instruction,
+ 		// where the LR is updated but the PC has not. If we preempt
+ 		// here we'll see a seemingly self-recursive call, which is in
+-- 
+2.38.0
+

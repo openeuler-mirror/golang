@@ -1,0 +1,47 @@
+From 009328b65d649f1bbabf9bd6384aae8e1cf2717d Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 15:32:16 +0800
+Subject: [PATCH 28/82] cmd/cgo: configure cgo tool for loong64
+
+Change-Id: I9699fd9af0112e72193ac24b736b85c580887a0f
+---
+ src/cmd/cgo/gcc.go  | 2 ++
+ src/cmd/cgo/main.go | 2 ++
+ 2 files changed, 4 insertions(+)
+
+diff --git a/src/cmd/cgo/gcc.go b/src/cmd/cgo/gcc.go
+index a73e998877..b9250d55b7 100644
+--- a/src/cmd/cgo/gcc.go
++++ b/src/cmd/cgo/gcc.go
+@@ -1593,6 +1593,8 @@ func (p *Package) gccMachine() []string {
+ 		} else if gomips == "softfloat" {
+ 			return []string{"-mabi=32", "-msoft-float"}
+ 		}
++	case "loong64":
++		return []string{"-mabi=lp64d"}
+ 	}
+ 	return nil
+ }
+diff --git a/src/cmd/cgo/main.go b/src/cmd/cgo/main.go
+index c6a0c525e6..46bd91b051 100644
+--- a/src/cmd/cgo/main.go
++++ b/src/cmd/cgo/main.go
+@@ -176,6 +176,7 @@ var ptrSizeMap = map[string]int64{
+ 	"amd64":    8,
+ 	"arm":      4,
+ 	"arm64":    8,
++	"loong64":  8,
+ 	"m68k":     4,
+ 	"mips":     4,
+ 	"mipsle":   4,
+@@ -201,6 +202,7 @@ var intSizeMap = map[string]int64{
+ 	"amd64":    8,
+ 	"arm":      4,
+ 	"arm64":    8,
++	"loong64":  8,
+ 	"m68k":     4,
+ 	"mips":     4,
+ 	"mipsle":   4,
+-- 
+2.38.0
+

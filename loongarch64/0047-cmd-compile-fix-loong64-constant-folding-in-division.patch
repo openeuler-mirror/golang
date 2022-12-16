@@ -1,0 +1,148 @@
+From aa6458665064ed642010cf34948310ac31139284 Mon Sep 17 00:00:00 2001
+From: Cuong Manh Le <cuong.manhle.vn@gmail.com>
+Date: Sat, 21 May 2022 19:00:18 +0700
+Subject: [PATCH 47/82] cmd/compile: fix loong64 constant folding in division
+ rules
+
+The divisor must be non-zero for the rule to be triggered.
+
+Fixes #53018
+
+Change-Id: Id56b8d986945bbb66e13131d11264ee438de5cb2
+---
+ .../compile/internal/ssa/gen/LOONG64.rules    |  8 ++---
+ .../compile/internal/ssa/rewriteLOONG64.go    | 16 ++++++++++
+ test/fixedbugs/issue53018.go                  | 30 +++++++++++++++++++
+ 3 files changed, 50 insertions(+), 4 deletions(-)
+ create mode 100644 test/fixedbugs/issue53018.go
+
+diff --git a/src/cmd/compile/internal/ssa/gen/LOONG64.rules b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+index 3fd4552aa4..4237aea16f 100644
+--- a/src/cmd/compile/internal/ssa/gen/LOONG64.rules
++++ b/src/cmd/compile/internal/ssa/gen/LOONG64.rules
+@@ -617,10 +617,10 @@
+ (SRLVconst [c] (MOVVconst [d]))  => (MOVVconst [int64(uint64(d)>>uint64(c))])
+ (SRAVconst [c] (MOVVconst [d]))  => (MOVVconst [d>>uint64(c)])
+ (Select1 (MULVU (MOVVconst [c]) (MOVVconst [d]))) => (MOVVconst [c*d])
+-(Select1 (DIVV  (MOVVconst [c]) (MOVVconst [d]))) => (MOVVconst [c/d])
+-(Select1 (DIVVU (MOVVconst [c]) (MOVVconst [d]))) => (MOVVconst [int64(uint64(c)/uint64(d))])
+-(Select0 (DIVV  (MOVVconst [c]) (MOVVconst [d]))) => (MOVVconst [c%d])   // mod
+-(Select0 (DIVVU (MOVVconst [c]) (MOVVconst [d]))) => (MOVVconst [int64(uint64(c)%uint64(d))]) // mod
++(Select1 (DIVV  (MOVVconst [c]) (MOVVconst [d]))) && d != 0 => (MOVVconst [c/d])
++(Select1 (DIVVU (MOVVconst [c]) (MOVVconst [d]))) && d != 0 => (MOVVconst [int64(uint64(c)/uint64(d))])
++(Select0 (DIVV  (MOVVconst [c]) (MOVVconst [d]))) && d != 0 => (MOVVconst [c%d])   // mod
++(Select0 (DIVVU (MOVVconst [c]) (MOVVconst [d]))) && d != 0 => (MOVVconst [int64(uint64(c)%uint64(d))]) // mod
+ (ANDconst [c] (MOVVconst [d])) => (MOVVconst [c&d])
+ (ANDconst [c] (ANDconst [d] x)) => (ANDconst [c&d] x)
+ (ORconst [c] (MOVVconst [d])) => (MOVVconst [c|d])
+diff --git a/src/cmd/compile/internal/ssa/rewriteLOONG64.go b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+index 463a0458a3..e0f0df03e8 100644
+--- a/src/cmd/compile/internal/ssa/rewriteLOONG64.go
++++ b/src/cmd/compile/internal/ssa/rewriteLOONG64.go
+@@ -6825,6 +6825,7 @@ func rewriteValueLOONG64_OpSelect0(v *Value) bool {
+ 		return true
+ 	}
+ 	// match: (Select0 (DIVV (MOVVconst [c]) (MOVVconst [d])))
++	// cond: d != 0
+ 	// result: (MOVVconst [c%d])
+ 	for {
+ 		if v_0.Op != OpLOONG64DIVV {
+@@ -6841,11 +6842,15 @@ func rewriteValueLOONG64_OpSelect0(v *Value) bool {
+ 			break
+ 		}
+ 		d := auxIntToInt64(v_0_1.AuxInt)
++		if !(d != 0) {
++			break
++		}
+ 		v.reset(OpLOONG64MOVVconst)
+ 		v.AuxInt = int64ToAuxInt(c % d)
+ 		return true
+ 	}
+ 	// match: (Select0 (DIVVU (MOVVconst [c]) (MOVVconst [d])))
++	// cond: d != 0
+ 	// result: (MOVVconst [int64(uint64(c)%uint64(d))])
+ 	for {
+ 		if v_0.Op != OpLOONG64DIVVU {
+@@ -6862,6 +6867,9 @@ func rewriteValueLOONG64_OpSelect0(v *Value) bool {
+ 			break
+ 		}
+ 		d := auxIntToInt64(v_0_1.AuxInt)
++		if !(d != 0) {
++			break
++		}
+ 		v.reset(OpLOONG64MOVVconst)
+ 		v.AuxInt = int64ToAuxInt(int64(uint64(c) % uint64(d)))
+ 		return true
+@@ -7018,6 +7026,7 @@ func rewriteValueLOONG64_OpSelect1(v *Value) bool {
+ 		return true
+ 	}
+ 	// match: (Select1 (DIVV (MOVVconst [c]) (MOVVconst [d])))
++	// cond: d != 0
+ 	// result: (MOVVconst [c/d])
+ 	for {
+ 		if v_0.Op != OpLOONG64DIVV {
+@@ -7034,11 +7043,15 @@ func rewriteValueLOONG64_OpSelect1(v *Value) bool {
+ 			break
+ 		}
+ 		d := auxIntToInt64(v_0_1.AuxInt)
++		if !(d != 0) {
++			break
++		}
+ 		v.reset(OpLOONG64MOVVconst)
+ 		v.AuxInt = int64ToAuxInt(c / d)
+ 		return true
+ 	}
+ 	// match: (Select1 (DIVVU (MOVVconst [c]) (MOVVconst [d])))
++	// cond: d != 0
+ 	// result: (MOVVconst [int64(uint64(c)/uint64(d))])
+ 	for {
+ 		if v_0.Op != OpLOONG64DIVVU {
+@@ -7055,6 +7068,9 @@ func rewriteValueLOONG64_OpSelect1(v *Value) bool {
+ 			break
+ 		}
+ 		d := auxIntToInt64(v_0_1.AuxInt)
++		if !(d != 0) {
++			break
++		}
+ 		v.reset(OpLOONG64MOVVconst)
+ 		v.AuxInt = int64ToAuxInt(int64(uint64(c) / uint64(d)))
+ 		return true
+diff --git a/test/fixedbugs/issue53018.go b/test/fixedbugs/issue53018.go
+new file mode 100644
+index 0000000000..439d9d58c1
+--- /dev/null
++++ b/test/fixedbugs/issue53018.go
+@@ -0,0 +1,30 @@
++// compile
++
++// Copyright 2022 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++package p
++
++var V []int
++
++func f(i int, c chan int) int {
++	arr := []int{0, 1}
++	for range c {
++		for a2 := range arr {
++			var a []int
++			V = V[:1/a2]
++			a[i] = 0
++		}
++		return func() int {
++			arr = []int{}
++			return func() int {
++				return func() int {
++					return func() int { return 4 }()
++				}()
++			}()
++		}()
++	}
++
++	return 0
++}
+-- 
+2.38.0
+

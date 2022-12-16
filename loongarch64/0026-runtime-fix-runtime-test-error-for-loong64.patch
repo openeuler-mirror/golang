@@ -1,0 +1,26 @@
+From 5b6184fe7e55aea4199a630a7f26a7a46fd5907c Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 1 Dec 2021 17:43:12 +0800
+Subject: [PATCH 26/82] runtime: fix runtime test error for loong64
+
+Change-Id: I61bef32b38ab07543a147cf172b169eae21b26cf
+---
+ src/runtime/gcinfo_test.go | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/runtime/gcinfo_test.go b/src/runtime/gcinfo_test.go
+index 0808b416f0..daa4ec58ba 100644
+--- a/src/runtime/gcinfo_test.go
++++ b/src/runtime/gcinfo_test.go
+@@ -164,7 +164,7 @@ func infoBigStruct() []byte {
+ 			typeScalar, typeScalar, typeScalar, typeScalar, // t int; y uint16; u uint64
+ 			typePointer, typeScalar, // i string
+ 		}
+-	case "arm64", "amd64", "mips64", "mips64le", "ppc64", "ppc64le", "riscv64", "s390x", "wasm":
++	case "arm64", "amd64", "loong64", "mips64", "mips64le", "ppc64", "ppc64le", "riscv64", "s390x", "wasm":
+ 		return []byte{
+ 			typePointer,                        // q *int
+ 			typeScalar, typeScalar, typeScalar, // w byte; e [17]byte
+-- 
+2.38.0
+

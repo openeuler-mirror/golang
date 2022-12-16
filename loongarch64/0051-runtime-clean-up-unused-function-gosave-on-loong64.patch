@@ -1,0 +1,39 @@
+From c74571972ad2d0cbb51ed2d1b4a494bf5e41a149 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 30 May 2022 18:44:57 +0800
+Subject: [PATCH 51/82] runtime: clean up unused function gosave on loong64
+
+Change-Id: I28960a33d251a36e5e364fa6e27c5b2e13349f6b
+---
+ src/runtime/asm_loong64.s | 15 ---------------
+ 1 file changed, 15 deletions(-)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index 85df3ed3c9..0cb1c412ef 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -110,21 +110,6 @@ TEXT runtime·jmpdefer(SB), NOSPLIT|NOFRAME, $0-16
+  *  go-routine
+  */
+ 
+-// void gosave(Gobuf*)
+-// save state in Gobuf; setjmp
+-TEXT runtime·gosave(SB), NOSPLIT|NOFRAME, $0-8
+-	MOVV	buf+0(FP), R19
+-	MOVV	R3, gobuf_sp(R19)
+-	MOVV	R1, gobuf_pc(R19)
+-	MOVV	g, gobuf_g(R19)
+-	MOVV	R0, gobuf_lr(R19)
+-	MOVV	R0, gobuf_ret(R19)
+-	// Assert ctxt is zero. See func save.
+-	MOVV	gobuf_ctxt(R19), R19
+-	BEQ	R19, 2(PC)
+-	JAL	runtime·badctxt(SB)
+-	RET
+-
+ // void gogo(Gobuf*)
+ // restore state from Gobuf; longjmp
+ TEXT runtime·gogo(SB), NOSPLIT|NOFRAME, $0-8
+-- 
+2.38.0
+

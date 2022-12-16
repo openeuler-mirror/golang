@@ -1,0 +1,157 @@
+From 0f5a966e95eb277d4797f0f1277bb37b9ad0c6f2 Mon Sep 17 00:00:00 2001
+From: Wayne Zuo <wdvxdr@golangcn.org>
+Date: Tue, 9 Aug 2022 23:08:57 +0800
+Subject: [PATCH 77/82] cmd/internal/obj/loong64: add ROTR, ROTRV instructions
+ support
+
+Reference: https://loongson.github.io/LoongArch-Documentation/LoongArch-Vol1-EN.html
+
+Change-Id: I29adb84eb70bffd963c79ed6957a5197896fb2bf
+Reviewed-on: https://go-review.googlesource.com/c/go/+/422316
+Run-TryBot: Wayne Zuo <wdvxdr@golangcn.org>
+Reviewed-by: Ian Lance Taylor <iant@google.com>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Reviewed-by: David Chase <drchase@google.com>
+---
+ src/cmd/asm/internal/asm/testdata/loong64enc1.s |  8 ++++++++
+ src/cmd/internal/obj/loong64/a.out.go           |  2 ++
+ src/cmd/internal/obj/loong64/anames.go          |  2 ++
+ src/cmd/internal/obj/loong64/asm.go             | 14 +++++++++++++-
+ 4 files changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc1.s b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+index ae143988a1..7e34cc056d 100644
+--- a/src/cmd/asm/internal/asm/testdata/loong64enc1.s
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+@@ -41,8 +41,12 @@ lable2:
+ 	SRL	R4, R5, R6	 	// a6901700
+ 	SRA	R4, R5			// a5101800
+ 	SRA	R4, R5, R6	 	// a6101800
++	ROTR	R4, R5			// a5101b00
++	ROTR	R4, R5, R6		// a6101b00
+ 	SLLV	R4, R5			// a5901800
+ 	SLLV	R4, R5, R6		// a6901800
++	ROTRV	R4, R5			// a5901b00
++	ROTRV	R4, R5, R6		// a6901b00
+ 	CLO	R4, R5			// 85100000
+ 	CLZ	R4, R5			// 85140000
+ 	ADDF	F4, F5			// a5900001
+@@ -102,8 +106,12 @@ lable2:
+ 	SRL	$4, R4			// 84904400
+ 	SRA	$4, R4, R5		// 85904800
+ 	SRA	$4, R4			// 84904800
++	ROTR	$4, R4, R5		// 85904c00
++	ROTR	$4, R4			// 84904c00
+ 	SLLV	$4, R4, R5		// 85104100
+ 	SLLV	$4, R4			// 84104100
++	ROTRV	$4, R4, R5		// 85104d00
++	ROTRV	$4, R4			// 84104d00
+ 	SYSCALL				// 00002b00
+ 	BEQ	R4, R5, 1(PC)		// 85040058
+ 	BEQ	R4, 1(PC)		// 80040058
+diff --git a/src/cmd/internal/obj/loong64/a.out.go b/src/cmd/internal/obj/loong64/a.out.go
+index 55ba8797a4..4fb4c91eea 100644
+--- a/src/cmd/internal/obj/loong64/a.out.go
++++ b/src/cmd/internal/obj/loong64/a.out.go
+@@ -337,6 +337,7 @@ const (
+ 	AFSQRTS
+ 	ASRA
+ 	ASRL
++	AROTR
+ 	ASUB
+ 	ASUBD
+ 	ASUBF
+@@ -364,6 +365,7 @@ const (
+ 	ASLLV
+ 	ASRAV
+ 	ASRLV
++	AROTRV
+ 	ADIVV
+ 	ADIVVU
+ 
+diff --git a/src/cmd/internal/obj/loong64/anames.go b/src/cmd/internal/obj/loong64/anames.go
+index 39e612e6fe..438261d813 100644
+--- a/src/cmd/internal/obj/loong64/anames.go
++++ b/src/cmd/internal/obj/loong64/anames.go
+@@ -88,6 +88,7 @@ var Anames = []string{
+ 	"FSQRTS",
+ 	"SRA",
+ 	"SRL",
++	"ROTR",
+ 	"SUB",
+ 	"SUBD",
+ 	"SUBF",
+@@ -107,6 +108,7 @@ var Anames = []string{
+ 	"SLLV",
+ 	"SRAV",
+ 	"SRLV",
++	"ROTRV",
+ 	"DIVV",
+ 	"DIVVU",
+ 	"REMV",
+diff --git a/src/cmd/internal/obj/loong64/asm.go b/src/cmd/internal/obj/loong64/asm.go
+index 149d025d3a..0d40ec1f39 100644
+--- a/src/cmd/internal/obj/loong64/asm.go
++++ b/src/cmd/internal/obj/loong64/asm.go
+@@ -1002,10 +1002,12 @@ func buildop(ctxt *obj.Link) {
+ 		case ASLL:
+ 			opset(ASRL, r0)
+ 			opset(ASRA, r0)
++			opset(AROTR, r0)
+ 
+ 		case ASLLV:
+ 			opset(ASRAV, r0)
+ 			opset(ASRLV, r0)
++			opset(AROTRV, r0)
+ 
+ 		case ASUB:
+ 			opset(ASUBU, r0)
+@@ -1763,12 +1765,16 @@ func (c *ctxt0) oprrr(a obj.As) uint32 {
+ 		return 0x2f << 15
+ 	case ASRA:
+ 		return 0x30 << 15
++	case AROTR:
++		return 0x36 << 15
+ 	case ASLLV:
+ 		return 0x31 << 15
+ 	case ASRLV:
+ 		return 0x32 << 15
+ 	case ASRAV:
+ 		return 0x33 << 15
++	case AROTRV:
++		return 0x37 << 15
+ 	case AADDV:
+ 		return 0x21 << 15
+ 	case AADDVU:
+@@ -1961,6 +1967,8 @@ func (c *ctxt0) opirr(a obj.As) uint32 {
+ 		return 0x00089 << 15
+ 	case ASRA:
+ 		return 0x00091 << 15
++	case AROTR:
++		return 0x00099 << 15
+ 	case AADDV:
+ 		return 0x00b << 22
+ 	case AADDVU:
+@@ -2055,6 +2063,9 @@ func (c *ctxt0) opirr(a obj.As) uint32 {
+ 	case ASRAV,
+ 		-ASRAV:
+ 		return 0x0049 << 16
++	case AROTRV,
++		-AROTRV:
++		return 0x004d << 16
+ 	case -ALL:
+ 		return 0x020 << 24
+ 	case -ALLV:
+@@ -2077,7 +2088,8 @@ func vshift(a obj.As) bool {
+ 	switch a {
+ 	case ASLLV,
+ 		ASRLV,
+-		ASRAV:
++		ASRAV,
++		AROTRV:
+ 		return true
+ 	}
+ 	return false
+-- 
+2.38.0
+

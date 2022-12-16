@@ -1,0 +1,265 @@
+From f911abbc599fc71a520c398edefdecad31efbb8f Mon Sep 17 00:00:00 2001
+From: Russ Cox <rsc@golang.org>
+Date: Tue, 2 Aug 2022 10:12:52 -0400
+Subject: [PATCH 80/82] cmd/link: detect glibc vs musl ldso at link time
+
+Doing the test at link time lets us distribute one Linux toolchain
+that works on both glibc-based and musl-based Linux systems.
+The old way built a toolchain that only ran on one or the other.
+
+Fixes #54197.
+
+Change-Id: Iaae8c274c78e1091eee828a720b49646be9bfffe
+Reviewed-on: https://go-review.googlesource.com/c/go/+/420774
+Auto-Submit: Russ Cox <rsc@golang.org>
+Reviewed-by: Cherry Mui <cherryyz@google.com>
+TryBot-Result: Gopher Robot <gobot@golang.org>
+Run-TryBot: Russ Cox <rsc@golang.org>
+---
+ src/cmd/link/internal/amd64/obj.go   |  1 +
+ src/cmd/link/internal/arm/obj.go     |  1 +
+ src/cmd/link/internal/arm64/obj.go   |  5 +++--
+ src/cmd/link/internal/ld/elf.go      | 11 +++++++++++
+ src/cmd/link/internal/ld/lib.go      |  1 +
+ src/cmd/link/internal/loong64/obj.go |  1 +
+ src/cmd/link/internal/mips/obj.go    |  5 ++++-
+ src/cmd/link/internal/mips64/obj.go  |  3 +++
+ src/cmd/link/internal/ppc64/obj.go   | 15 ++++++++++-----
+ src/cmd/link/internal/s390x/obj.go   |  3 ++-
+ src/cmd/link/internal/x86/obj.go     | 11 ++++++-----
+ src/make.bash                        |  9 ---------
+ 12 files changed, 43 insertions(+), 23 deletions(-)
+
+diff --git a/src/cmd/link/internal/amd64/obj.go b/src/cmd/link/internal/amd64/obj.go
+index d09c90ea28..f46045bc9d 100644
+--- a/src/cmd/link/internal/amd64/obj.go
++++ b/src/cmd/link/internal/amd64/obj.go
+@@ -65,6 +65,7 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		TLSIEtoLE:        tlsIEtoLE,
+ 
+ 		Linuxdynld:     "/lib64/ld-linux-x86-64.so.2",
++		LinuxdynldMusl: "/lib/ld-musl-x84_64.so.1",
+ 		Freebsddynld:   "/libexec/ld-elf.so.1",
+ 		Openbsddynld:   "/usr/libexec/ld.so",
+ 		Netbsddynld:    "/libexec/ld.elf_so",
+diff --git a/src/cmd/link/internal/arm/obj.go b/src/cmd/link/internal/arm/obj.go
+index b7d149851c..6da0c77483 100644
+--- a/src/cmd/link/internal/arm/obj.go
++++ b/src/cmd/link/internal/arm/obj.go
+@@ -63,6 +63,7 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		PEreloc1:         pereloc1,
+ 
+ 		Linuxdynld:     "/lib/ld-linux.so.3", // 2 for OABI, 3 for EABI
++		LinuxdynldMusl: "/lib/ld-musl-arm.so.1",
+ 		Freebsddynld:   "/usr/libexec/ld-elf.so.1",
+ 		Openbsddynld:   "/usr/libexec/ld.so",
+ 		Netbsddynld:    "/libexec/ld.elf_so",
+diff --git a/src/cmd/link/internal/arm64/obj.go b/src/cmd/link/internal/arm64/obj.go
+index 9c7459855c..a47be0b282 100644
+--- a/src/cmd/link/internal/arm64/obj.go
++++ b/src/cmd/link/internal/arm64/obj.go
+@@ -62,8 +62,9 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		PEreloc1:         pereloc1,
+ 		Trampoline:       trampoline,
+ 
+-		Androiddynld: "/system/bin/linker64",
+-		Linuxdynld:   "/lib/ld-linux-aarch64.so.1",
++		Androiddynld:   "/system/bin/linker64",
++		Linuxdynld:     "/lib/ld-linux-aarch64.so.1",
++		LinuxdynldMusl: "/lib/ld-musl-aarch64.so.1",
+ 
+ 		Freebsddynld:   "/usr/libexec/ld-elf.so.1",
+ 		Openbsddynld:   "/usr/libexec/ld.so",
+diff --git a/src/cmd/link/internal/ld/elf.go b/src/cmd/link/internal/ld/elf.go
+index 015a698479..3fd7140d91 100644
+--- a/src/cmd/link/internal/ld/elf.go
++++ b/src/cmd/link/internal/ld/elf.go
+@@ -15,6 +15,7 @@ import (
+ 	"encoding/hex"
+ 	"fmt"
+ 	"internal/buildcfg"
++	"os"
+ 	"path/filepath"
+ 	"runtime"
+ 	"sort"
+@@ -1769,6 +1770,16 @@ func asmbElf(ctxt *Link) {
+ 					}
+ 				} else {
+ 					interpreter = thearch.Linuxdynld
++					// If interpreter does not exist, try musl instead.
++					// This lets the same cmd/link binary work on
++					// both glibc-based and musl-based systems.
++					if _, err := os.Stat(interpreter); err != nil {
++						if musl := thearch.LinuxdynldMusl; musl != "" {
++							if _, err := os.Stat(musl); err == nil {
++								interpreter = musl
++							}
++						}
++					}
+ 				}
+ 
+ 			case objabi.Hfreebsd:
+diff --git a/src/cmd/link/internal/ld/lib.go b/src/cmd/link/internal/ld/lib.go
+index 074c07d185..2e6e6dd69f 100644
+--- a/src/cmd/link/internal/ld/lib.go
++++ b/src/cmd/link/internal/ld/lib.go
+@@ -191,6 +191,7 @@ type Arch struct {
+ 
+ 	Androiddynld   string
+ 	Linuxdynld     string
++	LinuxdynldMusl string
+ 	Freebsddynld   string
+ 	Netbsddynld    string
+ 	Openbsddynld   string
+diff --git a/src/cmd/link/internal/loong64/obj.go b/src/cmd/link/internal/loong64/obj.go
+index 62014fabc1..824f6e4e3d 100644
+--- a/src/cmd/link/internal/loong64/obj.go
++++ b/src/cmd/link/internal/loong64/obj.go
+@@ -31,6 +31,7 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Gentext:          gentext,
+ 
+ 		Linuxdynld:     "/lib64/ld.so.1",
++		LinuxdynldMusl: "/lib64/ld-musl-loongarch.so.1",
+ 		Freebsddynld:   "XXX",
+ 		Openbsddynld:   "XXX",
+ 		Netbsddynld:    "XXX",
+diff --git a/src/cmd/link/internal/mips/obj.go b/src/cmd/link/internal/mips/obj.go
+index 5ca7582529..f03c9abfe9 100644
+--- a/src/cmd/link/internal/mips/obj.go
++++ b/src/cmd/link/internal/mips/obj.go
+@@ -39,8 +39,10 @@ import (
+ 
+ func Init() (*sys.Arch, ld.Arch) {
+ 	arch := sys.ArchMIPS
++	musl := "/lib/ld-musl-mips.so.1"
+ 	if buildcfg.GOARCH == "mipsle" {
+ 		arch = sys.ArchMIPSLE
++		musl = "/lib/ld-musl-mipsel.so.1"
+ 	}
+ 
+ 	theArch := ld.Arch{
+@@ -60,7 +62,8 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Gentext:          gentext,
+ 		Machoreloc1:      machoreloc1,
+ 
+-		Linuxdynld: "/lib/ld.so.1",
++		Linuxdynld:     "/lib/ld.so.1",
++		LinuxdynldMusl: musl,
+ 
+ 		Freebsddynld:   "XXX",
+ 		Openbsddynld:   "XXX",
+diff --git a/src/cmd/link/internal/mips64/obj.go b/src/cmd/link/internal/mips64/obj.go
+index 544e1ef7be..557d7993cd 100644
+--- a/src/cmd/link/internal/mips64/obj.go
++++ b/src/cmd/link/internal/mips64/obj.go
+@@ -39,8 +39,10 @@ import (
+ 
+ func Init() (*sys.Arch, ld.Arch) {
+ 	arch := sys.ArchMIPS64
++	musl := "/lib/ld-musl-mips64.so.1"
+ 	if buildcfg.GOARCH == "mips64le" {
+ 		arch = sys.ArchMIPS64LE
++		musl = "/lib/ld-musl-mips64el.so.1"
+ 	}
+ 
+ 	theArch := ld.Arch{
+@@ -60,6 +62,7 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Machoreloc1:      machoreloc1,
+ 
+ 		Linuxdynld:     "/lib64/ld64.so.1",
++		LinuxdynldMusl: musl,
+ 		Freebsddynld:   "XXX",
+ 		Openbsddynld:   "/usr/libexec/ld.so",
+ 		Netbsddynld:    "XXX",
+diff --git a/src/cmd/link/internal/ppc64/obj.go b/src/cmd/link/internal/ppc64/obj.go
+index b6d5ad92af..f580c55456 100644
+--- a/src/cmd/link/internal/ppc64/obj.go
++++ b/src/cmd/link/internal/ppc64/obj.go
+@@ -38,9 +38,14 @@ import (
+ )
+ 
+ func Init() (*sys.Arch, ld.Arch) {
+-	arch := sys.ArchPPC64
+-	if buildcfg.GOARCH == "ppc64le" {
+-		arch = sys.ArchPPC64LE
++	arch := sys.ArchPPC64LE
++	dynld := "/lib64/ld64.so.2"
++	musl := "/lib/ld-musl-powerpc64le.so.1"
++
++	if buildcfg.GOARCH == "ppc64" {
++		arch = sys.ArchPPC64
++		dynld = "/lib64/ld64.so.1"
++		musl = "/lib/ld-musl-powerpc64.so.1"
+ 	}
+ 
+ 	theArch := ld.Arch{
+@@ -64,8 +69,8 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Machoreloc1:      machoreloc1,
+ 		Xcoffreloc1:      xcoffreloc1,
+ 
+-		// TODO(austin): ABI v1 uses /usr/lib/ld.so.1,
+-		Linuxdynld: "/lib64/ld64.so.1",
++		Linuxdynld:     dynld,
++		LinuxdynldMusl: musl,
+ 
+ 		Freebsddynld:   "XXX",
+ 		Openbsddynld:   "XXX",
+diff --git a/src/cmd/link/internal/s390x/obj.go b/src/cmd/link/internal/s390x/obj.go
+index 8acc1d4917..3aa8948151 100644
+--- a/src/cmd/link/internal/s390x/obj.go
++++ b/src/cmd/link/internal/s390x/obj.go
+@@ -56,7 +56,8 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Gentext:          gentext,
+ 		Machoreloc1:      machoreloc1,
+ 
+-		Linuxdynld: "/lib64/ld64.so.1",
++		Linuxdynld:     "/lib64/ld64.so.1",
++		LinuxdynldMusl: "/lib/ld-musl-s390x.so.1",
+ 
+ 		// not relevant for s390x
+ 		Freebsddynld:   "XXX",
+diff --git a/src/cmd/link/internal/x86/obj.go b/src/cmd/link/internal/x86/obj.go
+index a19437d8e6..b0a129eb0a 100644
+--- a/src/cmd/link/internal/x86/obj.go
++++ b/src/cmd/link/internal/x86/obj.go
+@@ -61,11 +61,12 @@ func Init() (*sys.Arch, ld.Arch) {
+ 		Machoreloc1:      machoreloc1,
+ 		PEreloc1:         pereloc1,
+ 
+-		Linuxdynld:   "/lib/ld-linux.so.2",
+-		Freebsddynld: "/usr/libexec/ld-elf.so.1",
+-		Openbsddynld: "/usr/libexec/ld.so",
+-		Netbsddynld:  "/usr/libexec/ld.elf_so",
+-		Solarisdynld: "/lib/ld.so.1",
++		Linuxdynld:     "/lib/ld-linux.so.2",
++		LinuxdynldMusl: "/lib/ld-musl-i386.so.1",
++		Freebsddynld:   "/usr/libexec/ld-elf.so.1",
++		Openbsddynld:   "/usr/libexec/ld.so",
++		Netbsddynld:    "/usr/libexec/ld.elf_so",
++		Solarisdynld:   "/lib/ld.so.1",
+ 	}
+ 
+ 	return arch, theArch
+diff --git a/src/make.bash b/src/make.bash
+index 7986125a06..ffea5cec65 100755
+--- a/src/make.bash
++++ b/src/make.bash
+@@ -130,15 +130,6 @@ if [ "$(uname -s)" = "GNU/kFreeBSD" ]; then
+ 	export CGO_ENABLED=0
+ fi
+ 
+-# Test which linker/loader our system is using, if GO_LDSO is not set.
+-if [ -z "$GO_LDSO" ] && type readelf >/dev/null 2>&1; then
+-	if echo "int main() { return 0; }" | ${CC:-cc} -o ./test-musl-ldso -x c - >/dev/null 2>&1; then
+-		LDSO=$(readelf -l ./test-musl-ldso | grep 'interpreter:' | sed -e 's/^.*interpreter: \(.*\)[]]/\1/') >/dev/null 2>&1
+-		[ -z "$LDSO" ] || export GO_LDSO="$LDSO"
+-		rm -f ./test-musl-ldso
+-	fi
+-fi
+-
+ # Clean old generated file that will cause problems in the build.
+ rm -f ./runtime/runtime_defs.go
+ 
+-- 
+2.38.0
+

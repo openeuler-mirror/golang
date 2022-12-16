@@ -1,0 +1,36 @@
+From ead15a2f9953e83c5fb76617336e430e3696e2f8 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Fri, 4 Nov 2022 13:27:23 +0800
+Subject: [PATCH 81/82] runtime: mark morestack_noctxt SPWRITE for
+ linux/loong64
+
+ref. CL 425396
+
+Updates #54332.
+
+Change-Id: I1a235b0cca4dbf79cf61cf5f40b594fc2d940857
+---
+ src/runtime/asm_loong64.s | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index 732a5c9583..abc065b03b 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -285,6 +285,13 @@ TEXT runtime·morestack(SB),NOSPLIT|NOFRAME,$0-0
+ 	UNDEF
+ 
+ TEXT runtime·morestack_noctxt(SB),NOSPLIT|NOFRAME,$0-0
++	// Force SPWRITE. This function doesn't actually write SP,
++	// but it is called with a special calling convention where
++	// the caller doesn't save LR on stack but passes it as a
++	// register (R5), and the unwinder currently doesn't understand.
++	// Make it SPWRITE to stop unwinding. (See issue 54332)
++	MOVV    R3, R3
++
+ 	MOVV	R0, REGCTXT
+ 	JMP	runtime·morestack(SB)
+ 
+-- 
+2.38.0
+

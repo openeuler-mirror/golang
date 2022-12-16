@@ -1,0 +1,56 @@
+From 35849e3947f4be1e3a575f99958ad3842bf9390a Mon Sep 17 00:00:00 2001
+From: limeidan <limeidan@loongson.cn>
+Date: Thu, 25 Aug 2022 17:23:29 +0800
+Subject: [PATCH 75/82] cmd/dist, misc/cgo/testcshared: enable c-shared test on
+ loong64
+
+Signed-off-by: limeidan <limeidan@loongson.cn>
+Change-Id: Idef995fe8be1a466369bd7332259846f2f147884
+---
+ misc/cgo/testcshared/testdata/libgo2/dup2.go | 2 +-
+ misc/cgo/testcshared/testdata/libgo2/dup3.go | 2 +-
+ src/cmd/dist/test.go                         | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/misc/cgo/testcshared/testdata/libgo2/dup2.go b/misc/cgo/testcshared/testdata/libgo2/dup2.go
+index d18f0b130d..1f3db81227 100644
+--- a/misc/cgo/testcshared/testdata/libgo2/dup2.go
++++ b/misc/cgo/testcshared/testdata/libgo2/dup2.go
+@@ -2,7 +2,7 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-// +build darwin dragonfly freebsd linux,!arm64 netbsd openbsd
++// +build darwin dragonfly freebsd linux,!arm64,!loong64 netbsd openbsd
+ 
+ package main
+ 
+diff --git a/misc/cgo/testcshared/testdata/libgo2/dup3.go b/misc/cgo/testcshared/testdata/libgo2/dup3.go
+index c9c65a6e3c..cf19b76ce8 100644
+--- a/misc/cgo/testcshared/testdata/libgo2/dup3.go
++++ b/misc/cgo/testcshared/testdata/libgo2/dup3.go
+@@ -2,7 +2,7 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-// +build linux,arm64
++// +build linux,arm64 linux,loong64
+ 
+ package main
+ 
+diff --git a/src/cmd/dist/test.go b/src/cmd/dist/test.go
+index 485fe6b17b..1d68b8a70d 100644
+--- a/src/cmd/dist/test.go
++++ b/src/cmd/dist/test.go
+@@ -1053,7 +1053,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
+ 		return false
+ 	case "c-shared":
+ 		switch pair {
+-		case "linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-s390x",
++		case "linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-loong64", "linux-ppc64le", "linux-s390x",
+ 			"darwin-amd64", "darwin-arm64",
+ 			"freebsd-amd64",
+ 			"android-arm", "android-arm64", "android-386",
+-- 
+2.38.0
+

@@ -1,0 +1,323 @@
+From 0e946b940ca5b6ff447d625855a75b32f1856d5a Mon Sep 17 00:00:00 2001
+From: limeidan <limeidan@loongson.cn>
+Date: Mon, 22 Aug 2022 20:24:59 +0800
+Subject: [PATCH 72/82] cmd/internal/obj/loong64, cmd/internal/objabi: add
+ c-shared relocations on loong64
+
+Signed-off-by: limeidan <limeidan@loongson.cn>
+Change-Id: I9e8ca663813662f89646e455eb42192b3c149881
+---
+ src/cmd/internal/obj/loong64/a.out.go       |   4 +-
+ src/cmd/internal/obj/loong64/asm.go         | 127 ++++++++++++++++++--
+ src/cmd/internal/obj/loong64/cnames.go      |   4 +-
+ src/cmd/internal/objabi/reloctype.go        |  13 ++
+ src/cmd/internal/objabi/reloctype_string.go |  26 ++--
+ 5 files changed, 149 insertions(+), 25 deletions(-)
+
+diff --git a/src/cmd/internal/obj/loong64/a.out.go b/src/cmd/internal/obj/loong64/a.out.go
+index c2825108e5..e02cae7c75 100644
+--- a/src/cmd/internal/obj/loong64/a.out.go
++++ b/src/cmd/internal/obj/loong64/a.out.go
+@@ -225,7 +225,9 @@ const (
+ 	C_LOREG
+ 	C_GOK
+ 	C_ADDR
+-	C_TLS
++	C_GOTADDR
++	C_TLS_LE
++	C_TLS_GD
+ 	C_TEXTSIZE
+ 
+ 	C_NCLASS // must be the last
+diff --git a/src/cmd/internal/obj/loong64/asm.go b/src/cmd/internal/obj/loong64/asm.go
+index 66265690e3..14e6f05da1 100644
+--- a/src/cmd/internal/obj/loong64/asm.go
++++ b/src/cmd/internal/obj/loong64/asm.go
+@@ -155,11 +155,11 @@ var optab = []Optab{
+ 	{AMOVB, C_REG, C_NONE, C_ADDR, 50, 8, 0, sys.Loong64, 0},
+ 	{AMOVBU, C_REG, C_NONE, C_ADDR, 50, 8, 0, 0, 0},
+ 	{AMOVBU, C_REG, C_NONE, C_ADDR, 50, 8, 0, sys.Loong64, 0},
+-	{AMOVW, C_REG, C_NONE, C_TLS, 53, 16, 0, 0, 0},
+-	{AMOVWU, C_REG, C_NONE, C_TLS, 53, 16, 0, sys.Loong64, 0},
+-	{AMOVV, C_REG, C_NONE, C_TLS, 53, 16, 0, sys.Loong64, 0},
+-	{AMOVB, C_REG, C_NONE, C_TLS, 53, 16, 0, 0, 0},
+-	{AMOVBU, C_REG, C_NONE, C_TLS, 53, 16, 0, 0, 0},
++	{AMOVW, C_REG, C_NONE, C_TLS_LE, 53, 16, 0, 0, 0},
++	{AMOVWU, C_REG, C_NONE, C_TLS_LE, 53, 16, 0, sys.Loong64, 0},
++	{AMOVV, C_REG, C_NONE, C_TLS_LE, 53, 16, 0, sys.Loong64, 0},
++	{AMOVB, C_REG, C_NONE, C_TLS_LE, 53, 16, 0, 0, 0},
++	{AMOVBU, C_REG, C_NONE, C_TLS_LE, 53, 16, 0, 0, 0},
+ 
+ 	{AMOVW, C_LEXT, C_NONE, C_REG, 36, 12, 0, sys.Loong64, 0},
+ 	{AMOVWU, C_LEXT, C_NONE, C_REG, 36, 12, 0, sys.Loong64, 0},
+@@ -184,11 +184,11 @@ var optab = []Optab{
+ 	{AMOVB, C_ADDR, C_NONE, C_REG, 51, 8, 0, sys.Loong64, 0},
+ 	{AMOVBU, C_ADDR, C_NONE, C_REG, 51, 8, 0, 0, 0},
+ 	{AMOVBU, C_ADDR, C_NONE, C_REG, 51, 8, 0, sys.Loong64, 0},
+-	{AMOVW, C_TLS, C_NONE, C_REG, 54, 16, 0, 0, 0},
+-	{AMOVWU, C_TLS, C_NONE, C_REG, 54, 16, 0, sys.Loong64, 0},
+-	{AMOVV, C_TLS, C_NONE, C_REG, 54, 16, 0, sys.Loong64, 0},
+-	{AMOVB, C_TLS, C_NONE, C_REG, 54, 16, 0, 0, 0},
+-	{AMOVBU, C_TLS, C_NONE, C_REG, 54, 16, 0, 0, 0},
++	{AMOVW, C_TLS_LE, C_NONE, C_REG, 54, 16, 0, 0, 0},
++	{AMOVWU, C_TLS_LE, C_NONE, C_REG, 54, 16, 0, sys.Loong64, 0},
++	{AMOVV, C_TLS_LE, C_NONE, C_REG, 54, 16, 0, sys.Loong64, 0},
++	{AMOVB, C_TLS_LE, C_NONE, C_REG, 54, 16, 0, 0, 0},
++	{AMOVBU, C_TLS_LE, C_NONE, C_REG, 54, 16, 0, 0, 0},
+ 
+ 	{AMOVW, C_SECON, C_NONE, C_REG, 3, 4, 0, sys.Loong64, 0},
+ 	{AMOVV, C_SECON, C_NONE, C_REG, 3, 4, 0, sys.Loong64, 0},
+@@ -269,6 +269,8 @@ var optab = []Optab{
+ 	{AJMP, C_NONE, C_NONE, C_ZOREG, 18, 4, REGZERO, 0, 0}, // jirl r0, rj, 0
+ 	{AJAL, C_NONE, C_NONE, C_ZOREG, 18, 4, REGLINK, 0, 0}, // jirl r1, rj, 0
+ 
++	{AMOVV, C_GOTADDR, C_NONE, C_REG, 63, 12, 0, sys.Loong64, 0},
++
+ 	{AMOVW, C_SEXT, C_NONE, C_FREG, 27, 4, 0, sys.Loong64, 0},
+ 	{AMOVF, C_SEXT, C_NONE, C_FREG, 27, 4, 0, sys.Loong64, 0},
+ 	{AMOVD, C_SEXT, C_NONE, C_FREG, 27, 4, 0, sys.Loong64, 0},
+@@ -325,6 +327,18 @@ var optab = []Optab{
+ 	{AMOVW, C_ADDCON, C_NONE, C_FREG, 34, 8, 0, sys.Loong64, 0},
+ 	{AMOVW, C_ANDCON, C_NONE, C_FREG, 34, 8, 0, sys.Loong64, 0},
+ 
++	{AMOVB, C_REG, C_NONE, C_TLS_GD, 56, 24, 0, sys.Loong64, 0},
++	{AMOVW, C_REG, C_NONE, C_TLS_GD, 56, 24, 0, sys.Loong64, 0},
++	{AMOVV, C_REG, C_NONE, C_TLS_GD, 56, 24, 0, sys.Loong64, 0},
++	{AMOVBU, C_REG, C_NONE, C_TLS_GD, 56, 24, 0, sys.Loong64, 0},
++	{AMOVWU, C_REG, C_NONE, C_TLS_GD, 56, 24, 0, sys.Loong64, 0},
++
++	{AMOVB, C_TLS_GD, C_NONE, C_REG, 57, 24, 0, sys.Loong64, 0},
++	{AMOVW, C_TLS_GD, C_NONE, C_REG, 57, 24, 0, sys.Loong64, 0},
++	{AMOVV, C_TLS_GD, C_NONE, C_REG, 57, 24, 0, sys.Loong64, 0},
++	{AMOVBU, C_TLS_GD, C_NONE, C_REG, 57, 24, 0, sys.Loong64, 0},
++	{AMOVWU, C_TLS_GD, C_NONE, C_REG, 57, 24, 0, sys.Loong64, 0},
++
+ 	{AWORD, C_LCON, C_NONE, C_NONE, 40, 4, 0, 0, 0},
+ 	{AWORD, C_DCON, C_NONE, C_NONE, 61, 4, 0, 0, 0},
+ 
+@@ -459,7 +473,7 @@ func span0(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
+ 
+ 	bp := c.cursym.P
+ 	var i int32
+-	var out [5]uint32
++	var out [6]uint32
+ 	for p := c.cursym.Func().Text.Link; p != nil; p = p.Link {
+ 		c.pc = p.Pc
+ 		o = c.oplook(p)
+@@ -542,12 +556,19 @@ func (c *ctxt0) aclass(a *obj.Addr) int {
+ 			c.instoffset = a.Offset
+ 			if a.Sym != nil { // use relocation
+ 				if a.Sym.Type == objabi.STLSBSS {
+-					return C_TLS
++					if c.ctxt.Flag_shared {
++						return C_TLS_GD
++					} else {
++						return C_TLS_LE
++					}
+ 				}
+ 				return C_ADDR
+ 			}
+ 			return C_LEXT
+ 
++		case obj.NAME_GOTREF:
++			return C_GOTADDR
++
+ 		case obj.NAME_AUTO:
+ 			if a.Reg == REGSP {
+ 				// unset base register for better printing, since
+@@ -1101,6 +1122,7 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
+ 	o3 := uint32(0)
+ 	o4 := uint32(0)
+ 	o5 := uint32(0)
++	o6 := uint32(0)
+ 
+ 	add := AADDU
+ 	add = AADDVU
+@@ -1578,6 +1600,70 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
+ 		rel2.Type = objabi.R_ADDRLOONG64TLS
+ 		o3 = OP_RRR(c.oprrr(AADDV), uint32(REG_R2), uint32(REGTMP), uint32(p.To.Reg))
+ 
++	case 56: // mov r, tlsvar GD model ==> (pcaddu12i + ld.d)__tls_get_addr + (pcaddu12i + addi.d)tlsvar@got + jirl + st.d
++		o1 = OP_IR(c.opir(APCADDU12I), uint32(0), uint32(REGTMP))
++		rel := obj.Addrel(c.cursym)
++		rel.Off = int32(c.pc)
++		rel.Siz = 4
++		rel.Sym = c.ctxt.Lookup("__tls_get_addr")
++		rel.Add = 0x0
++		rel.Type = objabi.R_LOONG64_GOTPCREL_HI
++		o2 = OP_12IRR(c.opirr(-p.As), uint32(0), uint32(REGTMP), uint32(REGTMP))
++		rel2 := obj.Addrel(c.cursym)
++		rel2.Off = int32(c.pc+4)
++		rel2.Siz = 4
++		rel2.Sym = c.ctxt.Lookup("__tls_get_addr")
++		rel2.Add = 0x0
++		rel2.Type = objabi.R_LOONG64_GOTPCREL_LO
++		o3 = OP_IR(c.opir(APCADDU12I), uint32(0), uint32(REG_R4))
++		rel3 := obj.Addrel(c.cursym)
++		rel3.Off = int32(c.pc+8)
++		rel3.Siz = 4
++		rel3.Sym = p.To.Sym
++		rel3.Add = 0x0
++		rel3.Type = objabi.R_LOONG64_TLS_GD_PCREL_HI
++		o4 = OP_12IRR(c.opirr(AADDV), uint32(0), uint32(REG_R4), uint32(REG_R4))
++		rel4 := obj.Addrel(c.cursym)
++		rel4.Off = int32(c.pc+12)
++		rel4.Siz = 4
++		rel4.Sym = p.To.Sym
++		rel4.Add = 0x0
++		rel4.Type = objabi.R_LOONG64_TLS_GD_PCREL_LO
++		o5 = OP_16IRR(c.opirr(AJIRL), uint32(0), uint32(REGTMP), uint32(REGLINK))
++		o6 = OP_12IRR(c.opirr(p.As), uint32(0), uint32(REG_R4), uint32(p.From.Reg))
++
++	case 57: // mov tlsvar, r GD model ==> (pcaddu12i + ld.d)__tls_get_addr + (pcaddu12i + addi.d)tlsvar@got + jirl + ld.d
++		o1 = OP_IR(c.opir(APCADDU12I), uint32(0), uint32(REGTMP))
++		rel := obj.Addrel(c.cursym)
++		rel.Off = int32(c.pc)
++		rel.Siz = 4
++		rel.Sym = c.ctxt.Lookup("__tls_get_addr")
++		rel.Add = 0x0
++		rel.Type = objabi.R_LOONG64_GOTPCREL_HI
++		o2 = OP_12IRR(c.opirr(-p.As), uint32(0), uint32(REGTMP), uint32(REGTMP))
++		rel2 := obj.Addrel(c.cursym)
++		rel2.Off = int32(c.pc+4)
++		rel2.Siz = 4
++		rel2.Sym = c.ctxt.Lookup("__tls_get_addr")
++		rel2.Add = 0x0
++		rel2.Type = objabi.R_LOONG64_GOTPCREL_LO
++		o3 = OP_IR(c.opir(APCADDU12I), uint32(0), uint32(REG_R4))
++		rel3 := obj.Addrel(c.cursym)
++		rel3.Off = int32(c.pc+8)
++		rel3.Siz = 4
++		rel3.Sym = p.From.Sym
++		rel3.Type = objabi.R_LOONG64_TLS_GD_PCREL_HI
++		rel3.Add = 0x0
++		o4 = OP_12IRR(c.opirr(AADDV), uint32(0), uint32(REG_R4), uint32(REG_R4))
++		rel4 := obj.Addrel(c.cursym)
++		rel4.Off = int32(c.pc+12)
++		rel4.Siz = 4
++		rel4.Sym = p.From.Sym
++		rel4.Type = objabi.R_LOONG64_TLS_GD_PCREL_LO
++		rel4.Add = 0x0
++		o5 = OP_16IRR(c.opirr(AJIRL), uint32(0), uint32(REGTMP), uint32(REGLINK))
++		o6 = OP_12IRR(c.opirr(-p.As), uint32(0), uint32(REG_R4), uint32(p.To.Reg))
++
+ 	case 59: // mov $dcon,r
+ 		// NOTE: this case does not use REGTMP. If it ever does,
+ 		// remove the NOTUSETMP flag in optab.
+@@ -1605,6 +1691,22 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
+ 
+ 	case 62: // rdtimex rd, rj
+ 		o1 = OP_RR(c.oprr(p.As), uint32(p.From.Reg), uint32(p.To.Reg))
++
++	case 63: // mov sym@GOT, r ==> pcaddu12i + ld.d
++		o1 = OP_IR(c.opir(APCADDU12I), uint32(0), uint32(REGTMP))
++		rel := obj.Addrel(c.cursym)
++		rel.Off = int32(c.pc)
++		rel.Siz = 4
++		rel.Sym = p.From.Sym
++		rel.Type = objabi.R_LOONG64_GOTPCREL_HI
++		rel.Add = 0x0
++		o2 = OP_12IRR(c.opirr(-p.As), uint32(0), uint32(REGTMP), uint32(p.To.Reg))
++		rel2 := obj.Addrel(c.cursym)
++		rel2.Off = int32(c.pc+4)
++		rel2.Siz = 4
++		rel2.Sym = p.From.Sym
++		rel2.Type = objabi.R_LOONG64_GOTPCREL_LO
++		rel2.Add = 0x0
+ 	}
+ 
+ 	out[0] = o1
+@@ -1612,6 +1714,7 @@ func (c *ctxt0) asmout(p *obj.Prog, o *Optab, out []uint32) {
+ 	out[2] = o3
+ 	out[3] = o4
+ 	out[4] = o5
++	out[5] = o6
+ }
+ 
+ func (c *ctxt0) vregoff(a *obj.Addr) int64 {
+diff --git a/src/cmd/internal/obj/loong64/cnames.go b/src/cmd/internal/obj/loong64/cnames.go
+index e757e242ee..c594ac97a3 100644
+--- a/src/cmd/internal/obj/loong64/cnames.go
++++ b/src/cmd/internal/obj/loong64/cnames.go
+@@ -37,7 +37,9 @@ var cnames0 = []string{
+ 	"LOREG",
+ 	"GOK",
+ 	"ADDR",
+-	"TLS",
++	"GOTADDR",
++	"TLS_LE",
++	"TLS_GD",
+ 	"TEXTSIZE",
+ 	"NCLASS",
+ }
+diff --git a/src/cmd/internal/objabi/reloctype.go b/src/cmd/internal/objabi/reloctype.go
+index 99bc5f7a68..d5bc57e782 100644
+--- a/src/cmd/internal/objabi/reloctype.go
++++ b/src/cmd/internal/objabi/reloctype.go
+@@ -247,6 +247,19 @@ const (
+ 	// TODO(mundaym): remove once variants can be serialized - see issue 14218.
+ 	R_PCRELDBL
+ 
++	// Loong64.
++
++	// R_LOONG64_TLS_GD_PCREL_HI and R_LOONG64_TLS_GD_PCREL_LO relocates an pcaddu12i, addi.d pair to compute
++	// the address of the GOT slot of the tls symbol, the address will be passed to __tls_get_addr to
++	// get the true address of tlsvar.
++	R_LOONG64_TLS_GD_PCREL_HI
++	R_LOONG64_TLS_GD_PCREL_LO
++
++	// R_LOONG64_GOTPCREL_HI and R_LOONG64_GOTPCREL_LO relocates an pcaddu12i, addi.d pair to compute
++	// the address of the GOT slot of the referenced symbol.
++	R_LOONG64_GOTPCREL_HI
++	R_LOONG64_GOTPCREL_LO
++
+ 	// R_ADDRMIPSU (only used on mips/mips64) resolves to the sign-adjusted "upper" 16
+ 	// bits (bit 16-31) of an external address, by encoding it into the instruction.
+ 	R_ADDRMIPSU
+diff --git a/src/cmd/internal/objabi/reloctype_string.go b/src/cmd/internal/objabi/reloctype_string.go
+index 9d34a0f7d5..30fe39ba56 100644
+--- a/src/cmd/internal/objabi/reloctype_string.go
++++ b/src/cmd/internal/objabi/reloctype_string.go
+@@ -1,4 +1,4 @@
+-// Code generated by "stringer -type RelocType reloctype.go"; DO NOT EDIT.
++// Code generated by "stringer -type=RelocType cmd/internal/objabi/reloctype.go"; DO NOT EDIT.
+ 
+ package objabi
+ 
+@@ -66,19 +66,23 @@ func _() {
+ 	_ = x[R_RISCV_TLS_IE_ITYPE-56]
+ 	_ = x[R_RISCV_TLS_IE_STYPE-57]
+ 	_ = x[R_PCRELDBL-58]
+-	_ = x[R_ADDRMIPSU-59]
+-	_ = x[R_ADDRLOONG64U-60]
+-	_ = x[R_ADDRMIPSTLS-61]
+-	_ = x[R_ADDRLOONG64TLS-62]
+-	_ = x[R_ADDRLOONG64TLSU-63]
+-	_ = x[R_ADDRCUOFF-64]
+-	_ = x[R_WASMIMPORT-65]
+-	_ = x[R_XCOFFREF-66]
++	_ = x[R_LOONG64_TLS_GD_PCREL_HI-59]
++	_ = x[R_LOONG64_TLS_GD_PCREL_LO-60]
++	_ = x[R_LOONG64_GOTPCREL_HI-61]
++	_ = x[R_LOONG64_GOTPCREL_LO-62]
++	_ = x[R_ADDRMIPSU-63]
++	_ = x[R_ADDRLOONG64U-64]
++	_ = x[R_ADDRMIPSTLS-65]
++	_ = x[R_ADDRLOONG64TLS-66]
++	_ = x[R_ADDRLOONG64TLSU-67]
++	_ = x[R_ADDRCUOFF-68]
++	_ = x[R_WASMIMPORT-69]
++	_ = x[R_XCOFFREF-70]
+ }
+ 
+-const _RelocType_name = "R_ADDRR_ADDRPOWERR_ADDRARM64R_ADDRMIPSR_ADDRLOONG64R_ADDROFFR_SIZER_CALLR_CALLARMR_CALLARM64R_CALLINDR_CALLPOWERR_CALLMIPSR_CALLRISCVR_CALLLOONG64R_CONSTR_PCRELR_TLS_LER_TLS_IER_GOTOFFR_PLT0R_PLT1R_PLT2R_USEFIELDR_USETYPER_USEIFACER_USEIFACEMETHODR_METHODOFFR_KEEPR_POWER_TOCR_GOTPCRELR_JMPMIPSR_JMPLOONG64R_DWARFSECREFR_DWARFFILEREFR_ARM64_TLS_LER_ARM64_TLS_IER_ARM64_GOTPCRELR_ARM64_GOTR_ARM64_PCRELR_ARM64_LDST8R_ARM64_LDST16R_ARM64_LDST32R_ARM64_LDST64R_ARM64_LDST128R_POWER_TLS_LER_POWER_TLS_IER_POWER_TLSR_ADDRPOWER_DSR_ADDRPOWER_GOTR_ADDRPOWER_PCRELR_ADDRPOWER_TOCRELR_ADDRPOWER_TOCREL_DSR_RISCV_PCREL_ITYPER_RISCV_PCREL_STYPER_RISCV_TLS_IE_ITYPER_RISCV_TLS_IE_STYPER_PCRELDBLR_ADDRMIPSUR_ADDRLOONG64UR_ADDRMIPSTLSR_ADDRLOONG64TLSR_ADDRLOONG64TLSUR_ADDRCUOFFR_WASMIMPORTR_XCOFFREF"
++const _RelocType_name = "R_ADDRR_ADDRPOWERR_ADDRARM64R_ADDRMIPSR_ADDRLOONG64R_ADDROFFR_SIZER_CALLR_CALLARMR_CALLARM64R_CALLINDR_CALLPOWERR_CALLMIPSR_CALLRISCVR_CALLLOONG64R_CONSTR_PCRELR_TLS_LER_TLS_IER_GOTOFFR_PLT0R_PLT1R_PLT2R_USEFIELDR_USETYPER_USEIFACER_USEIFACEMETHODR_METHODOFFR_KEEPR_POWER_TOCR_GOTPCRELR_JMPMIPSR_JMPLOONG64R_DWARFSECREFR_DWARFFILEREFR_ARM64_TLS_LER_ARM64_TLS_IER_ARM64_GOTPCRELR_ARM64_GOTR_ARM64_PCRELR_ARM64_LDST8R_ARM64_LDST16R_ARM64_LDST32R_ARM64_LDST64R_ARM64_LDST128R_POWER_TLS_LER_POWER_TLS_IER_POWER_TLSR_ADDRPOWER_DSR_ADDRPOWER_GOTR_ADDRPOWER_PCRELR_ADDRPOWER_TOCRELR_ADDRPOWER_TOCREL_DSR_RISCV_PCREL_ITYPER_RISCV_PCREL_STYPER_RISCV_TLS_IE_ITYPER_RISCV_TLS_IE_STYPER_PCRELDBLR_LOONG64_TLS_GD_PCREL_HIR_LOONG64_TLS_GD_PCREL_LOR_LOONG64_GOTPCREL_HIR_LOONG64_GOTPCREL_LOR_ADDRMIPSUR_ADDRLOONG64UR_ADDRMIPSTLSR_ADDRLOONG64TLSR_ADDRLOONG64TLSUR_ADDRCUOFFR_WASMIMPORTR_XCOFFREF"
+ 
+-var _RelocType_index = [...]uint16{0, 6, 17, 28, 38, 51, 60, 66, 72, 81, 92, 101, 112, 122, 133, 146, 153, 160, 168, 176, 184, 190, 196, 202, 212, 221, 231, 247, 258, 264, 275, 285, 294, 306, 319, 333, 347, 361, 377, 388, 401, 414, 428, 442, 456, 471, 485, 499, 510, 524, 539, 556, 574, 595, 614, 633, 653, 673, 683, 694, 708, 721, 737, 754, 765, 777, 787}
++var _RelocType_index = [...]uint16{0, 6, 17, 28, 38, 51, 60, 66, 72, 81, 92, 101, 112, 122, 133, 146, 153, 160, 168, 176, 184, 190, 196, 202, 212, 221, 231, 247, 258, 264, 275, 285, 294, 306, 319, 333, 347, 361, 377, 388, 401, 414, 428, 442, 456, 471, 485, 499, 510, 524, 539, 556, 574, 595, 614, 633, 653, 673, 683, 708, 733, 754, 775, 786, 800, 813, 829, 846, 857, 869, 879}
+ 
+ func (i RelocType) String() string {
+ 	i -= 1
+-- 
+2.38.0
+
