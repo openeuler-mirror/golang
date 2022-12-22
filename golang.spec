@@ -63,7 +63,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        12
+Release:        13
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -173,6 +173,7 @@ Patch6020:	0020-release-branch.go1.18-regexp-limit-size-of-parsed-re.patch
 Patch6021:	0021-release-branch.go1.18-net-http-httputil-avoid-query-.patch
 Patch6022:	0022-release-branch.go1.18-archive-tar-limit-size-of-head.patch
 Patch6023:	0023-syscall-os-exec-reject-environment-variables-contain.patch
+Patch6024:	0024-release-branch.go1.18-add-definition-byte-string-cut.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -411,6 +412,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Sat Dec 17 2022 wanglimin<wanglimin@xfusion.com> - 1.17.3-13
+- Add string cut
+
 * Fri Oct 11 2022 hanchao <hanchao47@huawei.com> - 1.17.3-12
 - Type:CVE
 - CVE:CVE-2022-41716
