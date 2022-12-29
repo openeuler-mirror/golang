@@ -1,0 +1,45 @@
+From 00776af6da1ca76845125eaa7c83a6197746c7ee Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 15 Nov 2021 20:59:24 +0800
+Subject: [PATCH 37/82] internal/syscall/unix: loong64 use generic syscall
+
+Change-Id: I5988bf3efed37b03b9193f1089dfece060ccba99
+---
+ src/internal/syscall/unix/at_sysnum_fstatat_linux.go | 4 ++--
+ src/internal/syscall/unix/sysnum_linux_generic.go    | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/src/internal/syscall/unix/at_sysnum_fstatat_linux.go b/src/internal/syscall/unix/at_sysnum_fstatat_linux.go
+index e53a2d1b75..5f7ea12e01 100644
+--- a/src/internal/syscall/unix/at_sysnum_fstatat_linux.go
++++ b/src/internal/syscall/unix/at_sysnum_fstatat_linux.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build arm64 || riscv64
+-// +build arm64 riscv64
++//go:build arm64 || riscv64 || loong64
++// +build arm64 riscv64 loong64
+ 
+ package unix
+ 
+diff --git a/src/internal/syscall/unix/sysnum_linux_generic.go b/src/internal/syscall/unix/sysnum_linux_generic.go
+index a76025454c..3ec0712573 100644
+--- a/src/internal/syscall/unix/sysnum_linux_generic.go
++++ b/src/internal/syscall/unix/sysnum_linux_generic.go
+@@ -2,9 +2,9 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build linux && (arm64 || riscv64)
++//go:build linux && (arm64 || riscv64 || loong64)
+ // +build linux
+-// +build arm64 riscv64
++// +build arm64 riscv64 loong64
+ 
+ package unix
+ 
+-- 
+2.38.0
+

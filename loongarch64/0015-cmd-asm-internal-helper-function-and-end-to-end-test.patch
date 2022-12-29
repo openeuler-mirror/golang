@@ -1,0 +1,812 @@
+From b65bebe93d3e5d0fc5449079af0eb293f45af7ac Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 15:25:14 +0800
+Subject: [PATCH 15/82] cmd/asm/internal: helper function and end-to-end test
+ for assembler
+
+Change-Id: I93d8be36e44e516df70b25e20d9c0695a05510d1
+---
+ src/cmd/asm/internal/arch/arch.go             |  56 +++++
+ src/cmd/asm/internal/arch/loong64.go          |  67 ++++++
+ src/cmd/asm/internal/asm/asm.go               |  18 ++
+ src/cmd/asm/internal/asm/endtoend_test.go     |   7 +
+ src/cmd/asm/internal/asm/operand_test.go      |  88 ++++++++
+ src/cmd/asm/internal/asm/testdata/loong64.s   |  11 +
+ .../asm/internal/asm/testdata/loong64enc1.s   | 209 ++++++++++++++++++
+ .../asm/internal/asm/testdata/loong64enc2.s   |  82 +++++++
+ .../asm/internal/asm/testdata/loong64enc3.s   | 131 +++++++++++
+ 9 files changed, 669 insertions(+)
+ create mode 100644 src/cmd/asm/internal/arch/loong64.go
+ create mode 100644 src/cmd/asm/internal/asm/testdata/loong64.s
+ create mode 100644 src/cmd/asm/internal/asm/testdata/loong64enc1.s
+ create mode 100644 src/cmd/asm/internal/asm/testdata/loong64enc2.s
+ create mode 100644 src/cmd/asm/internal/asm/testdata/loong64enc3.s
+
+diff --git a/src/cmd/asm/internal/arch/arch.go b/src/cmd/asm/internal/arch/arch.go
+index 026d8abf81..95afa1dac3 100644
+--- a/src/cmd/asm/internal/arch/arch.go
++++ b/src/cmd/asm/internal/arch/arch.go
+@@ -9,6 +9,7 @@ import (
+ 	"cmd/internal/obj"
+ 	"cmd/internal/obj/arm"
+ 	"cmd/internal/obj/arm64"
++	"cmd/internal/obj/loong64"
+ 	"cmd/internal/obj/mips"
+ 	"cmd/internal/obj/ppc64"
+ 	"cmd/internal/obj/riscv"
+@@ -60,6 +61,8 @@ func Set(GOARCH string) *Arch {
+ 		return archArm()
+ 	case "arm64":
+ 		return archArm64()
++	case "loong64":
++		return archLoong64(&loong64.Linkloong64)
+ 	case "mips":
+ 		return archMips(&mips.Linkmips)
+ 	case "mipsle":
+@@ -534,6 +537,59 @@ func archMips64(linkArch *obj.LinkArch) *Arch {
+ 	}
+ }
+ 
++func archLoong64(linkArch *obj.LinkArch) *Arch {
++	register := make(map[string]int16)
++	// Create maps for easy lookup of instruction names etc.
++	// Note that there is no list of names as there is for x86.
++	for i := loong64.REG_R0; i <= loong64.REG_R31; i++ {
++		register[obj.Rconv(i)] = int16(i)
++	}
++	for i := loong64.REG_F0; i <= loong64.REG_F31; i++ {
++		register[obj.Rconv(i)] = int16(i)
++	}
++	for i := loong64.REG_FCSR0; i <= loong64.REG_FCSR31; i++ {
++		register[obj.Rconv(i)] = int16(i)
++	}
++	for i := loong64.REG_FCC0; i <= loong64.REG_FCC31; i++ {
++		register[obj.Rconv(i)] = int16(i)
++	}
++	// Pseudo-registers.
++	register["SB"] = RSB
++	register["FP"] = RFP
++	register["PC"] = RPC
++	// Avoid unintentionally clobbering g using R22.
++	delete(register, "R22")
++	register["g"] = loong64.REG_R22
++	register["RSB"] = loong64.REG_R31
++	registerPrefix := map[string]bool{
++		"F":    true,
++		"FCSR": true,
++		"FCC":  true,
++		"R":    true,
++	}
++
++	instructions := make(map[string]obj.As)
++	for i, s := range obj.Anames {
++		instructions[s] = obj.As(i)
++	}
++	for i, s := range loong64.Anames {
++		if obj.As(i) >= obj.A_ARCHSPECIFIC {
++			instructions[s] = obj.As(i) + obj.ABaseLOONG64
++		}
++	}
++	// Annoying alias.
++	instructions["JAL"] = loong64.AJAL
++
++	return &Arch{
++		LinkArch:       linkArch,
++		Instructions:   instructions,
++		Register:       register,
++		RegisterPrefix: registerPrefix,
++		RegisterNumber: loong64RegisterNumber,
++		IsJump:         jumpLOONG64,
++	}
++}
++
+ func archRISCV64() *Arch {
+ 	register := make(map[string]int16)
+ 
+diff --git a/src/cmd/asm/internal/arch/loong64.go b/src/cmd/asm/internal/arch/loong64.go
+new file mode 100644
+index 0000000000..e1fae1f2d7
+--- /dev/null
++++ b/src/cmd/asm/internal/arch/loong64.go
+@@ -0,0 +1,67 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// This file encapsulates some of the odd characteristics of the
++// LOONG64 (LOONG64) instruction set, to minimize its interaction
++// with the core of the assembler.
++
++package arch
++
++import (
++	"cmd/internal/obj"
++	"cmd/internal/obj/loong64"
++)
++
++func jumpLOONG64(word string) bool {
++	switch word {
++	case "BEQ", "BFPF", "BFPT", "BLTZ", "BGEZ", "BLEZ", "BGTZ", "BLT", "BLTU", "JIRL", "BNE", "BGE", "BGEU", "JMP", "JAL", "CALL":
++		return true
++	}
++	return false
++}
++
++// IsLOONG64CMP reports whether the op (as defined by an loong64.A* constant) is
++// one of the CMP instructions that require special handling.
++func IsLOONG64CMP(op obj.As) bool {
++	switch op {
++	case loong64.ACMPEQF, loong64.ACMPEQD, loong64.ACMPGEF, loong64.ACMPGED,
++		loong64.ACMPGTF, loong64.ACMPGTD:
++		return true
++	}
++	return false
++}
++
++// IsLOONG64MUL reports whether the op (as defined by an loong64.A* constant) is
++// one of the MUL/DIV/REM instructions that require special handling.
++func IsLOONG64MUL(op obj.As) bool {
++	switch op {
++	case loong64.AMUL, loong64.AMULU, loong64.AMULV, loong64.AMULVU,
++		loong64.ADIV, loong64.ADIVU, loong64.ADIVV, loong64.ADIVVU,
++		loong64.AREM, loong64.AREMU, loong64.AREMV, loong64.AREMVU:
++		return true
++	}
++	return false
++}
++
++func loong64RegisterNumber(name string, n int16) (int16, bool) {
++	switch name {
++	case "F":
++		if 0 <= n && n <= 31 {
++			return loong64.REG_F0 + n, true
++		}
++	case "FCSR":
++		if 0 <= n && n <= 31 {
++			return loong64.REG_FCSR0 + n, true
++		}
++	case "FCC":
++		if 0 <= n && n <= 31 {
++			return loong64.REG_FCC0 + n, true
++		}
++	case "R":
++		if 0 <= n && n <= 31 {
++			return loong64.REG_R0 + n, true
++		}
++	}
++	return 0, false
++}
+diff --git a/src/cmd/asm/internal/asm/asm.go b/src/cmd/asm/internal/asm/asm.go
+index cf0d1550f9..1397fa87f6 100644
+--- a/src/cmd/asm/internal/asm/asm.go
++++ b/src/cmd/asm/internal/asm/asm.go
+@@ -433,6 +433,14 @@ func (p *Parser) asmJump(op obj.As, cond string, a []obj.Addr) {
+ 			prog.Reg = p.getRegister(prog, op, &a[1])
+ 			break
+ 		}
++		if p.arch.Family == sys.Loong64 {
++			// 3-operand jumps.
++			// First two must be registers
++			target = &a[2]
++			prog.From = a[0]
++			prog.Reg = p.getRegister(prog, op, &a[1])
++			break
++		}
+ 		if p.arch.Family == sys.S390X {
+ 			// 3-operand jumps.
+ 			target = &a[2]
+@@ -593,6 +601,12 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
+ 				prog.Reg = p.getRegister(prog, op, &a[1])
+ 				break
+ 			}
++		} else if p.arch.Family == sys.Loong64 {
++			if arch.IsLOONG64CMP(op) {
++				prog.From = a[0]
++				prog.Reg = p.getRegister(prog, op, &a[1])
++				break
++			}
+ 		}
+ 		prog.From = a[0]
+ 		prog.To = a[1]
+@@ -602,6 +616,10 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
+ 			prog.From = a[0]
+ 			prog.Reg = p.getRegister(prog, op, &a[1])
+ 			prog.To = a[2]
++		case sys.Loong64:
++			prog.From = a[0]
++			prog.Reg = p.getRegister(prog, op, &a[1])
++			prog.To = a[2]
+ 		case sys.ARM:
+ 			// Special cases.
+ 			if arch.IsARMSTREX(op) {
+diff --git a/src/cmd/asm/internal/asm/endtoend_test.go b/src/cmd/asm/internal/asm/endtoend_test.go
+index ead8b27b01..33a4465af3 100644
+--- a/src/cmd/asm/internal/asm/endtoend_test.go
++++ b/src/cmd/asm/internal/asm/endtoend_test.go
+@@ -447,6 +447,13 @@ func TestMIPSEndToEnd(t *testing.T) {
+ 	testEndToEnd(t, "mips64", "mips64")
+ }
+ 
++func TestLOONG64Encoder(t *testing.T) {
++	testEndToEnd(t, "loong64", "loong64enc1")
++	testEndToEnd(t, "loong64", "loong64enc2")
++	testEndToEnd(t, "loong64", "loong64enc3")
++	testEndToEnd(t, "loong64", "loong64")
++}
++
+ func TestPPC64EndToEnd(t *testing.T) {
+ 	testEndToEnd(t, "ppc64", "ppc64")
+ }
+diff --git a/src/cmd/asm/internal/asm/operand_test.go b/src/cmd/asm/internal/asm/operand_test.go
+index 8ef02b1a0e..f8c9571378 100644
+--- a/src/cmd/asm/internal/asm/operand_test.go
++++ b/src/cmd/asm/internal/asm/operand_test.go
+@@ -125,6 +125,11 @@ func TestMIPS64OperandParser(t *testing.T) {
+ 	testOperandParser(t, parser, mips64OperandTests)
+ }
+ 
++func TestLOONG64OperandParser(t *testing.T) {
++	parser := newParser("loong64")
++	testOperandParser(t, parser, loong64OperandTests)
++}
++
+ func TestS390XOperandParser(t *testing.T) {
+ 	parser := newParser("s390x")
+ 	testOperandParser(t, parser, s390xOperandTests)
+@@ -143,6 +148,7 @@ func TestFuncAddress(t *testing.T) {
+ 		{"ppc64", ppc64OperandTests},
+ 		{"mips", mipsOperandTests},
+ 		{"mips64", mips64OperandTests},
++		{"loong64", loong64OperandTests},
+ 		{"s390x", s390xOperandTests},
+ 	} {
+ 		t.Run(sub.arch, func(t *testing.T) {
+@@ -845,6 +851,88 @@ var mipsOperandTests = []operandTest{
+ 	{"[):[o-FP", ""}, // Issue 12469 - asm hung parsing the o-FP range on non ARM platforms.
+ }
+ 
++var loong64OperandTests = []operandTest{
++	{"$((1<<63)-1)", "$9223372036854775807"},
++	{"$(-64*1024)", "$-65536"},
++	{"$(1024 * 8)", "$8192"},
++	{"$-1", "$-1"},
++	{"$-24(R4)", "$-24(R4)"},
++	{"$0", "$0"},
++	{"$0(R1)", "$(R1)"},
++	{"$0.5", "$(0.5)"},
++	{"$0x7000", "$28672"},
++	{"$0x88888eef", "$2290650863"},
++	{"$1", "$1"},
++	{"$_main<>(SB)", "$_main<>(SB)"},
++	{"$argframe(FP)", "$argframe(FP)"},
++	{"$~3", "$-4"},
++	{"(-288-3*8)(R1)", "-312(R1)"},
++	{"(16)(R7)", "16(R7)"},
++	{"(8)(g)", "8(g)"},
++	{"(R0)", "(R0)"},
++	{"(R3)", "(R3)"},
++	{"(R4)", "(R4)"},
++	{"(R5)", "(R5)"},
++	{"-1(R4)", "-1(R4)"},
++	{"-1(R5)", "-1(R5)"},
++	{"6(PC)", "6(PC)"},
++	{"F14", "F14"},
++	{"F15", "F15"},
++	{"F16", "F16"},
++	{"F17", "F17"},
++	{"F18", "F18"},
++	{"F19", "F19"},
++	{"F20", "F20"},
++	{"F21", "F21"},
++	{"F22", "F22"},
++	{"F23", "F23"},
++	{"F24", "F24"},
++	{"F25", "F25"},
++	{"F26", "F26"},
++	{"F27", "F27"},
++	{"F28", "F28"},
++	{"F29", "F29"},
++	{"F30", "F30"},
++	{"F31", "F31"},
++	{"R0", "R0"},
++	{"R1", "R1"},
++	{"R11", "R11"},
++	{"R12", "R12"},
++	{"R13", "R13"},
++	{"R14", "R14"},
++	{"R15", "R15"},
++	{"R16", "R16"},
++	{"R17", "R17"},
++	{"R18", "R18"},
++	{"R19", "R19"},
++	{"R2", "R2"},
++	{"R20", "R20"},
++	{"R21", "R21"},
++	{"R23", "R23"},
++	{"R24", "R24"},
++	{"R25", "R25"},
++	{"R26", "R26"},
++	{"R27", "R27"},
++	{"R28", "R28"},
++	{"R29", "R29"},
++	{"R30", "R30"},
++	{"R3", "R3"},
++	{"R4", "R4"},
++	{"R5", "R5"},
++	{"R6", "R6"},
++	{"R7", "R7"},
++	{"R8", "R8"},
++	{"R9", "R9"},
++	{"a(FP)", "a(FP)"},
++	{"g", "g"},
++	{"RSB", "R31"},
++	{"ret+8(FP)", "ret+8(FP)"},
++	{"runtime·abort(SB)", "runtime.abort(SB)"},
++	{"·AddUint32(SB)", "\"\".AddUint32(SB)"},
++	{"·trunc(SB)", "\"\".trunc(SB)"},
++	{"[):[o-FP", ""}, // Issue 12469 - asm hung parsing the o-FP range on non ARM platforms.
++}
++
+ var s390xOperandTests = []operandTest{
+ 	{"$((1<<63)-1)", "$9223372036854775807"},
+ 	{"$(-64*1024)", "$-65536"},
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64.s b/src/cmd/asm/internal/asm/testdata/loong64.s
+new file mode 100644
+index 0000000000..a4bf9ec103
+--- /dev/null
++++ b/src/cmd/asm/internal/asm/testdata/loong64.s
+@@ -0,0 +1,11 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++#include "../../../../../runtime/textflag.h"
++//TODO
++
++TEXT foo(SB),DUPOK|NOSPLIT,$0
++	JAL	1(PC)	//CALL 1(PC)	//000c0054
++	JAL	(R4)	//CALL (R4)	//8100004c
++	JAL	foo(SB)	//CALL foo(SB)	//00100054
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc1.s b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+new file mode 100644
+index 0000000000..c724cf97f5
+--- /dev/null
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc1.s
+@@ -0,0 +1,209 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++#include "../../../../../runtime/textflag.h"
++
++TEXT asmtest(SB),DUPOK|NOSPLIT,$0
++lable1:
++	BFPT	1(PC)			// 00050048
++	BFPT	lable1	// BFPT 2	//1ffdff4b
++
++lable2:
++	BFPF	1(PC)			// 00040048
++	BFPF	lable2	// BFPF 4 	// 1ffcff4b
++
++	JMP	foo(SB)			// 00100050
++	JMP	(R4)			// 8000004c
++	JMP	1(PC)			// 00040058
++	MOVW	$65536, R4		// 04020014
++	MOVW	$4096, R4		// 24000014
++	MOVV	$65536, R4		// 04020014
++	MOVV	$4096, R4		// 24000014
++	MOVW	R4, R5			// 85001700
++	MOVV	R4, R5			// 85001500
++	MOVBU	R4, R5			// 85fc4303
++	SUB	R4, R5, R6		// a6101100
++	SUBV	R4, R5, R6		// a6901100
++	ADD	R4, R5, R6		// a6101000
++	ADDV	R4, R5, R6		// a6901000
++	AND	R4, R5, R6		// a6901400
++	SUB	R4, R5			// a5101100
++	SUBV	R4, R5			// a5901100
++	ADD	R4, R5			// a5101000
++	ADDV	R4, R5			// a5901000
++	AND	R4, R5			// a5901400
++	NEGW	R4, R5			// 05101100
++	NEGV	R4, R5			// 05901100
++	SLL	R4, R5			// a5101700
++	SLL	R4, R5, R6		// a6101700
++	SRL	R4, R5			// a5901700
++	SRL	R4, R5, R6	 	// a6901700
++	SRA	R4, R5			// a5101800
++	SRA	R4, R5, R6	 	// a6101800
++	SLLV	R4, R5			// a5901800
++	SLLV	R4, R5, R6		// a6901800
++	CLO	R4, R5			// 85100000
++	CLZ	R4, R5			// 85140000
++	ADDF	F4, F5			// a5900001
++	ADDF	F4, R5, F6		// a6900001
++	CMPEQF	F4, R5			// a010120c
++	ABSF	F4, F5			// 85041401
++	MOVVF	F4, F5			// 85181d01
++	MOVF	F4, F5			// 85941401
++	MOVD	F4, F5			// 85981401
++	MOVW	R4, result+16(FP)	// 64608029
++	MOVWU	R4, result+16(FP)	// 64608029
++	MOVV	R4, result+16(FP)	// 6460c029
++	MOVB	R4, result+16(FP)	// 64600029
++	MOVBU	R4, result+16(FP)	// 64600029
++	MOVWL	R4, result+16(FP)	// 6460002f
++	MOVVL	R4, result+16(FP)	// 6460802f
++	MOVW	R4, 1(R5)		// a4048029
++	MOVWU	R4, 1(R5)		// a4048029
++	MOVV	R4, 1(R5)		// a404c029
++	MOVB	R4, 1(R5)		// a4040029
++	MOVBU	R4, 1(R5)		// a4040029
++	MOVWL	R4, 1(R5)		// a404002f
++	MOVVL	R4, 1(R5)		// a404802f
++	SC	R4, 1(R5)		// a4040021
++	SCV	R4, 1(R5)		// a4040023
++	MOVW	y+8(FP), R4		// 64408028
++	MOVWU	y+8(FP), R4		// 6440802a
++	MOVV	y+8(FP), R4		// 6440c028
++	MOVB	y+8(FP), R4		// 64400028
++	MOVBU	y+8(FP), R4		// 6440002a
++	MOVWL	y+8(FP), R4		// 6440002e
++	MOVVL	y+8(FP), R4		// 6440802e
++	MOVW	1(R5), R4		// a4048028
++	MOVWU	1(R5), R4		// a404802a
++	MOVV	1(R5), R4		// a404c028
++	MOVB	1(R5), R4		// a4040028
++	MOVBU	1(R5), R4		// a404002a
++	MOVWL	1(R5), R4		// a404002e
++	MOVVL	1(R5), R4		// a404802e
++	LL	1(R5), R4		// a4040020
++	LLV	1(R5), R4		// a4040022
++	MOVW	$4(R4), R5		// 8510c002
++	MOVV	$4(R4), R5		// 8510c002
++	MOVW	$-1, R4			// 04fcff02
++	MOVV	$-1, R4			// 04fcff02
++	MOVW	$1, R4			// 0404c002
++	MOVV	$1, R4			// 0404c002
++	ADD	$-1, R4, R5		// 85fcbf02
++	ADD	$-1, R4			// 84fcbf02
++	ADDV	$-1, R4, R5		// 85fcff02
++	ADDV	$-1, R4			// 84fcff02
++	AND	$1, R4, R5		// 85044003
++	AND	$1, R4			// 84044003
++	SLL	$4, R4, R5		// 85904000
++	SLL	$4, R4			// 84904000
++	SRL	$4, R4, R5		// 85904400
++	SRL	$4, R4			// 84904400
++	SRA	$4, R4, R5		// 85904800
++	SRA	$4, R4			// 84904800
++	SLLV	$4, R4, R5		// 85104100
++	SLLV	$4, R4			// 84104100
++	SYSCALL				// 00002b00
++	BEQ	R4, R5, 1(PC)		// 85040058
++	BEQ	R4, 1(PC)		// 80040058
++	BLTU	R4, 1(PC)		// 80040068
++	MOVW	y+8(FP), F4		// 6440002b
++	MOVF	y+8(FP), F4		// 6440002b
++	MOVD	y+8(FP), F4		// 6440802b
++	MOVW	1(F5), F4		// a404002b
++	MOVF	1(F5), F4		// a404002b
++	MOVD	1(F5), F4		// a404802b
++	MOVW	F4, result+16(FP)	// 6460402b
++	MOVF	F4, result+16(FP)	// 6460402b
++	MOVD	F4, result+16(FP)	// 6460c02b
++	MOVW	F4, 1(F5)		// a404402b
++	MOVF	F4, 1(F5)		// a404402b
++	MOVD	F4, 1(F5)		// a404c02b
++	MOVW	R4, F5			// 85a41401
++	MOVW	F4, R5			// 85b41401
++	MOVV	R4, F5			// 85a81401
++	MOVV	F4, R5			// 85b81401
++	WORD	$74565			// 45230100
++	BREAK	R4, result+16(FP)	// 64600006
++	BREAK	R4, 1(R5)		// a4040006
++	BREAK				// 00002a00
++	UNDEF				// 00002a00
++
++	// mul
++	MUL	R4, R5	  		// a5101c00
++	MUL	R4, R5, R6	  	// a6101c00
++	MULV	R4, R5	   		// a5901d00
++	MULV	R4, R5, R6	   	// a6901d00
++	MULVU	R4, R5			// a5901d00
++	MULVU	R4, R5, R6		// a6901d00
++	MULHV	R4, R5			// a5101e00
++	MULHV	R4, R5, R6		// a6101e00
++	MULHVU	R4, R5			// a5901e00
++	MULHVU	R4, R5, R6	 	// a6901e00
++	REMV	R4, R5	   		// a5902200
++	REMV	R4, R5, R6	   	// a6902200
++	REMVU	R4, R5			// a5902300
++	REMVU	R4, R5, R6		// a6902300
++	DIVV	R4, R5			// a5102200
++	DIVV	R4, R5, R6	   	// a6102200
++	DIVVU	R4, R5	 		// a5102300
++	DIVVU	R4, R5, R6		// a6102300
++
++	MOVH	R4, result+16(FP)	// 64604029
++	MOVH	R4, 1(R5)		// a4044029
++	MOVH	y+8(FP), R4		// 64404028
++	MOVH	1(R5), R4		// a4044028
++	MOVHU	R4, R5			// 8500cf00
++	MOVHU	R4, result+16(FP)	// 64604029
++	MOVHU	R4, 1(R5)		// a4044029
++	MOVHU	y+8(FP), R4		// 6440402a
++	MOVHU	1(R5), R4		// a404402a
++	MULU	R4, R5	   		// a5101c00
++	MULU	R4, R5, R6		// a6101c00
++	MULH	R4, R5	   		// a5901c00
++	MULH	R4, R5, R6	   	// a6901c00
++	MULHU	R4, R5			// a5101d00
++	MULHU	R4, R5, R6		// a6101d00
++	REM	R4, R5	  		// a5902000
++	REM	R4, R5, R6	  	// a6902000
++	REMU	R4, R5	   		// a5902100
++	REMU	R4, R5, R6	   	// a6902100
++	DIV	R4, R5	  		// a5102000
++	DIV	R4, R5, R6	  	// a6102000
++	DIVU	R4, R5	   		// a5102100
++	DIVU	R4, R5, R6	   	// a6102100
++	SRLV	R4, R5 			// a5101900
++	SRLV	R4, R5, R6 		// a6101900
++	SRLV	$4, R4, R5		// 85104500
++	SRLV	$4, R4			// 84104500
++	SRLV	$32, R4, R5 		// 85804500
++	SRLV	$32, R4			// 84804500
++
++	MOVFD	F4, F5			// 85241901
++	MOVDF	F4, F5			// 85181901
++	MOVWF	F4, F5			// 85101d01
++	MOVFW	F4, F5			// 85041b01
++	MOVWD	F4, F5			// 85201d01
++	MOVDW	F4, F5			// 85081b01
++	NEGF	F4, F5			// 85141401
++	NEGD	F4, F5			// 85181401
++	ABSD	F4, F5			// 85081401
++	TRUNCDW	F4, F5			// 85881a01
++	TRUNCFW	F4, F5			// 85841a01
++	SQRTF	F4, F5			// 85441401
++	SQRTD	F4, F5			// 85481401
++
++	DBAR	 			// 00007238
++	NOOP	 			// 00004003
++
++	MOVWR	R4, result+16(FP) 	// 6460402f
++	MOVWR	R4, 1(R5) 		// a404402f
++	MOVWR	y+8(FP), R4 		// 6440402e
++	MOVWR	1(R5), R4 		// a404402e
++
++	CMPGTF	F4, R5 			// a090110c
++	CMPGTD	F4, R5 			// a090210c
++	CMPGEF	F4, R5			// a090130c
++	CMPGED	F4, R5			// a090230c
++	CMPEQD	F4, R5			// a010220c
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc2.s b/src/cmd/asm/internal/asm/testdata/loong64enc2.s
+new file mode 100644
+index 0000000000..675b263acf
+--- /dev/null
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc2.s
+@@ -0,0 +1,82 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++#include "../../../../../runtime/textflag.h"
++
++TEXT asmtest(SB),DUPOK|NOSPLIT,$0
++	MOVB	R4, R5			// 85e04000a5e04800
++	MOVWU	R4, R5			// 85804100a5804500
++	MOVW	$74565, R4		// 4402001484148d03
++	MOVW	$4097, R4		// 2400001484048003
++	MOVV	$74565, R4		// 4402001484148d03
++	MOVV	$4097, R4		// 2400001484048003
++	AND	$-1, R4, R5		// 1efcbf0285f81400
++	AND	$-1, R4			// 1efcbf0284f81400
++	MOVW	$-1, F4			// 1efcbf02c4a71401
++	MOVW	$1, F4			// 1e048002c4a71401
++	TEQ	$4, R4, R5		// 8508005c04002a00
++	TEQ	$4, R4			// 0408005c04002a00
++	TNE	$4, R4, R5		// 8508005804002a00
++	TNE	$4, R4			// 0408005804002a00
++	ADD	$65536, R4, R5		// 1e02001485781000
++	ADD	$4096, R4, R5		// 3e00001485781000
++	ADD	$65536, R4		// 1e02001484781000
++	ADD	$4096, R4		// 3e00001484781000
++	ADDV	$65536, R4, R5		// 1e02001485f81000
++	ADDV	$4096, R4, R5		// 3e00001485f81000
++	ADDV	$65536, R4		// 1e02001484f81000
++	ADDV	$4096, R4		// 3e00001484f81000
++	AND	$65536, R4, R5		// 1e02001485f81400
++	AND	$4096, R4, R5		// 3e00001485f81400
++	AND	$65536, R4		// 1e02001484f81400
++	AND	$4096, R4		// 3e00001484f81400
++	SGT	$65536, R4, R5		// 1e02001485781200
++	SGT	$4096, R4, R5		// 3e00001485781200
++	SGT	$65536, R4		// 1e02001484781200
++	SGT	$4096, R4		// 3e00001484781200
++	SGTU	$65536, R4, R5		// 1e02001485f81200
++	SGTU	$4096, R4, R5		// 3e00001485f81200
++	SGTU	$65536, R4		// 1e02001484f81200
++	SGTU	$4096, R4		// 3e00001484f81200
++	ADDU	$65536, R4, R5		// 1e02001485781000
++	ADDU	$4096, R4, R5		// 3e00001485781000
++	ADDU	$65536, R4		// 1e02001484781000
++	ADDU	$4096, R4		// 3e00001484781000
++	ADDVU	$65536, R4, R5		// 1e02001485f81000
++	ADDVU	$4096, R4, R5		// 3e00001485f81000
++	ADDVU	$65536, R4		// 1e02001484f81000
++	ADDVU	$4096, R4		// 3e00001484f81000
++	OR	$65536, R4, R5		// 1e02001485781500
++	OR	$4096, R4, R5		// 3e00001485781500
++	OR	$65536, R4		// 1e02001484781500
++	OR	$4096, R4		// 3e00001484781500
++	OR	$-1, R4, R5		// 1efcbf0285781500
++	OR	$-1, R4			// 1efcbf0284781500
++	XOR	$65536, R4, R5		// 1e02001485f81500
++	XOR	$4096, R4, R5		// 3e00001485f81500
++	XOR	$65536, R4		// 1e02001484f81500
++	XOR	$4096, R4		// 3e00001484f81500
++	XOR	$-1, R4, R5		// 1efcbf0285f81500
++	XOR	$-1, R4			// 1efcbf0284f81500
++	MOVH	R4, R5			// 85c04000a5c04800
++
++	// relocation	instructions
++	MOVW	R4, name(SB)		// 1e00001cc4038029
++	MOVWU	R4, name(SB)		// 1e00001cc4038029
++	MOVV	R4, name(SB)		// 1e00001cc403c029
++	MOVB	R4, name(SB)		// 1e00001cc4030029
++	MOVBU	R4, name(SB)		// 1e00001cc4030029
++	MOVF	F4, name(SB)		// 1e00001cc403402b
++	MOVD	F4, name(SB)		// 1e00001cc403c02b
++	MOVW	name(SB), R4		// 1e00001cc4038028
++	MOVWU	name(SB), R4		// 1e00001cc403802a
++	MOVV	name(SB), R4		// 1e00001cc403c028
++	MOVB	name(SB), R4		// 1e00001cc4030028
++	MOVBU	name(SB), R4		// 1e00001cc403002a
++	MOVF	name(SB), F4		// 1e00001cc403002b
++	MOVD	name(SB), F4		// 1e00001cc403802b
++	MOVH	R4, name(SB)		// 1e00001cc4034029
++	MOVH	name(SB), R4		// 1e00001cc4034028
++	MOVHU	R4, name(SB)		// 1e00001cc4034029
++	MOVHU	name(SB), R4		// 1e00001cc403402a
+diff --git a/src/cmd/asm/internal/asm/testdata/loong64enc3.s b/src/cmd/asm/internal/asm/testdata/loong64enc3.s
+new file mode 100644
+index 0000000000..fd6d9fedc4
+--- /dev/null
++++ b/src/cmd/asm/internal/asm/testdata/loong64enc3.s
+@@ -0,0 +1,131 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++#include "../../../../../runtime/textflag.h"
++
++TEXT asmtest(SB),DUPOK|NOSPLIT,$0
++	MOVW	$65536(R4), R5			// 1e020014de03800385f81000
++	MOVW	$4096(R4), R5 			// 3e000014de03800385f81000
++	MOVV	$65536(R4), R5			// 1e020014de03800385f81000
++	MOVV	$4096(R4), R5			// 3e000014de03800385f81000
++	ADD	$74565, R4			// 5e020014de178d0384781000
++	ADD	$4097, R4  			// 3e000014de07800384781000
++	ADDV	$74565, R4			// 5e020014de178d0384f81000
++	ADDV	$4097, R4 			// 3e000014de07800384f81000
++	AND	$74565, R4			// 5e020014de178d0384f81400
++	AND	$4097, R4 		 	// 3e000014de07800384f81400
++	ADD	$74565, R4, R5			// 5e020014de178d0385781000
++	ADD	$4097, R4, R5  			// 3e000014de07800385781000
++	ADDV	$74565, R4, R5			// 5e020014de178d0385f81000
++	ADDV	$4097, R4, R5 			// 3e000014de07800385f81000
++	AND	$74565, R4, R5			// 5e020014de178d0385f81400
++	AND	$4097, R4, R5			// 3e000014de07800385f81400
++
++	MOVW	R4, result+65540(FP)		// 1e020014de8f1000c4338029
++	MOVW	R4, result+4097(FP)   		// 3e000014de8f1000c4278029
++	MOVWU	R4, result+65540(FP)		// 1e020014de8f1000c4338029
++	MOVWU	R4, result+4097(FP)  		// 3e000014de8f1000c4278029
++	MOVV	R4, result+65540(FP)		// 1e020014de8f1000c433c029
++	MOVV	R4, result+4097(FP)   		// 3e000014de8f1000c427c029
++	MOVB	R4, result+65540(FP)		// 1e020014de8f1000c4330029
++	MOVB	R4, result+4097(FP)   		// 3e000014de8f1000c4270029
++	MOVBU	R4, result+65540(FP)		// 1e020014de8f1000c4330029
++	MOVBU	R4, result+4097(FP)		// 3e000014de8f1000c4270029
++	MOVW	R4, 65536(R5)			// 1e020014de971000c4038029
++	MOVW	R4, 4096(R5)  			// 3e000014de971000c4038029
++	MOVWU	R4, 65536(R5)			// 1e020014de971000c4038029
++	MOVWU	R4, 4096(R5)			// 3e000014de971000c4038029
++	MOVV	R4, 65536(R5)			// 1e020014de971000c403c029
++	MOVV	R4, 4096(R5)			// 3e000014de971000c403c029
++	MOVB	R4, 65536(R5)			// 1e020014de971000c4030029
++	MOVB	R4, 4096(R5)			// 3e000014de971000c4030029
++	MOVBU	R4, 65536(R5)			// 1e020014de971000c4030029
++	MOVBU	R4, 4096(R5)			// 3e000014de971000c4030029
++	SC	R4, 65536(R5)			// 1e020014de971000c4030021
++	SC	R4, 4096(R5)	   		// 3e000014de971000c4030021
++	MOVW	y+65540(FP), R4			// 1e020014de8f1000c4338028
++	MOVWU	y+65540(FP), R4			// 1e020014de8f1000c433802a
++	MOVV	y+65540(FP), R4			// 1e020014de8f1000c433c028
++	MOVB	y+65540(FP), R4			// 1e020014de8f1000c4330028
++	MOVBU	y+65540(FP), R4			// 1e020014de8f1000c433002a
++	MOVW	y+4097(FP), R4			// 3e000014de8f1000c4278028
++	MOVWU	y+4097(FP), R4			// 3e000014de8f1000c427802a
++	MOVV	y+4097(FP), R4			// 3e000014de8f1000c427c028
++	MOVB	y+4097(FP), R4			// 3e000014de8f1000c4270028
++	MOVBU	y+4097(FP), R4			// 3e000014de8f1000c427002a
++	MOVW	65536(R5), R4			// 1e020014de971000c4038028
++	MOVWU	65536(R5), R4			// 1e020014de971000c403802a
++	MOVV	65536(R5), R4			// 1e020014de971000c403c028
++	MOVB	65536(R5), R4			// 1e020014de971000c4030028
++	MOVBU	65536(R5), R4			// 1e020014de971000c403002a
++	MOVW	4096(R5), R4			// 3e000014de971000c4038028
++	MOVWU	4096(R5), R4			// 3e000014de971000c403802a
++	MOVV	4096(R5), R4			// 3e000014de971000c403c028
++	MOVB	4096(R5), R4			// 3e000014de971000c4030028
++	MOVBU	4096(R5), R4			// 3e000014de971000c403002a
++	MOVW	y+65540(FP), F4			// 1e020014de8f1000c433002b
++	MOVF	y+65540(FP), F4			// 1e020014de8f1000c433002b
++	MOVD	y+65540(FP), F4			// 1e020014de8f1000c433802b
++	MOVW	y+4097(FP), F4			// 3e000014de8f1000c427002b
++	MOVF	y+4097(FP), F4			// 3e000014de8f1000c427002b
++	MOVD	y+4097(FP), F4			// 3e000014de8f1000c427802b
++	MOVW	65536(R5), F4			// 1e020014de971000c403002b
++	MOVF	65536(R5), F4			// 1e020014de971000c403002b
++	MOVD	65536(R5), F4			// 1e020014de971000c403802b
++	MOVW	4096(R5), F4			// 3e000014de971000c403002b
++	MOVF	4096(R5), F4			// 3e000014de971000c403002b
++	MOVD	4096(R5), F4			// 3e000014de971000c403802b
++	MOVW	F4, result+65540(FP)		// 1e020014de8f1000c433402b
++	MOVF	F4, result+65540(FP)		// 1e020014de8f1000c433402b
++	MOVD	F4, result+65540(FP)		// 1e020014de8f1000c433c02b
++	MOVW	F4, result+4097(FP)		// 3e000014de8f1000c427402b
++	MOVF	F4, result+4097(FP)		// 3e000014de8f1000c427402b
++	MOVD	F4, result+4097(FP)		// 3e000014de8f1000c427c02b
++	MOVW	F4, 65536(R5)			// 1e020014de971000c403402b
++	MOVF	F4, 65536(R5)			// 1e020014de971000c403402b
++	MOVD	F4, 65536(R5)			// 1e020014de971000c403c02b
++	MOVW	F4, 4096(R5)			// 3e000014de971000c403402b
++	MOVF	F4, 4096(R5)			// 3e000014de971000c403402b
++	MOVD	F4, 4096(R5)			// 3e000014de971000c403c02b
++
++	MOVH	R4, result+65540(FP)		// 1e020014de8f1000c4334029
++	MOVH	R4, 65536(R5)			// 1e020014de971000c4034029
++	MOVH	y+65540(FP), R4			// 1e020014de8f1000c4334028
++	MOVH	65536(R5), R4			// 1e020014de971000c4034028
++	MOVH	R4, result+4097(FP)		// 3e000014de8f1000c4274029
++	MOVH	R4, 4096(R5)			// 3e000014de971000c4034029
++	MOVH	y+4097(FP), R4			// 3e000014de8f1000c4274028
++	MOVH	4096(R5), R4			// 3e000014de971000c4034028
++	MOVHU	R4, result+65540(FP)		// 1e020014de8f1000c4334029
++	MOVHU	R4, 65536(R5)			// 1e020014de971000c4034029
++	MOVHU	y+65540(FP), R4			// 1e020014de8f1000c433402a
++	MOVHU	65536(R5), R4			// 1e020014de971000c403402a
++	MOVHU	R4, result+4097(FP)		// 3e000014de8f1000c4274029
++	MOVHU	R4, 4096(R5)			// 3e000014de971000c4034029
++	MOVHU	y+4097(FP), R4 			// 3e000014de8f1000c427402a
++	MOVHU	4096(R5), R4			// 3e000014de971000c403402a
++	SGT	$74565, R4 			// 5e020014de178d0384781200
++	SGT	$74565, R4, R5 			// 5e020014de178d0385781200
++	SGT	$4097, R4 			// 3e000014de07800384781200
++	SGT	$4097, R4, R5 			// 3e000014de07800385781200
++	SGTU	$74565, R4 			// 5e020014de178d0384f81200
++	SGTU	$74565, R4, R5 			// 5e020014de178d0385f81200
++	SGTU	$4097, R4 			// 3e000014de07800384f81200
++	SGTU	$4097, R4, R5 			// 3e000014de07800385f81200
++	ADDU	$74565, R4 			// 5e020014de178d0384781000
++	ADDU	$74565, R4, R5 			// 5e020014de178d0385781000
++	ADDU	$4097, R4 			// 3e000014de07800384781000
++	ADDU	$4097, R4, R5 			// 3e000014de07800385781000
++	ADDVU	$4097, R4			// 3e000014de07800384f81000
++	ADDVU	$4097, R4, R5 			// 3e000014de07800385f81000
++	ADDVU	$74565, R4			// 5e020014de178d0384f81000
++	ADDVU	$74565, R4, R5			// 5e020014de178d0385f81000
++	OR	$74565, R4			// 5e020014de178d0384781500
++	OR	$74565, R4, R5			// 5e020014de178d0385781500
++	OR	$4097, R4			// 3e000014de07800384781500
++	OR	$4097, R4, R5			// 3e000014de07800385781500
++	XOR	$74565, R4			// 5e020014de178d0384f81500
++	XOR	$74565, R4, R5			// 5e020014de178d0385f81500
++	XOR	$4097, R4			// 3e000014de07800384f81500
++	XOR	$4097, R4, R5			// 3e000014de07800385f81500
+-- 
+2.38.0
+

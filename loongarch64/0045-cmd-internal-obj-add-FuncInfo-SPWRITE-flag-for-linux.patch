@@ -1,0 +1,50 @@
+From 6a802e230b9ada07bba0a0022dd35b8c86a1c1b4 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 23 May 2022 08:32:35 +0800
+Subject: [PATCH 45/82] cmd/internal/obj: add FuncInfo SPWRITE flag for
+ linux/loong64
+
+Co-authored-by: limeidan <limeidan@loongson.cn>
+Change-Id: Iac4f706fc9ff1047f1fa02f7178ebfbe38ad1ec3
+---
+ src/cmd/internal/obj/loong64/obj.go | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
+
+diff --git a/src/cmd/internal/obj/loong64/obj.go b/src/cmd/internal/obj/loong64/obj.go
+index 36036e5cd5..abfe67dcbc 100644
+--- a/src/cmd/internal/obj/loong64/obj.go
++++ b/src/cmd/internal/obj/loong64/obj.go
+@@ -8,7 +8,7 @@ import (
+ 	"cmd/internal/obj"
+ 	"cmd/internal/objabi"
+ 	"cmd/internal/sys"
+-
++	"log"
+ 	"math"
+ )
+ 
+@@ -460,6 +460,21 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
+ 				p.From.Reg = REGSP
+ 			}
+ 		}
++
++		if p.To.Type == obj.TYPE_REG && p.To.Reg == REGSP && p.Spadj == 0 {
++			f := c.cursym.Func()
++			if f.FuncFlag&objabi.FuncFlag_SPWRITE == 0 {
++				c.cursym.Func().FuncFlag |= objabi.FuncFlag_SPWRITE
++				if ctxt.Debugvlog || !ctxt.IsAsm {
++					ctxt.Logf("auto-SPWRITE: %s %v\n", c.cursym.Name, p)
++					if !ctxt.IsAsm {
++						ctxt.Diag("invalid auto-SPWRITE in non-assembly")
++						ctxt.DiagFlush()
++						log.Fatalf("bad SPWRITE")
++					}
++				}
++			}
++		}
+ 	}
+ }
+ 
+-- 
+2.38.0
+

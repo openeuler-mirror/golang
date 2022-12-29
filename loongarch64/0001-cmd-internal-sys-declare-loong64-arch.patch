@@ -1,0 +1,57 @@
+From 24c67e919a28cd2e8874fdd18737d640fdb0f2f1 Mon Sep 17 00:00:00 2001
+From: WANG Xuerui <git@xen0n.name>
+Date: Sun, 20 Jun 2021 12:59:45 +0800
+Subject: [PATCH 01/82] cmd/internal/sys: declare loong64 arch
+
+Updates #46229
+
+Change-Id: Icb736f2440443e9245872b091d13e5bdfb6cb01a
+Reviewed-on: https://go-review.googlesource.com/c/go/+/339009
+Reviewed-by: Meng Zhuo <mzh@golangcn.org>
+Reviewed-by: Cherry Mui <cherryyz@google.com>
+Trust: Meng Zhuo <mzh@golangcn.org>
+Trust: Michael Knyszek <mknyszek@google.com>
+Run-TryBot: Meng Zhuo <mzh@golangcn.org>
+TryBot-Result: Go Bot <gobot@golang.org>
+---
+ src/cmd/internal/sys/arch.go | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/src/cmd/internal/sys/arch.go b/src/cmd/internal/sys/arch.go
+index a3e39768b6..e7063fde89 100644
+--- a/src/cmd/internal/sys/arch.go
++++ b/src/cmd/internal/sys/arch.go
+@@ -22,6 +22,7 @@ const (
+ 	RISCV64
+ 	S390X
+ 	Wasm
++	Loong64
+ )
+ 
+ // Arch represents an individual architecture.
+@@ -189,6 +190,16 @@ var ArchWasm = &Arch{
+ 	Alignment: 1,
+ }
+ 
++var ArchLoong64 = &Arch{
++	Name:      "loong64",
++	Family:    Loong64,
++	ByteOrder: binary.LittleEndian,
++	PtrSize:   8,
++	RegSize:   8,
++	MinLC:     4,
++	Alignment: 8, // Unaligned accesses are not guaranteed to be fast
++}
++
+ var Archs = [...]*Arch{
+ 	Arch386,
+ 	ArchAMD64,
+@@ -203,4 +214,5 @@ var Archs = [...]*Arch{
+ 	ArchRISCV64,
+ 	ArchS390X,
+ 	ArchWasm,
++	ArchLoong64,
+ }
+-- 
+2.38.0
+

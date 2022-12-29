@@ -1,0 +1,39 @@
+From cb0e1d40dbdd8faa5266cfd58b2f1a7220f70683 Mon Sep 17 00:00:00 2001
+From: WANG Xuerui <git@xen0n.name>
+Date: Wed, 3 Aug 2022 19:43:49 +0800
+Subject: [PATCH 64/82] cmd/link: recognize the new R_LARCH_32_PCREL type on
+ loong64
+
+Due to the latest binutils change [1], at least for certain 32-bit
+relocs in .eh_frame section, this new type of relocation record is
+emitted, leading to breakage on systems with bleeding-edge toolchain
+when trying to link with object(s) with such new-style relocs.
+
+Simply treating it the same as the existing reloc types seems enough.
+
+Fixes #54222
+
+[1]: https://sourceware.org/git/?p=binutils-gdb.git;a=commit;h=f09482a8747b6fd4c2d59a6a64677d3a3fe1e092
+
+Change-Id: I876d6711d5d4a674bead37e57f9503f1622d1136
+---
+ src/cmd/link/internal/loadelf/ldelf.go | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/src/cmd/link/internal/loadelf/ldelf.go b/src/cmd/link/internal/loadelf/ldelf.go
+index d677bff3c9..fbdace587f 100644
+--- a/src/cmd/link/internal/loadelf/ldelf.go
++++ b/src/cmd/link/internal/loadelf/ldelf.go
+@@ -1004,7 +1004,8 @@ func relSize(arch *sys.Arch, pn string, elftype uint32) (uint8, uint8, error) {
+ 		LOONG64 | uint32(elf.R_LARCH_MARK_LA)<<16,
+ 		LOONG64 | uint32(elf.R_LARCH_SOP_POP_32_S_0_10_10_16_S2)<<16,
+ 		LOONG64 | uint32(elf.R_LARCH_64)<<16,
+-		LOONG64 | uint32(elf.R_LARCH_MARK_PCREL)<<16:
++		LOONG64 | uint32(elf.R_LARCH_MARK_PCREL)<<16,
++		LOONG64 | uint32(elf.R_LARCH_32_PCREL)<<16:
+ 		return 4, 4, nil
+ 
+ 	case S390X | uint32(elf.R_390_8)<<16:
+-- 
+2.38.0
+

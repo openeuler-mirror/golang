@@ -1,0 +1,34 @@
+From 7bd5760e25b36d3139669605a76775f90fc8e2f9 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 24 Nov 2021 16:41:33 +0800
+Subject: [PATCH 05/82] cmd/compile: register loong64.Init function for
+ compiler
+
+Change-Id: Ia3cb07af626e3422e43e3834baf15b7c8fad2326
+---
+ src/cmd/compile/main.go | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/src/cmd/compile/main.go b/src/cmd/compile/main.go
+index 3af1e1fafd..7d38bea7fa 100644
+--- a/src/cmd/compile/main.go
++++ b/src/cmd/compile/main.go
+@@ -10,6 +10,7 @@ import (
+ 	"cmd/compile/internal/arm64"
+ 	"cmd/compile/internal/base"
+ 	"cmd/compile/internal/gc"
++	"cmd/compile/internal/loong64"
+ 	"cmd/compile/internal/mips"
+ 	"cmd/compile/internal/mips64"
+ 	"cmd/compile/internal/ppc64"
+@@ -29,6 +30,7 @@ var archInits = map[string]func(*ssagen.ArchInfo){
+ 	"amd64":    amd64.Init,
+ 	"arm":      arm.Init,
+ 	"arm64":    arm64.Init,
++	"loong64":  loong64.Init,
+ 	"mips":     mips.Init,
+ 	"mipsle":   mips.Init,
+ 	"mips64":   mips64.Init,
+-- 
+2.38.0
+

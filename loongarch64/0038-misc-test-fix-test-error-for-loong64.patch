@@ -1,0 +1,93 @@
+From f8b046d1bced9feed15058779030b023bef8d0fa Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 17:13:29 +0800
+Subject: [PATCH 38/82] misc, test: fix test error for loong64
+
+Change-Id: I6760b4a7e51646773cd0f48baa1baba01b213b7d
+---
+ .../cgo/test/testdata/issue9400/asm_loong64.s | 33 +++++++++++++++++++
+ test/intrinsic_atomic.go                      |  2 +-
+ test/nosplit.go                               |  3 ++
+ test/run.go                                   |  1 +
+ 4 files changed, 38 insertions(+), 1 deletion(-)
+ create mode 100644 misc/cgo/test/testdata/issue9400/asm_loong64.s
+
+diff --git a/misc/cgo/test/testdata/issue9400/asm_loong64.s b/misc/cgo/test/testdata/issue9400/asm_loong64.s
+new file mode 100644
+index 0000000000..25132fa601
+--- /dev/null
++++ b/misc/cgo/test/testdata/issue9400/asm_loong64.s
+@@ -0,0 +1,33 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++// +build !gccgo
++
++#include "textflag.h"
++
++#define DBAR	WORD $0x38720000
++
++TEXT ·RewindAndSetgid(SB),NOSPLIT|NOFRAME,$0-0
++	// Rewind stack pointer so anything that happens on the stack
++	// will clobber the test pattern created by the caller
++	ADDV	$(1024*8), R3
++
++	// Ask signaller to setgid
++	MOVW	$1, R12
++	DBAR
++	MOVW	R12, ·Baton(SB)
++	DBAR
++
++	// Wait for setgid completion
++loop:
++	DBAR
++	MOVW	·Baton(SB), R12
++	OR	R13, R13, R13	// hint that we're in a spin loop
++	BNE	R12, loop
++	DBAR
++
++	// Restore stack
++	ADDV	$(-1024*8), R3
++	RET
+diff --git a/test/intrinsic_atomic.go b/test/intrinsic_atomic.go
+index 61911b7a46..a1004c89d9 100644
+--- a/test/intrinsic_atomic.go
++++ b/test/intrinsic_atomic.go
+@@ -1,5 +1,5 @@
+ // errorcheck -0 -d=ssa/intrinsics/debug
+-// +build amd64 arm64 mips mipsle mips64 mips64le ppc64 ppc64le riscv64 s390x
++// +build amd64 arm64 loong64 mips mipsle mips64 mips64le ppc64 ppc64le riscv64 s390x
+ 
+ // Copyright 2016 The Go Authors. All rights reserved.
+ // Use of this source code is governed by a BSD-style
+diff --git a/test/nosplit.go b/test/nosplit.go
+index 7c7e1bfd99..8e1ebfffb4 100644
+--- a/test/nosplit.go
++++ b/test/nosplit.go
+@@ -263,6 +263,9 @@ TestCases:
+ 		case "mips64", "mips64le":
+ 			ptrSize = 8
+ 			fmt.Fprintf(&buf, "#define REGISTER (R0)\n")
++		case "loong64":
++			ptrSize = 8
++			fmt.Fprintf(&buf, "#define REGISTER (R0)\n")
+ 		case "ppc64", "ppc64le":
+ 			ptrSize = 8
+ 			fmt.Fprintf(&buf, "#define REGISTER (CTR)\n")
+diff --git a/test/run.go b/test/run.go
+index d7f5d02391..4b94538f6a 100644
+--- a/test/run.go
++++ b/test/run.go
+@@ -1588,6 +1588,7 @@ var (
+ 		"amd64":   {},
+ 		"arm":     {"GOARM", "5", "6", "7"},
+ 		"arm64":   {},
++		"loong64": {},
+ 		"mips":    {"GOMIPS", "hardfloat", "softfloat"},
+ 		"mips64":  {"GOMIPS64", "hardfloat", "softfloat"},
+ 		"ppc64":   {"GOPPC64", "power8", "power9"},
+-- 
+2.38.0
+

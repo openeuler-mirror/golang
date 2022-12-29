@@ -1,0 +1,30 @@
+From a97e788c90c32fc3fdb3d6a74db016390ffbac09 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 24 Mar 2022 21:11:16 +0800
+Subject: [PATCH 41/82] runtime: fixed func breakpoint implementation on
+ loong64.
+
+use the break instruction to implement the function of the func breakpoint.
+
+Signed-off-by: Guoqi Chen <chenguoqi@loongson.cn>
+Change-Id: Iad0274d110f39f0ca2b330df103fd73f8ebbb358
+---
+ src/runtime/asm_loong64.s | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index cfc270f28b..9541f6e045 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -79,7 +79,7 @@ DATA	runtime·mainPC+0(SB)/8,$runtime·main(SB)
+ GLOBL	runtime·mainPC(SB),RODATA,$8
+ 
+ TEXT runtime·breakpoint(SB),NOSPLIT|NOFRAME,$0-0
+-	MOVV	R0, 2(R0) // TODO: TD
++	BREAK
+ 	RET
+ 
+ TEXT runtime·asminit(SB),NOSPLIT|NOFRAME,$0-0
+-- 
+2.38.0
+

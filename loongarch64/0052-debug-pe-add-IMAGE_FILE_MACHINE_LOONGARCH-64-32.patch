@@ -1,0 +1,85 @@
+From 145772f832299e95702917ae898ca875669b95d0 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 27 Jun 2022 10:12:53 +0800
+Subject: [PATCH 52/82] debug/pe: add IMAGE_FILE_MACHINE_LOONGARCH{64,32}
+
+Related: https://github.com/MicrosoftDocs/win32/pull/1067
+
+Change-Id: I946253f217a5c616ae4a19be44634000cba5020e
+---
+ api/go1.17.txt     |  4 ++++
+ src/debug/pe/pe.go | 46 ++++++++++++++++++++++++----------------------
+ 2 files changed, 28 insertions(+), 22 deletions(-)
+
+diff --git a/api/go1.17.txt b/api/go1.17.txt
+index 61b38c3343..0e7fe3c09f 100644
+--- a/api/go1.17.txt
++++ b/api/go1.17.txt
+@@ -298,3 +298,7 @@ pkg debug/elf, const R_LARCH_TLS_TPREL64 R_LARCH
+ pkg debug/elf, method (R_LARCH) GoString() string
+ pkg debug/elf, method (R_LARCH) String() string
+ pkg debug/elf, type R_LARCH int
++pkg debug/pe, const IMAGE_FILE_MACHINE_LOONGARCH32 = 25138
++pkg debug/pe, const IMAGE_FILE_MACHINE_LOONGARCH32 ideal-int
++pkg debug/pe, const IMAGE_FILE_MACHINE_LOONGARCH64 = 25188
++pkg debug/pe, const IMAGE_FILE_MACHINE_LOONGARCH64 ideal-int
+diff --git a/src/debug/pe/pe.go b/src/debug/pe/pe.go
+index db112fe7ad..9d55c40f9c 100644
+--- a/src/debug/pe/pe.go
++++ b/src/debug/pe/pe.go
+@@ -87,28 +87,30 @@ type OptionalHeader64 struct {
+ }
+ 
+ const (
+-	IMAGE_FILE_MACHINE_UNKNOWN   = 0x0
+-	IMAGE_FILE_MACHINE_AM33      = 0x1d3
+-	IMAGE_FILE_MACHINE_AMD64     = 0x8664
+-	IMAGE_FILE_MACHINE_ARM       = 0x1c0
+-	IMAGE_FILE_MACHINE_ARMNT     = 0x1c4
+-	IMAGE_FILE_MACHINE_ARM64     = 0xaa64
+-	IMAGE_FILE_MACHINE_EBC       = 0xebc
+-	IMAGE_FILE_MACHINE_I386      = 0x14c
+-	IMAGE_FILE_MACHINE_IA64      = 0x200
+-	IMAGE_FILE_MACHINE_M32R      = 0x9041
+-	IMAGE_FILE_MACHINE_MIPS16    = 0x266
+-	IMAGE_FILE_MACHINE_MIPSFPU   = 0x366
+-	IMAGE_FILE_MACHINE_MIPSFPU16 = 0x466
+-	IMAGE_FILE_MACHINE_POWERPC   = 0x1f0
+-	IMAGE_FILE_MACHINE_POWERPCFP = 0x1f1
+-	IMAGE_FILE_MACHINE_R4000     = 0x166
+-	IMAGE_FILE_MACHINE_SH3       = 0x1a2
+-	IMAGE_FILE_MACHINE_SH3DSP    = 0x1a3
+-	IMAGE_FILE_MACHINE_SH4       = 0x1a6
+-	IMAGE_FILE_MACHINE_SH5       = 0x1a8
+-	IMAGE_FILE_MACHINE_THUMB     = 0x1c2
+-	IMAGE_FILE_MACHINE_WCEMIPSV2 = 0x169
++	IMAGE_FILE_MACHINE_UNKNOWN     = 0x0
++	IMAGE_FILE_MACHINE_AM33        = 0x1d3
++	IMAGE_FILE_MACHINE_AMD64       = 0x8664
++	IMAGE_FILE_MACHINE_ARM         = 0x1c0
++	IMAGE_FILE_MACHINE_ARMNT       = 0x1c4
++	IMAGE_FILE_MACHINE_ARM64       = 0xaa64
++	IMAGE_FILE_MACHINE_EBC         = 0xebc
++	IMAGE_FILE_MACHINE_I386        = 0x14c
++	IMAGE_FILE_MACHINE_IA64        = 0x200
++	IMAGE_FILE_MACHINE_LOONGARCH32 = 0x6232
++	IMAGE_FILE_MACHINE_LOONGARCH64 = 0x6264
++	IMAGE_FILE_MACHINE_M32R        = 0x9041
++	IMAGE_FILE_MACHINE_MIPS16      = 0x266
++	IMAGE_FILE_MACHINE_MIPSFPU     = 0x366
++	IMAGE_FILE_MACHINE_MIPSFPU16   = 0x466
++	IMAGE_FILE_MACHINE_POWERPC     = 0x1f0
++	IMAGE_FILE_MACHINE_POWERPCFP   = 0x1f1
++	IMAGE_FILE_MACHINE_R4000       = 0x166
++	IMAGE_FILE_MACHINE_SH3         = 0x1a2
++	IMAGE_FILE_MACHINE_SH3DSP      = 0x1a3
++	IMAGE_FILE_MACHINE_SH4         = 0x1a6
++	IMAGE_FILE_MACHINE_SH5         = 0x1a8
++	IMAGE_FILE_MACHINE_THUMB       = 0x1c2
++	IMAGE_FILE_MACHINE_WCEMIPSV2   = 0x169
+ )
+ 
+ // IMAGE_DIRECTORY_ENTRY constants
+-- 
+2.38.0
+

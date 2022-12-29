@@ -1,0 +1,37 @@
+From ddbb53bb835d86e486a357ea0d4a5e901dab269f Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Thu, 25 Nov 2021 11:41:03 +0800
+Subject: [PATCH 11/82] cmd/compile/internal/ssa: add support on loong64 for
+ schedule phase
+
+Change-Id: Id533912c62d8c4e2aa3c124561772b543d685d7d
+---
+ src/cmd/compile/internal/ssa/schedule.go | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/compile/internal/ssa/schedule.go b/src/cmd/compile/internal/ssa/schedule.go
+index 4e3e5e75e3..e6f6cf2550 100644
+--- a/src/cmd/compile/internal/ssa/schedule.go
++++ b/src/cmd/compile/internal/ssa/schedule.go
+@@ -78,7 +78,7 @@ func (h ValHeap) Less(i, j int) bool {
+ func (op Op) isLoweredGetClosurePtr() bool {
+ 	switch op {
+ 	case OpAMD64LoweredGetClosurePtr, OpPPC64LoweredGetClosurePtr, OpARMLoweredGetClosurePtr, OpARM64LoweredGetClosurePtr,
+-		Op386LoweredGetClosurePtr, OpMIPS64LoweredGetClosurePtr, OpS390XLoweredGetClosurePtr, OpMIPSLoweredGetClosurePtr,
++		Op386LoweredGetClosurePtr, OpMIPS64LoweredGetClosurePtr, OpLOONG64LoweredGetClosurePtr, OpS390XLoweredGetClosurePtr, OpMIPSLoweredGetClosurePtr,
+ 		OpRISCV64LoweredGetClosurePtr, OpWasmLoweredGetClosurePtr:
+ 		return true
+ 	}
+@@ -128,7 +128,8 @@ func schedule(f *Func) {
+ 				v.Op == OpARMLoweredNilCheck || v.Op == OpARM64LoweredNilCheck ||
+ 				v.Op == Op386LoweredNilCheck || v.Op == OpMIPS64LoweredNilCheck ||
+ 				v.Op == OpS390XLoweredNilCheck || v.Op == OpMIPSLoweredNilCheck ||
+-				v.Op == OpRISCV64LoweredNilCheck || v.Op == OpWasmLoweredNilCheck:
++				v.Op == OpRISCV64LoweredNilCheck || v.Op == OpWasmLoweredNilCheck ||
++				v.Op == OpLOONG64LoweredNilCheck:
+ 				// Nil checks must come before loads from the same address.
+ 				score[v.ID] = ScoreNilCheck
+ 			case v.Op == OpPhi:
+-- 
+2.38.0
+

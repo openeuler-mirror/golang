@@ -12,19 +12,19 @@
 %define __find_requires %{nil}
 
 %bcond_with bootstrap
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %bcond_without ignore_tests
 %else
 %bcond_with ignore_tests
 %endif
 
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %global external_linker 1
 %else
 %global external_linker 0
 %endif
 
-%ifarch x86_64 aarch64 riscv64
+%ifarch x86_64 aarch64 riscv64 loongarch64
 %global cgo_enabled 1
 %else
 %global cgo_enabled 0
@@ -59,15 +59,23 @@
 %ifarch riscv64
 %global gohostarch riscv64
 %endif
+%ifarch loongarch64
+%global gohostarch loong64
+%endif
 
 
 Name:           golang
 Version:        1.17.3
-Release:        12
+Release:        13
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
 Source0:        https://dl.google.com/go/go1.17.3.src.tar.gz
+%ifarch loongarch64
+Source1:        loongarch64.tar.gz
+Source2:        loongarch64.conf
+Source3:        apply-patches
+%endif
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -218,6 +226,13 @@ end
 
 %prep
 %autosetup -n go -p1
+
+%ifarch loongarch64
+cp %{SOURCE1} .
+cp %{SOURCE2} .
+cp %{SOURCE3} .
+sh ./apply-patches
+%endif
 
 %build
 uname -a
@@ -411,6 +426,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Dec 15 2022 chenguoqi <chenguoqi@loongson.cn> - 1.17.3-13
+- Add loongarch64 base support
+
 * Fri Oct 11 2022 hanchao <hanchao47@huawei.com> - 1.17.3-12
 - Type:CVE
 - CVE:CVE-2022-41716

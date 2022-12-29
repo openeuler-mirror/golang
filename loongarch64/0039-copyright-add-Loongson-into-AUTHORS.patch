@@ -1,0 +1,25 @@
+From 400cb127f9017e9336b10c4a0149aea88ef2b750 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 14:57:00 +0800
+Subject: [PATCH 39/82] copyright: add Loongson into AUTHORS
+
+Change-Id: I23fb430f1f6e8a587f13e2f020721cbd3a45d4ed
+---
+ AUTHORS | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/AUTHORS b/AUTHORS
+index 95d3158d20..c0bad0c247 100644
+--- a/AUTHORS
++++ b/AUTHORS
+@@ -824,6 +824,7 @@ Liberty Fund Inc
+ Linaro Limited
+ Lion Yang <lion@aosc.xyz>
+ Lloyd Dewolf <foolswisdom@gmail.com>
++Loongson Inc.
+ Lorenzo Masini <rugginoso@develer.com>
+ Lorenzo Stoakes <lstoakes@gmail.com>
+ Luan Santos <cfcluan@gmail.com>
+-- 
+2.38.0
+

@@ -1,0 +1,48 @@
+From 88308741850cb8d2deaf74b825439aef7e8bd101 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Mon, 23 May 2022 08:58:51 +0800
+Subject: [PATCH 46/82] runtime: add missing {TOPFRAME,NOFRAME} flag for
+ linux/loong64
+
+Co-authored-by: limeidan <limeidan@loongson.cn>
+Change-Id: I0011a10f831e6c2b0da96265682212b0747f0e2a
+---
+ src/runtime/asm_loong64.s | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/src/runtime/asm_loong64.s b/src/runtime/asm_loong64.s
+index 9541f6e045..85df3ed3c9 100644
+--- a/src/runtime/asm_loong64.s
++++ b/src/runtime/asm_loong64.s
+@@ -11,7 +11,7 @@
+ 
+ #define	REGCTXT	R29
+ 
+-TEXT runtime·rt0_go(SB),NOSPLIT,$0
++TEXT runtime·rt0_go(SB),NOSPLIT|TOPFRAME,$0
+ 	// R3 = stack; R4 = argc; R5 = argv
+ 
+ 	ADDV	$-24, R3
+@@ -127,12 +127,16 @@ TEXT runtime·gosave(SB), NOSPLIT|NOFRAME, $0-8
+ 
+ // void gogo(Gobuf*)
+ // restore state from Gobuf; longjmp
+-TEXT runtime·gogo(SB), NOSPLIT, $16-8
++TEXT runtime·gogo(SB), NOSPLIT|NOFRAME, $0-8
+ 	MOVV	buf+0(FP), R4
+-	MOVV	gobuf_g(R4), g	// make sure g is not nil
++	MOVV	gobuf_g(R4), R5
++	MOVV	0(R5), R0	// make sure g != nil
++	JMP	gogo<>(SB)
++
++TEXT gogo<>(SB), NOSPLIT|NOFRAME, $0
++	MOVV	R5, g
+ 	JAL	runtime·save_g(SB)
+ 
+-	MOVV	0(g), R5
+ 	MOVV	gobuf_sp(R4), R3
+ 	MOVV	gobuf_lr(R4), R1
+ 	MOVV	gobuf_ret(R4), R19
+-- 
+2.38.0
+

@@ -1,0 +1,297 @@
+From eae19e1c6d1fdeb5113cb651fefc8de8723869e7 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Sun, 15 Aug 2021 16:31:52 +0800
+Subject: [PATCH 34/82] internal/bytealg: support basic byte operation on
+ loong64
+
+Change-Id: I4ac6d38dc632abfa0b698325ca0ae349c0d7ecd3
+---
+ src/internal/bytealg/compare_generic.go   |  4 +-
+ src/internal/bytealg/compare_loong64.s    | 88 +++++++++++++++++++++++
+ src/internal/bytealg/compare_native.go    |  4 +-
+ src/internal/bytealg/equal_loong64.s      | 54 ++++++++++++++
+ src/internal/bytealg/indexbyte_generic.go |  4 +-
+ src/internal/bytealg/indexbyte_loong64.s  | 54 ++++++++++++++
+ src/internal/bytealg/indexbyte_native.go  |  4 +-
+ 7 files changed, 204 insertions(+), 8 deletions(-)
+ create mode 100644 src/internal/bytealg/compare_loong64.s
+ create mode 100644 src/internal/bytealg/equal_loong64.s
+ create mode 100644 src/internal/bytealg/indexbyte_loong64.s
+
+diff --git a/src/internal/bytealg/compare_generic.go b/src/internal/bytealg/compare_generic.go
+index 0690d0cf31..70428ba8e2 100644
+--- a/src/internal/bytealg/compare_generic.go
++++ b/src/internal/bytealg/compare_generic.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build !386 && !amd64 && !s390x && !arm && !arm64 && !ppc64 && !ppc64le && !mips && !mipsle && !wasm && !mips64 && !mips64le
+-// +build !386,!amd64,!s390x,!arm,!arm64,!ppc64,!ppc64le,!mips,!mipsle,!wasm,!mips64,!mips64le
++//go:build !386 && !amd64 && !s390x && !arm && !arm64 && !ppc64 && !ppc64le && !mips && !mipsle && !wasm && !mips64 && !mips64le && !loong64
++// +build !386,!amd64,!s390x,!arm,!arm64,!ppc64,!ppc64le,!mips,!mipsle,!wasm,!mips64,!mips64le,!loong64
+ 
+ package bytealg
+ 
+diff --git a/src/internal/bytealg/compare_loong64.s b/src/internal/bytealg/compare_loong64.s
+new file mode 100644
+index 0000000000..853bab3898
+--- /dev/null
++++ b/src/internal/bytealg/compare_loong64.s
+@@ -0,0 +1,88 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "go_asm.h"
++#include "textflag.h"
++
++TEXT ·Compare(SB),NOSPLIT,$0-56
++	MOVV	a_base+0(FP), R6
++	MOVV	b_base+24(FP), R7
++	MOVV	a_len+8(FP), R4
++	MOVV	b_len+32(FP), R5
++	MOVV	$ret+48(FP), R13
++	JMP	cmpbody<>(SB)
++
++TEXT runtime·cmpstring(SB),NOSPLIT,$0-40
++	MOVV	a_base+0(FP), R6
++	MOVV	b_base+16(FP), R7
++	MOVV	a_len+8(FP), R4
++	MOVV	b_len+24(FP), R5
++	MOVV	$ret+32(FP), R13
++	JMP	cmpbody<>(SB)
++
++// On entry:
++// R4 length of a
++// R5 length of b
++// R6 points to the start of a
++// R7 points to the start of b
++// R13 points to the return value (-1/0/1)
++TEXT cmpbody<>(SB),NOSPLIT|NOFRAME,$0
++	BEQ	R6, R7, samebytes // same start of a and b
++
++	SGTU	R4, R5, R9
++	BNE	R0, R9, r2_lt_r1
++	MOVV	R4, R14
++	JMP	entry
++r2_lt_r1:
++	MOVV	R5, R14	// R14 is min(R4, R5)
++entry:
++	ADDV	R6, R14, R12	// R6 start of a, R14 end of a
++	BEQ	R6, R12, samebytes // length is 0
++
++	SRLV	$4, R14		// R14 is number of chunks
++	BEQ	R0, R14, byte_loop
++
++	// make sure both a and b are aligned.
++	OR	R6, R7, R15
++	AND	$7, R15
++	BNE	R0, R15, byte_loop
++
++chunk16_loop:
++	BEQ	R0, R14, byte_loop
++	MOVV	(R6), R8
++	MOVV	(R7), R9
++	BNE	R8, R9, byte_loop
++	MOVV	8(R6), R16
++	MOVV	8(R7), R17
++	ADDV	$16, R6
++	ADDV	$16, R7
++	SUBVU	$1, R14
++	BEQ	R16, R17, chunk16_loop
++	SUBV	$8, R6
++	SUBV	$8, R7
++
++byte_loop:
++	BEQ	R6, R12, samebytes
++	MOVBU	(R6), R8
++	ADDVU	$1, R6
++	MOVBU	(R7), R9
++	ADDVU	$1, R7
++	BEQ	R8, R9, byte_loop
++
++byte_cmp:
++	SGTU	R8, R9, R12 // R12 = 1 if (R8 > R9)
++	BNE	R0, R12, ret
++	MOVV	$-1, R12
++	JMP	ret
++
++samebytes:
++	SGTU	R4, R5, R8
++	SGTU	R5, R4, R9
++	SUBV	R9, R8, R12
++
++ret:
++	MOVV	R12, (R13)
++	RET
+diff --git a/src/internal/bytealg/compare_native.go b/src/internal/bytealg/compare_native.go
+index baa188ff7a..c473cca823 100644
+--- a/src/internal/bytealg/compare_native.go
++++ b/src/internal/bytealg/compare_native.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build 386 || amd64 || s390x || arm || arm64 || ppc64 || ppc64le || mips || mipsle || wasm || mips64 || mips64le
+-// +build 386 amd64 s390x arm arm64 ppc64 ppc64le mips mipsle wasm mips64 mips64le
++//go:build 386 || amd64 || s390x || arm || arm64 || ppc64 || ppc64le || mips || mipsle || wasm || mips64 || mips64le || loong64
++// +build 386 amd64 s390x arm arm64 ppc64 ppc64le mips mipsle wasm mips64 mips64le loong64
+ 
+ package bytealg
+ 
+diff --git a/src/internal/bytealg/equal_loong64.s b/src/internal/bytealg/equal_loong64.s
+new file mode 100644
+index 0000000000..a954407e35
+--- /dev/null
++++ b/src/internal/bytealg/equal_loong64.s
+@@ -0,0 +1,54 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "go_asm.h"
++#include "textflag.h"
++
++#define	REGCTXT	R29
++
++// memequal(a, b unsafe.Pointer, size uintptr) bool
++TEXT runtime·memequal(SB),NOSPLIT|NOFRAME,$0-25
++	MOVV	a+0(FP), R4
++	MOVV	b+8(FP), R5
++	BEQ	R4, R5, eq
++	MOVV	size+16(FP), R6
++	ADDV	R4, R6, R7
++loop:
++	BNE	R4, R7, test
++	MOVV	$1, R4
++	MOVB	R4, ret+24(FP)
++	RET
++test:
++	MOVBU	(R4), R9
++	ADDV	$1, R4
++	MOVBU	(R5), R10
++	ADDV	$1, R5
++	BEQ	R9, R10, loop
++
++	MOVB	R0, ret+24(FP)
++	RET
++eq:
++	MOVV	$1, R4
++	MOVB	R4, ret+24(FP)
++	RET
++
++// memequal_varlen(a, b unsafe.Pointer) bool
++TEXT runtime·memequal_varlen(SB),NOSPLIT,$40-17
++	MOVV	a+0(FP), R4
++	MOVV	b+8(FP), R5
++	BEQ	R4, R5, eq
++	MOVV	8(REGCTXT), R6    // compiler stores size at offset 8 in the closure
++	MOVV	R4, 8(R3)
++	MOVV	R5, 16(R3)
++	MOVV	R6, 24(R3)
++	JAL	runtime·memequal(SB)
++	MOVBU	32(R3), R4
++	MOVB	R4, ret+16(FP)
++	RET
++eq:
++	MOVV	$1, R4
++	MOVB	R4, ret+16(FP)
++	RET
+diff --git a/src/internal/bytealg/indexbyte_generic.go b/src/internal/bytealg/indexbyte_generic.go
+index 6ef639fafd..95123fda02 100644
+--- a/src/internal/bytealg/indexbyte_generic.go
++++ b/src/internal/bytealg/indexbyte_generic.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build !386 && !amd64 && !s390x && !arm && !arm64 && !ppc64 && !ppc64le && !mips && !mipsle && !mips64 && !mips64le && !riscv64 && !wasm
+-// +build !386,!amd64,!s390x,!arm,!arm64,!ppc64,!ppc64le,!mips,!mipsle,!mips64,!mips64le,!riscv64,!wasm
++//go:build !386 && !amd64 && !s390x && !arm && !arm64 && !ppc64 && !ppc64le && !mips && !mipsle && !mips64 && !mips64le && !riscv64 && !wasm && !loong64
++// +build !386,!amd64,!s390x,!arm,!arm64,!ppc64,!ppc64le,!mips,!mipsle,!mips64,!mips64le,!riscv64,!wasm,!loong64
+ 
+ package bytealg
+ 
+diff --git a/src/internal/bytealg/indexbyte_loong64.s b/src/internal/bytealg/indexbyte_loong64.s
+new file mode 100644
+index 0000000000..a585cdbd86
+--- /dev/null
++++ b/src/internal/bytealg/indexbyte_loong64.s
+@@ -0,0 +1,54 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// +build loong64
++
++#include "go_asm.h"
++#include "textflag.h"
++
++TEXT ·IndexByte(SB),NOSPLIT,$0-40
++	MOVV	b_base+0(FP), R4
++	MOVV	b_len+8(FP), R5
++	MOVBU	c+24(FP), R6	// byte to find
++	MOVV	R4, R7		// store base for later
++	ADDV	R4, R5		// end
++	ADDV	$-1, R4
++
++loop:
++	ADDV	$1, R4
++	BEQ	R4, R5, notfound
++	MOVBU	(R4), R8
++	BNE	R6, R8, loop
++
++	SUBV	R7, R4		// remove base
++	MOVV	R4, ret+32(FP)
++	RET
++
++notfound:
++	MOVV	$-1, R4
++	MOVV	R4, ret+32(FP)
++	RET
++
++TEXT ·IndexByteString(SB),NOSPLIT,$0-32
++	MOVV	s_base+0(FP), R4
++	MOVV	s_len+8(FP), R5
++	MOVBU	c+16(FP), R6	// byte to find
++	MOVV	R4, R7		// store base for later
++	ADDV	R4, R5		// end
++	ADDV	$-1, R4
++
++loop:
++	ADDV	$1, R4
++	BEQ	R4, R5, notfound
++	MOVBU	(R4), R8
++	BNE	R6, R8, loop
++
++	SUBV	R7, R4		// remove base
++	MOVV	R4, ret+24(FP)
++	RET
++
++notfound:
++	MOVV	$-1, R4
++	MOVV	R4, ret+24(FP)
++	RET
+diff --git a/src/internal/bytealg/indexbyte_native.go b/src/internal/bytealg/indexbyte_native.go
+index 965f38fe52..6775b3e1d7 100644
+--- a/src/internal/bytealg/indexbyte_native.go
++++ b/src/internal/bytealg/indexbyte_native.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build 386 || amd64 || s390x || arm || arm64 || ppc64 || ppc64le || mips || mipsle || mips64 || mips64le || riscv64 || wasm
+-// +build 386 amd64 s390x arm arm64 ppc64 ppc64le mips mipsle mips64 mips64le riscv64 wasm
++//go:build 386 || amd64 || s390x || arm || arm64 || ppc64 || ppc64le || mips || mipsle || mips64 || mips64le || riscv64 || wasm || loong64
++// +build 386 amd64 s390x arm arm64 ppc64 ppc64le mips mipsle mips64 mips64le riscv64 wasm loong64
+ 
+ package bytealg
+ 
+-- 
+2.38.0
+

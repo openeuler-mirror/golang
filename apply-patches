@@ -1,0 +1,13 @@
+#!/bin/bash
+
+set -ex
+
+if [ ! -d loongarch64 ]; then
+	tar -xf loongarch64.tar.gz
+fi
+
+for p in $(cat loongarch64.conf); do
+	patch -p1 -s -i loongarch64/$p
+done
+
+rm -rf $0 loongarch64 loongarch64.tar.gz loongarch64.conf

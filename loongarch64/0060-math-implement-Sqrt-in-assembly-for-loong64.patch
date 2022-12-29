@@ -1,0 +1,74 @@
+From 783382a155991cb8608d69467c26c1f6fa6fea30 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Wed, 3 Aug 2022 14:54:11 +0800
+Subject: [PATCH 60/82] math: implement Sqrt in assembly for loong64
+
+Benchmark:
+goos: linux
+goarch: loong64
+                             old time/op  new time/op  delta
+BenchmarkSqrtIndirect           81.6ns      21.42ns    -73.75%
+BenchmarkSqrtLatency           4.004ns      4.004ns      0.00%
+BenchmarkSqrtIndirectLatency   59.74ns      10.35ns    -82.67%
+BenchmarkSqrtGoLatency         64.46ns      64.47ns      0.02%
+BenchmarkSqrtPrime              1851ns       1852ns      0.05%
+
+Change-Id: Icc29b90ea3a2eaff67bc4fbea6d0931f929179c5
+---
+ src/math/sqrt_asm.go    |  4 ++--
+ src/math/sqrt_loong64.s | 12 ++++++++++++
+ src/math/sqrt_noasm.go  |  4 ++--
+ 3 files changed, 16 insertions(+), 4 deletions(-)
+ create mode 100644 src/math/sqrt_loong64.s
+
+diff --git a/src/math/sqrt_asm.go b/src/math/sqrt_asm.go
+index b9102568ed..fc5aa7752a 100644
+--- a/src/math/sqrt_asm.go
++++ b/src/math/sqrt_asm.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build 386 || amd64 || arm64 || arm || mips || mipsle || ppc64 || ppc64le || s390x || riscv64 || wasm
+-// +build 386 amd64 arm64 arm mips mipsle ppc64 ppc64le s390x riscv64 wasm
++//go:build 386 || amd64 || arm64 || arm || loong64 || mips || mipsle || ppc64 || ppc64le || s390x || riscv64 || wasm
++// +build 386 amd64 arm64 arm loong64 mips mipsle ppc64 ppc64le s390x riscv64 wasm
+ 
+ package math
+ 
+diff --git a/src/math/sqrt_loong64.s b/src/math/sqrt_loong64.s
+new file mode 100644
+index 0000000000..e81e734caf
+--- /dev/null
++++ b/src/math/sqrt_loong64.s
+@@ -0,0 +1,12 @@
++// Copyright 2022 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++#include "textflag.h"
++
++// func archSqrt(x float64) float64
++TEXT ·archSqrt(SB),NOSPLIT,$0
++	MOVD	x+0(FP), F0
++	FSQRTD	F0, F0
++	MOVD	F0, ret+8(FP)
++	RET
+diff --git a/src/math/sqrt_noasm.go b/src/math/sqrt_noasm.go
+index 7b546b7e8c..6b3de9a953 100644
+--- a/src/math/sqrt_noasm.go
++++ b/src/math/sqrt_noasm.go
+@@ -2,8 +2,8 @@
+ // Use of this source code is governed by a BSD-style
+ // license that can be found in the LICENSE file.
+ 
+-//go:build !386 && !amd64 && !arm64 && !arm && !mips && !mipsle && !ppc64 && !ppc64le && !s390x && !riscv64 && !wasm
+-// +build !386,!amd64,!arm64,!arm,!mips,!mipsle,!ppc64,!ppc64le,!s390x,!riscv64,!wasm
++//go:build !386 && !amd64 && !arm64 && !arm && !loong64 && !mips && !mipsle && !ppc64 && !ppc64le && !s390x && !riscv64 && !wasm
++// +build !386,!amd64,!arm64,!arm,!loong64,!mips,!mipsle,!ppc64,!ppc64le,!s390x,!riscv64,!wasm
+ 
+ package math
+ 
+-- 
+2.38.0
+

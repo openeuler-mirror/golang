@@ -1,0 +1,57 @@
+From cbe3dc0b142b5d962d20efe9742fd1e50feaa407 Mon Sep 17 00:00:00 2001
+From: Guoqi Chen <chenguoqi@loongson.cn>
+Date: Fri, 4 Nov 2022 11:07:58 +0800
+Subject: [PATCH 82/82] cmd/compile,cmd/dist,cmd/go: enable pie buildmode for
+ linux/loong64
+
+Enable pie as a buildmode for linux/loong64, along with associated tests.
+
+Change-Id: I931139d98c446ad4909b42426ee8a223d2e8dfd7
+---
+ src/cmd/dist/test.go              | 2 +-
+ src/cmd/go/go_test.go             | 2 +-
+ src/cmd/internal/sys/supported.go | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/src/cmd/dist/test.go b/src/cmd/dist/test.go
+index 1d68b8a70d..070c0268ea 100644
+--- a/src/cmd/dist/test.go
++++ b/src/cmd/dist/test.go
+@@ -1082,7 +1082,7 @@ func (t *tester) supportedBuildmode(mode string) bool {
+ 	case "pie":
+ 		switch pair {
+ 		case "aix/ppc64",
+-			"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-ppc64le", "linux-riscv64", "linux-s390x",
++			"linux-386", "linux-amd64", "linux-arm", "linux-arm64", "linux-loong64", "linux-ppc64le", "linux-riscv64", "linux-s390x",
+ 			"android-amd64", "android-arm", "android-arm64", "android-386":
+ 			return true
+ 		case "darwin-amd64", "darwin-arm64":
+diff --git a/src/cmd/go/go_test.go b/src/cmd/go/go_test.go
+index 6ce276537b..49ca469751 100644
+--- a/src/cmd/go/go_test.go
++++ b/src/cmd/go/go_test.go
+@@ -2061,7 +2061,7 @@ func TestBuildmodePIE(t *testing.T) {
+ 
+ 	platform := fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH)
+ 	switch platform {
+-	case "linux/386", "linux/amd64", "linux/arm", "linux/arm64", "linux/ppc64le", "linux/riscv64", "linux/s390x",
++	case "linux/386", "linux/amd64", "linux/arm", "linux/arm64", "linux/loong64", "linux/ppc64le", "linux/riscv64", "linux/s390x",
+ 		"android/amd64", "android/arm", "android/arm64", "android/386",
+ 		"freebsd/amd64",
+ 		"windows/386", "windows/amd64", "windows/arm":
+diff --git a/src/cmd/internal/sys/supported.go b/src/cmd/internal/sys/supported.go
+index 4c7b8062d8..0626ce27eb 100644
+--- a/src/cmd/internal/sys/supported.go
++++ b/src/cmd/internal/sys/supported.go
+@@ -87,7 +87,7 @@ func BuildModeSupported(compiler, buildmode, goos, goarch string) bool {
+ 
+ 	case "pie":
+ 		switch platform {
+-		case "linux/386", "linux/amd64", "linux/arm", "linux/arm64", "linux/ppc64le", "linux/riscv64", "linux/s390x",
++		case "linux/386", "linux/amd64", "linux/arm", "linux/arm64", "linux/loong64", "linux/ppc64le", "linux/riscv64", "linux/s390x",
+ 			"android/amd64", "android/arm", "android/arm64", "android/386",
+ 			"freebsd/amd64",
+ 			"darwin/amd64", "darwin/arm64",
+-- 
+2.38.0
+
