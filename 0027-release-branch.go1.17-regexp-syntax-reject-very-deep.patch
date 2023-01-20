@@ -1,0 +1,119 @@
+From 94fbe72e320175d2655c04bee76974941edb2491 Mon Sep 17 00:00:00 2001
+From: Russ Cox <rsc@golang.org>
+Date: Wed, 2 Feb 2022 16:41:32 -0500
+Subject: [PATCH] regexp/syntax: reject very deeply nested regexps in Parse
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The regexp code assumes it can recurse over the structure of
+a regexp safely. Go's growable stacks make that reasonable
+for all plausible regexps, but implausible ones can reach the
+“infinite recursion?” stack limit.
+
+This CL limits the depth of any parsed regexp to 1000.
+That is, the depth of the parse tree is required to be ≤ 1000.
+Regexps that require deeper parse trees will return ErrInternalError.
+A future CL will change the error to ErrInvalidDepth,
+but using ErrInternalError for now avoids introducing new API
+in point releases when this is backported.
+
+Fixes #51112.
+Fixes #51118.
+
+Change-Id: I97d2cd82195946eb43a4ea8561f5b95f91fb14c5
+Reviewed-on: https://go-review.googlesource.com/c/go/+/384616
+Trust: Russ Cox <rsc@golang.org>
+Run-TryBot: Russ Cox <rsc@golang.org>
+Reviewed-by: Ian Lance Taylor <iant@golang.org>
+Reviewed-on: https://go-review.googlesource.com/c/go/+/384854
+TryBot-Result: Gopher Robot <gobot@golang.org>
+
+Conflict: NA
+Reference: https://go-review.googlesource.com/c/go/+/384854/
+---
+ src/regexp/syntax/parse.go      | 19 ++++++-------------
+ src/regexp/syntax/parse_test.go |  5 +++++
+ 2 files changed, 11 insertions(+), 13 deletions(-)
+
+diff --git a/src/regexp/syntax/parse.go b/src/regexp/syntax/parse.go
+index 67254d6..3792960 100644
+--- a/src/regexp/syntax/parse.go
++++ b/src/regexp/syntax/parse.go
+@@ -43,7 +43,6 @@ const (
+ 	ErrMissingRepeatArgument ErrorCode = "missing argument to repetition operator"
+ 	ErrTrailingBackslash     ErrorCode = "trailing backslash at end of expression"
+ 	ErrUnexpectedParen       ErrorCode = "unexpected )"
+-	ErrNestingDepth          ErrorCode = "expression nests too deeply"
+ )
+ 
+ func (e ErrorCode) String() string {
+@@ -266,7 +265,7 @@ func (p *parser) checkHeight(re *Regexp) {
+ 		}
+ 	}
+ 	if p.calcHeight(re, true) > maxHeight {
+-		panic(ErrNestingDepth)
++		panic(ErrInternalError)
+ 	}
+ }
+ 
+@@ -578,16 +577,12 @@ func (p *parser) collapse(subs []*Regexp, op Op) *Regexp {
+ // frees (passes to p.reuse) any removed *Regexps.
+ //
+ // For example,
+-//
+-//	ABC|ABD|AEF|BCX|BCY
+-//
++//     ABC|ABD|AEF|BCX|BCY
+ // simplifies by literal prefix extraction to
+-//
+-//	A(B(C|D)|EF)|BC(X|Y)
+-//
++//     A(B(C|D)|EF)|BC(X|Y)
+ // which simplifies by character class introduction to
++//     A(B[CD]|EF)|BC[XY]
+ //
+-//	A(B[CD]|EF)|BC[XY]
+ func (p *parser) factor(sub []*Regexp) []*Regexp {
+ 	if len(sub) < 2 {
+ 		return sub
+@@ -897,10 +892,8 @@ func parse(s string, flags Flags) (_ *Regexp, err error) {
+ 			panic(r)
+ 		case nil:
+ 			// ok
+-		case ErrInternalError: // too big
++		case ErrInternalError:
+ 			err = &Error{Code: ErrInternalError, Expr: s}
+-		case ErrNestingDepth:
+-			err = &Error{Code: ErrNestingDepth, Expr: s}
+ 		}
+ 	}()
+ 
+@@ -1943,7 +1936,7 @@ func appendClass(r []rune, x []rune) []rune {
+ 	return r
+ }
+ 
+-// appendFoldedClass returns the result of appending the case folding of the class x to the class r.
++// appendFolded returns the result of appending the case folding of the class x to the class r.
+ func appendFoldedClass(r []rune, x []rune) []rune {
+ 	for i := 0; i < len(x); i += 2 {
+ 		r = appendFoldedRange(r, x[i], x[i+1])
+diff --git a/src/regexp/syntax/parse_test.go b/src/regexp/syntax/parse_test.go
+index 6044da6..67e3c56 100644
+--- a/src/regexp/syntax/parse_test.go
++++ b/src/regexp/syntax/parse_test.go
+@@ -207,6 +207,11 @@ var parseTests = []parseTest{
+ 	// Valid repetitions.
+ 	{`((((((((((x{2}){2}){2}){2}){2}){2}){2}){2}){2}))`, ``},
+ 	{`((((((((((x{1}){2}){2}){2}){2}){2}){2}){2}){2}){2})`, ``},
++
++	// Valid nesting.
++	{strings.Repeat("(", 999) + strings.Repeat(")", 999), ``},
++	{strings.Repeat("(?:", 999) + strings.Repeat(")*", 999), ``},
++	{"(" + strings.Repeat("|", 12345) + ")", ``}, // not nested at all
+ }
+ 
+ const testFlags = MatchNL | PerlX | UnicodeGroups
+-- 
+2.33.0
+
