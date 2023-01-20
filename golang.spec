@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        13
+Release:        14
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -181,6 +181,12 @@ Patch6020:	0020-release-branch.go1.18-regexp-limit-size-of-parsed-re.patch
 Patch6021:	0021-release-branch.go1.18-net-http-httputil-avoid-query-.patch
 Patch6022:	0022-release-branch.go1.18-archive-tar-limit-size-of-head.patch
 Patch6023:	0023-syscall-os-exec-reject-environment-variables-contain.patch
+Patch6024:	0024-release-branch.go1.17-crypto-elliptic-make-IsOnCurve.patch
+Patch6025:	0025-release-branch.go1.17-cmd-go-internal-modfetch-do-no.patch
+Patch6026:	0026-release-branch.go1.17-regexp-syntax-reject-very-deep.patch
+Patch6027:	0027-release-branch.go1.17-net-http-update-bundled-golang.patch
+Patch6028:	0028-release-branch.go1.17-math-big-prevent-overflow-in-R.patch
+Patch6029:	0029-release-branch.go1.18-net-http-update-bundled-golang.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -426,6 +432,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Jan 20 2023 hanchao <hanchao47@huawei.com> - 1.17.3-14
+- Type:CVE
+- CVE:CVE-2022-23806,CVE-2022-23773,CVE-2022-24921,CVE-2021-44716,CVE-2022-23772,CVE-2022-41717
+- SUG:NA
+- DESC: fix CVE-2022-23806,CVE-2022-23773,CVE-2022-24921,CVE-2021-44716,CVE-2022-23772,CVE-2022-41717
+
 * Thu Dec 15 2022 chenguoqi <chenguoqi@loongson.cn> - 1.17.3-13
 - Add loongarch64 base support
 
