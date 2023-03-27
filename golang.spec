@@ -63,7 +63,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        14
+Release:        15
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -180,6 +180,9 @@ Patch6027:	0027-release-branch.go1.17-regexp-syntax-reject-very-deep.patch
 Patch6028:	0028-release-branch.go1.17-net-http-update-bundled-golang.patch
 Patch6029:	0029-release-branch.go1.17-math-big-prevent-overflow-in-R.patch
 Patch6030:	0030-release-branch.go1.18-net-http-update-bundled-golang.patch
+Patch6031:	0031-all-update-vendored-golang.org-x-net.patch
+Patch6032:	0032-crypto-tls-replace-all-usages-of-BytesOrPanic.patch
+Patch6033:	0033-mime-multipart-limit-memory-inode-consumption-of-Rea.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -418,6 +421,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Tue Mar 21 2023 hanchao <hanchao47@huawei.com> - 1.17.3-15
+- Type:CVE
+- CVE:CVE-2022-41723,CVE-2022-41724,CVE-2022-41725
+- SUG:NA
+- DESC: fix CVE-2022-41723,CVE-2022-41724,CVE-2022-41725
+
 * Fri Jan 20 2023 hanchao <hanchao47@huawei.com> - 1.17.3-14
 - Type:CVE
 - CVE:CVE-2022-23806,CVE-2022-23773,CVE-2022-24921,CVE-2021-44716,CVE-2022-23772,CVE-2022-41717
