@@ -1,8 +1,7 @@
-From 9c818de1bf9577c6a71b849739858458073b9cb8 Mon Sep 17 00:00:00 2001
+From 8e0482f4157c5020719c039ab1ba06f74d180768 Mon Sep 17 00:00:00 2001
 From: Damien Neil <dneil@google.com>
 Date: Wed, 25 Jan 2023 09:27:01 -0800
-Subject: [PATCH] [release-branch.go1.19] mime/multipart: limit memory/inode
- consumption of ReadForm
+Subject: [PATCH] mime/multipart: limit memory/inode consumption of ReadForm
 
 Reader.ReadForm is documented as storing "up to maxMemory bytes + 10MB"
 in memory. Parsed forms can consume substantially more memory than
@@ -57,44 +56,47 @@ Auto-Submit: Michael Pratt <mpratt@google.com>
 Reference:https://go-review.googlesource.com/c/go/+/468116
 Conflict:NA
 ---
- src/mime/multipart/formdata.go       | 159 +++++++++++++++++++++++----
- src/mime/multipart/formdata_test.go  | 140 ++++++++++++++++++++++-
- src/mime/multipart/multipart.go      |  29 +++--
+ src/internal/godebug/godebug.go      |  34 +++++++
+ src/internal/godebug/godebug_test.go |  34 +++++++
+ src/mime/multipart/formdata.go       | 134 ++++++++++++++++++++-----
+ src/mime/multipart/formdata_test.go  | 140 ++++++++++++++++++++++++++-
+ src/mime/multipart/multipart.go      |  29 ++++--
  src/mime/multipart/readmimeheader.go |  14 +++
  src/net/http/request_test.go         |   2 +-
- src/net/textproto/reader.go          |  18 +++
- 6 files changed, 326 insertions(+), 36 deletions(-)
+ src/net/textproto/reader.go          |  18 ++++
+ 8 files changed, 369 insertions(+), 36 deletions(-)
+ create mode 100644 src/internal/godebug/godebug.go
+ create mode 100644 src/internal/godebug/godebug_test.go
  create mode 100644 src/mime/multipart/readmimeheader.go
 
-diff --git a/src/mime/multipart/formdata.go b/src/mime/multipart/formdata.go
-index 832d0ad693..74727aedad 100644
---- a/src/mime/multipart/formdata.go
-+++ b/src/mime/multipart/formdata.go
-@@ -9,6 +9,7 @@ import (
- 	"errors"
- 	"io"
- 	"io/ioutil"
-+	"math"
- 	"net/textproto"
- 	"os"
- )
-@@ -31,18 +32,86 @@ func (r *Reader) ReadForm(maxMemory int64) (*Form, error) {
- 	return r.readForm(maxMemory)
- }
- 
-+// godebugGet returns the value for the provided GODEBUG key.
-+func godebugGet(key string) string {
-+	return godebugGet2(os.Getenv("GODEBUG"), key)
+diff --git a/src/internal/godebug/godebug.go b/src/internal/godebug/godebug.go
+new file mode 100644
+index 0000000..ac434e5
+--- /dev/null
++++ b/src/internal/godebug/godebug.go
+@@ -0,0 +1,34 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
++
++// Package godebug parses the GODEBUG environment variable.
++package godebug
++
++import "os"
++
++// Get returns the value for the provided GODEBUG key.
++func Get(key string) string {
++	return get(os.Getenv("GODEBUG"), key)
 +}
 +
-+// godebugGet2 returns the value part of key=value in s (a GODEBUG value).
-+func godebugGet2(s, key string) string {
++// get returns the value part of key=value in s (a GODEBUG value).
++func get(s, key string) string {
 +	for i := 0; i < len(s)-len(key)-1; i++ {
 +		if i > 0 && s[i-1] != ',' {
 +			continue
 +		}
 +		afterKey := s[i+len(key):]
-+	if afterKey[0] != '=' || s[i:i+len(key)] != key {
++		if afterKey[0] != '=' || s[i:i+len(key)] != key {
 +			continue
 +		}
 +		val := afterKey[1:]
@@ -107,7 +109,63 @@ index 832d0ad693..74727aedad 100644
 +	}
 +	return ""
 +}
+diff --git a/src/internal/godebug/godebug_test.go b/src/internal/godebug/godebug_test.go
+new file mode 100644
+index 0000000..41b9117
+--- /dev/null
++++ b/src/internal/godebug/godebug_test.go
+@@ -0,0 +1,34 @@
++// Copyright 2021 The Go Authors. All rights reserved.
++// Use of this source code is governed by a BSD-style
++// license that can be found in the LICENSE file.
 +
++package godebug
++
++import "testing"
++
++func TestGet(t *testing.T) {
++	tests := []struct {
++		godebug string
++		key     string
++		want    string
++	}{
++		{"", "", ""},
++		{"", "foo", ""},
++		{"foo=bar", "foo", "bar"},
++		{"foo=bar,after=x", "foo", "bar"},
++		{"before=x,foo=bar,after=x", "foo", "bar"},
++		{"before=x,foo=bar", "foo", "bar"},
++		{",,,foo=bar,,,", "foo", "bar"},
++		{"foodecoy=wrong,foo=bar", "foo", "bar"},
++		{"foo=", "foo", ""},
++		{"foo", "foo", ""},
++		{",foo", "foo", ""},
++		{"foo=bar,baz", "loooooooong", ""},
++	}
++	for _, tt := range tests {
++		got := get(tt.godebug, tt.key)
++		if got != tt.want {
++			t.Errorf("get(%q, %q) = %q; want %q", tt.godebug, tt.key, got, tt.want)
++		}
++	}
++}
+diff --git a/src/mime/multipart/formdata.go b/src/mime/multipart/formdata.go
+index 832d0ad..5c3d794 100644
+--- a/src/mime/multipart/formdata.go
++++ b/src/mime/multipart/formdata.go
+@@ -7,8 +7,10 @@ package multipart
+ import (
+ 	"bytes"
+ 	"errors"
++	"internal/godebug"
+ 	"io"
+ 	"io/ioutil"
++	"math"
+ 	"net/textproto"
+ 	"os"
+ )
+@@ -33,16 +35,58 @@ func (r *Reader) ReadForm(maxMemory int64) (*Form, error) {
+ 
  func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
  	form := &Form{make(map[string][]string), make(map[string][]*FileHeader)}
 +	var (
@@ -115,7 +173,7 @@ index 832d0ad693..74727aedad 100644
 +		fileOff int64
 +	)
 +	numDiskFiles := 0
-+	multipartFiles := godebugGet("multipartfiles")
++	multipartFiles := godebug.Get("multipartfiles")
 +	combineFiles := multipartFiles != "distinct"
  	defer func() {
 +		if file != nil {
@@ -168,7 +226,7 @@ index 832d0ad693..74727aedad 100644
  		if err == io.EOF {
  			break
  		}
-@@ -56,16 +125,27 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
+@@ -56,16 +100,27 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
  		}
  		filename := p.FileName()
  
@@ -199,7 +257,7 @@ index 832d0ad693..74727aedad 100644
  				return nil, ErrMessageTooLarge
  			}
  			form.Value[name] = append(form.Value[name], b.String())
-@@ -73,35 +153,45 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
+@@ -73,35 +128,45 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
  		}
  
  		// file, store in memory or on disk
@@ -257,7 +315,7 @@ index 832d0ad693..74727aedad 100644
  		}
  		form.File[name] = append(form.File[name], fh)
  	}
-@@ -109,6 +199,17 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
+@@ -109,6 +174,17 @@ func (r *Reader) readForm(maxMemory int64) (_ *Form, err error) {
  	return form, nil
  }
  
@@ -275,7 +333,7 @@ index 832d0ad693..74727aedad 100644
  // Form is a parsed multipart form.
  // Its File parts are stored either in memory or on disk,
  // and are accessible via the *FileHeader's Open method.
-@@ -126,7 +227,7 @@ func (f *Form) RemoveAll() error {
+@@ -126,7 +202,7 @@ func (f *Form) RemoveAll() error {
  		for _, fh := range fhs {
  			if fh.tmpfile != "" {
  				e := os.Remove(fh.tmpfile)
@@ -284,7 +342,7 @@ index 832d0ad693..74727aedad 100644
  					err = e
  				}
  			}
-@@ -141,15 +242,25 @@ type FileHeader struct {
+@@ -141,15 +217,25 @@ type FileHeader struct {
  	Header   textproto.MIMEHeader
  	Size     int64
  
@@ -313,7 +371,7 @@ index 832d0ad693..74727aedad 100644
  	}
  	return os.Open(fh.tmpfile)
  }
-@@ -168,8 +279,12 @@ type File interface {
+@@ -168,8 +254,12 @@ type File interface {
  
  type sectionReadCloser struct {
  	*io.SectionReader
@@ -327,7 +385,7 @@ index 832d0ad693..74727aedad 100644
  	return nil
  }
 diff --git a/src/mime/multipart/formdata_test.go b/src/mime/multipart/formdata_test.go
-index 7d756c8c24..c77f6f0152 100644
+index 7d756c8..ae54267 100644
 --- a/src/mime/multipart/formdata_test.go
 +++ b/src/mime/multipart/formdata_test.go
 @@ -6,7 +6,9 @@ package multipart
@@ -497,7 +555,7 @@ index 7d756c8c24..c77f6f0152 100644
 +	}
 +}
 diff --git a/src/mime/multipart/multipart.go b/src/mime/multipart/multipart.go
-index 1750300fb5..0c22e6597c 100644
+index 1750300..0c22e65 100644
 --- a/src/mime/multipart/multipart.go
 +++ b/src/mime/multipart/multipart.go
 @@ -121,12 +121,12 @@ func (r *stickyErrorReader) Read(p []byte) (n int, _ error) {
@@ -587,7 +645,7 @@ index 1750300fb5..0c22e6597c 100644
  			}
 diff --git a/src/mime/multipart/readmimeheader.go b/src/mime/multipart/readmimeheader.go
 new file mode 100644
-index 0000000000..6836928c9e
+index 0000000..6836928
 --- /dev/null
 +++ b/src/mime/multipart/readmimeheader.go
 @@ -0,0 +1,14 @@
@@ -606,7 +664,7 @@ index 0000000000..6836928c9e
 +//go:linkname readMIMEHeader net/textproto.readMIMEHeader
 +func readMIMEHeader(r *textproto.Reader, lim int64) (textproto.MIMEHeader, error)
 diff --git a/src/net/http/request_test.go b/src/net/http/request_test.go
-index 72316c4e21..abe6090525 100644
+index 72316c4..abe6090 100644
 --- a/src/net/http/request_test.go
 +++ b/src/net/http/request_test.go
 @@ -953,7 +953,7 @@ func testMissingFile(t *testing.T, req *Request) {
@@ -619,7 +677,7 @@ index 72316c4e21..abe6090525 100644
  	if err != ErrMissingFile {
  		t.Errorf("FormFile err = %q, want ErrMissingFile", err)
 diff --git a/src/net/textproto/reader.go b/src/net/textproto/reader.go
-index a00fd2395f..fd07ab406b 100644
+index a00fd23..fd07ab4 100644
 --- a/src/net/textproto/reader.go
 +++ b/src/net/textproto/reader.go
 @@ -7,9 +7,11 @@ package textproto
