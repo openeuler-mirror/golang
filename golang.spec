@@ -66,7 +66,7 @@
 
 Name:           golang
 Version:        1.17.3
-Release:        15
+Release:        16
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -190,6 +190,13 @@ Patch6029:	0029-release-branch.go1.18-net-http-update-bundled-golang.patch
 Patch6030:	0030-all-update-vendored-golang.org-x-net.patch
 Patch6031:	0031-crypto-tls-replace-all-usages-of-BytesOrPanic.patch
 Patch6032:	0032-mime-multipart-limit-memory-inode-consumption-of-Rea.patch
+Patch6033:  0033-release-branch.go1.18-add-definition-byte-string-cut.patch
+Patch6034:  0034-release-branch.go1.19-net-textproto-avoid-overpredic.patch
+Patch6035:  0035-release-branch.go1.19-go-scanner-reject-large-line-a.patch
+Patch6036:  0036-release-branch.go1.19-html-template-disallow-actions.patch
+Patch6037:  0037-release-branch.go1.19-mime-multipart-avoid-excessive.patch
+Patch6038:  0038-release-branch.go1.19-net-textproto-mime-multipart-i.patch
+Patch6039:  0039-release-branch.go1.19-mime-multipart-limit-parsed-mi.patch
 
 ExclusiveArch:  %{golang_arches}
 
@@ -435,6 +442,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Apr 13 2023 hanchao <hanchao47@huawei.com> - 1.17.3-16
+- Type:CVE
+- CVE:CVE-2023-24534,CVE-2023-24536,CVE-2023-24537,CVE-2023-24538
+- SUG:NA
+- DESC: fix CVE-2023-24534,CVE-2023-24536,CVE-2023-24537,CVE-2023-24538
+
 * Tue Mar 21 2023 hanchao <hanchao47@huawei.com> - 1.17.3-15
 - Type:CVE
 - CVE:CVE-2022-41723,CVE-2022-41724,CVE-2022-41725
