@@ -58,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        24
+Release:        25
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -229,9 +229,15 @@ Patch6084:	0084-release-branch.go1.18-net-http-update-bundled-golang.patch
 Patch6085:	0085-all-update-vendored-golang.org-x-net.patch
 Patch6086:	0086-release-branch.go1.19-crypto-tls-replace-all-usages-.patch
 Patch6087:	0087-release-branch.go1.19-mime-multipart-limit-memory-in.patch
+Patch6088:  0088-release-branch.go1.19-net-textproto-avoid-overpredic.patch
+Patch6089:  0089-release-branch.go1.19-go-scanner-reject-large-line-a.patch
+Patch6090:  0090-release-branch.go1.19-html-template-disallow-actions.patch
+Patch6091:  0091-release-branch.go1.19-mime-multipart-avoid-excessive.patch
+Patch6092:  0092-release-branch.go1.19-net-textproto-mime-multipart-i.patch
+Patch6093:  0093-release-branch.go1.19-mime-multipart-limit-parsed-mi.patch
 
-Patch9001:	0001-drop-hard-code-cert.patch
-Patch9002:	0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
+Patch9001:  0001-drop-hard-code-cert.patch
+Patch9002:  0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
 
 %description
 %{summary}.
@@ -468,6 +474,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Thu Apr 13 2023 hanchao <hanchao47@huawei.com> - 1.15.7-25
+- Type:CVE
+- CVE:CVE-2023-24534,CVE-2023-24536,CVE-2023-24537,CVE-2023-24538
+- SUG:NA
+- DESC:fix CVE-2023-24534,CVE-2023-24536,CVE-2023-24537,CVE-2023-24538
+
 * Thu Mar 23 2023 hanchao <hanchao47@huawei.com> - 1.15.7-24
 - Type:CVE
 - CVE:CVE-2022-41723,CVE-2022-41724,CVE-2022-41725
