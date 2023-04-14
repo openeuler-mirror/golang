@@ -1,0 +1,199 @@
+From 2113c53920d02e7805372b543d2b658394fcd636 Mon Sep 17 00:00:00 2001
+From: Michael Pratt <mpratt@google.com>
+Date: Tue, 17 Nov 2020 11:55:53 -0500
+Subject: [PATCH 1/2] runtime: don't take allglock in tracebackothers
+
+tracebackothers is called from fatal throw/panic.
+
+A fatal throw may be taken with allglock held (notably in the allocator
+when allglock is held), which would cause a deadlock in tracebackothers
+when we try to take allglock again. Locking allglock here is also often
+a lock order violation w.r.t. the locks held when throw was called.
+
+Avoid the deadlock and ordering issues by skipping locking altogether.
+It is OK to miss concurrently created Gs (which are generally avoided by
+freezetheworld(), and which were possible previously anyways if created
+after the loop).
+
+Fatal throw/panic freezetheworld(), which should freeze other threads
+that may be racing to modify allgs. However, freezetheworld() does _not_
+guarantee that it stops all other threads, so we can't simply drop the
+lock.
+
+Fixes #42669
+Updates #43175
+
+Change-Id: I657aec46ed35fd5d1b3f1ba25b500128ab26b088
+Reviewed-on: https://go-review.googlesource.com/c/go/+/270861
+Reviewed-by: Michael Knyszek <mknyszek@google.com>
+Trust: Michael Pratt <mpratt@google.com>
+
+Conflict: NA
+Reference: https://go-review.googlesource.com/c/go/+/270861
+---
+ src/runtime/mgcmark.go   |  1 -
+ src/runtime/proc.go      | 43 ++++++++++++++++++++++++++++++++++++----
+ src/runtime/runtime2.go  |  1 -
+ src/runtime/traceback.go | 27 +++++++++++++++----------
+ 4 files changed, 56 insertions(+), 16 deletions(-)
+
+diff --git a/src/runtime/mgcmark.go b/src/runtime/mgcmark.go
+index b2fbcd4105..6ecc467475 100644
+--- a/src/runtime/mgcmark.go
++++ b/src/runtime/mgcmark.go
+@@ -143,7 +143,6 @@ fail:
+ 	println("gp", gp, "goid", gp.goid,
+ 		"status", readgstatus(gp),
+ 		"gcscandone", gp.gcscandone)
+-	unlock(&allglock) // Avoid self-deadlock with traceback.
+ 	throw("scan missed a g")
+ }
+ 
+diff --git a/src/runtime/proc.go b/src/runtime/proc.go
+index 7fa19d867b..db49fbf385 100644
+--- a/src/runtime/proc.go
++++ b/src/runtime/proc.go
+@@ -460,8 +460,29 @@ func lockedOSThread() bool {
+ }
+ 
+ var (
+-	allgs    []*g
++	// allgs contains all Gs ever created (including dead Gs), and thus
++	// never shrinks.
++	//
++	// Access via the slice is protected by allglock or stop-the-world.
++	// Readers that cannot take the lock may (carefully!) use the atomic
++	// variables below.
+ 	allglock mutex
++	allgs    []*g
++
++	// allglen and allgptr are atomic variables that contain len(allg) and
++	// &allg[0] respectively. Proper ordering depends on totally-ordered
++	// loads and stores. Writes are protected by allglock.
++	//
++	// allgptr is updated before allglen. Readers should read allglen
++	// before allgptr to ensure that allglen is always <= len(allgptr). New
++	// Gs appended during the race can be missed. For a consistent view of
++	// all Gs, allglock must be held.
++	//
++	// allgptr copies should always be stored as a concrete type or
++	// unsafe.Pointer, not uintptr, to ensure that GC can still reach it
++	// even if it points to a stale array.
++	allglen uintptr
++	allgptr **g
+ )
+ 
+ func allgadd(gp *g) {
+@@ -471,10 +492,25 @@ func allgadd(gp *g) {
+ 
+ 	lock(&allglock)
+ 	allgs = append(allgs, gp)
+-	allglen = uintptr(len(allgs))
++	if &allgs[0] != allgptr {
++		atomicstorep(unsafe.Pointer(&allgptr), unsafe.Pointer(&allgs[0]))
++	}
++	atomic.Storeuintptr(&allglen, uintptr(len(allgs)))
+ 	unlock(&allglock)
+ }
+ 
++// atomicAllG returns &allgs[0] and len(allgs) for use with atomicAllGIndex.
++func atomicAllG() (**g, uintptr) {
++	length := atomic.Loaduintptr(&allglen)
++	ptr := (**g)(atomic.Loadp(unsafe.Pointer(&allgptr)))
++	return ptr, length
++}
++
++// atomicAllGIndex returns ptr[i] with the allgptr returned from atomicAllG.
++func atomicAllGIndex(ptr **g, i uintptr) *g {
++	return *(**g)(add(unsafe.Pointer(ptr), i*sys.PtrSize))
++}
++
+ const (
+ 	// Number of goroutine ids to grab from sched.goidgen to local per-P cache at once.
+ 	// 16 seems to provide enough amortization, but other than that it's mostly arbitrary number.
+@@ -3913,7 +3949,7 @@ func badunlockosthread() {
+ }
+ 
+ func gcount() int32 {
+-	n := int32(allglen) - sched.gFree.n - int32(atomic.Load(&sched.ngsys))
++	n := int32(atomic.Loaduintptr(&allglen)) - sched.gFree.n - int32(atomic.Load(&sched.ngsys))
+ 	for _, _p_ := range allp {
+ 		n -= _p_.gFree.n
+ 	}
+@@ -4583,7 +4619,6 @@ func checkdead() {
+ 		case _Grunnable,
+ 			_Grunning,
+ 			_Gsyscall:
+-			unlock(&allglock)
+ 			print("runtime: checkdead: find g ", gp.goid, " in status ", s, "\n")
+ 			throw("checkdead: runnable g")
+ 		}
+diff --git a/src/runtime/runtime2.go b/src/runtime/runtime2.go
+index 814364aa42..c82678e0ed 100644
+--- a/src/runtime/runtime2.go
++++ b/src/runtime/runtime2.go
+@@ -1031,7 +1031,6 @@ func (w waitReason) String() string {
+ }
+ 
+ var (
+-	allglen    uintptr
+ 	allm       *m
+ 	allp       []*p  // len(allp) == gomaxprocs; may change at safe points, otherwise immutable
+ 	allpLock   mutex // Protects P-less reads of allp and all writes
+diff --git a/src/runtime/traceback.go b/src/runtime/traceback.go
+index 944c8473d2..bf4e02da0e 100644
+--- a/src/runtime/traceback.go
++++ b/src/runtime/traceback.go
+@@ -918,17 +918,25 @@ func tracebackothers(me *g) {
+ 	level, _, _ := gotraceback()
+ 
+ 	// Show the current goroutine first, if we haven't already.
+-	g := getg()
+-	gp := g.m.curg
+-	if gp != nil && gp != me {
++	curgp := getg().m.curg
++	if curgp != nil && curgp != me {
+ 		print("\n")
+-		goroutineheader(gp)
+-		traceback(^uintptr(0), ^uintptr(0), 0, gp)
++		goroutineheader(curgp)
++		traceback(^uintptr(0), ^uintptr(0), 0, curgp)
+ 	}
+ 
+-	lock(&allglock)
+-	for _, gp := range allgs {
+-		if gp == me || gp == g.m.curg || readgstatus(gp) == _Gdead || isSystemGoroutine(gp, false) && level < 2 {
++	// We can't take allglock here because this may be during fatal
++	// throw/panic, where locking allglock could be out-of-order or a
++	// direct deadlock.
++	//
++	// Instead, use atomic access to allgs which requires no locking. We
++	// don't lock against concurrent creation of new Gs, but even with
++	// allglock we may miss Gs created after this loop.
++	ptr, length := atomicAllG()
++	for i := uintptr(0); i < length; i++ {
++		gp := atomicAllGIndex(ptr, i)
++
++		if gp == me || gp == curgp || readgstatus(gp) == _Gdead || isSystemGoroutine(gp, false) && level < 2 {
+ 			continue
+ 		}
+ 		print("\n")
+@@ -937,14 +945,13 @@ func tracebackothers(me *g) {
+ 		// called from a signal handler initiated during a
+ 		// systemstack call. The original G is still in the
+ 		// running state, and we want to print its stack.
+-		if gp.m != g.m && readgstatus(gp)&^_Gscan == _Grunning {
++		if gp.m != getg().m && readgstatus(gp)&^_Gscan == _Grunning {
+ 			print("\tgoroutine running on other thread; stack unavailable\n")
+ 			printcreatedby(gp)
+ 		} else {
+ 			traceback(^uintptr(0), ^uintptr(0), 0, gp)
+ 		}
+ 	}
+-	unlock(&allglock)
+ }
+ 
+ // tracebackHexdump hexdumps part of stk around frame.sp and frame.fp
+-- 
+2.33.0
+
