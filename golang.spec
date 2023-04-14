@@ -58,7 +58,7 @@
 
 Name:           golang
 Version:        1.15.7
-Release:        25
+Release:        26
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
@@ -235,6 +235,8 @@ Patch6090:  0090-release-branch.go1.19-html-template-disallow-actions.patch
 Patch6091:  0091-release-branch.go1.19-mime-multipart-avoid-excessive.patch
 Patch6092:  0092-release-branch.go1.19-net-textproto-mime-multipart-i.patch
 Patch6093:  0093-release-branch.go1.19-mime-multipart-limit-parsed-mi.patch
+Patch6094:	0094-runtime-don-t-take-allglock-in-tracebackothers.patch
+Patch6095:	0095-runtime-encapsulate-access-to-allgs.patch
 
 Patch9001:  0001-drop-hard-code-cert.patch
 Patch9002:  0002-fix-patch-cmd-go-internal-modfetch-do-not-sho.patch
@@ -474,6 +476,12 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Fri Apr 14 2023 hanchao <hanchao47@huawei.com> - 1.15.7-26
+- Type:bugfix
+- CVE:
+- SUG:NA
+- DESC:fix a deadlock issue when a signal is received.
+
 * Thu Apr 13 2023 hanchao <hanchao47@huawei.com> - 1.15.7-25
 - Type:CVE
 - CVE:CVE-2023-24534,CVE-2023-24536,CVE-2023-24537,CVE-2023-24538

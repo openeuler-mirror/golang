@@ -1,0 +1,339 @@
+From e1c2b3b3da33448e41a39aabd0cc8cbcea0e1450 Mon Sep 17 00:00:00 2001
+From: Michael Pratt <mpratt@google.com>
+Date: Wed, 23 Dec 2020 15:05:37 -0500
+Subject: [PATCH 2/2] runtime: encapsulate access to allgs
+
+Correctly accessing allgs is a bit hairy. Some paths need to lock
+allglock, some don't. Those that don't are safest using atomicAllG, but
+usage is not consistent.
+
+Rather than doing this ad-hoc, move all access* through forEachG /
+forEachGRace, the locking and atomic versions, respectively. This will
+make it easier to ensure safe access.
+
+* markroot is the only exception, as it has a far-removed guarantee of
+safe access via an atomic load of allglen far before actual use.
+
+Change-Id: Ie1c7a8243e155ae2b4bc3143577380c695680e89
+Reviewed-on: https://go-review.googlesource.com/c/go/+/279994
+Trust: Michael Pratt <mpratt@google.com>
+Run-TryBot: Michael Pratt <mpratt@google.com>
+TryBot-Result: Go Bot <gobot@golang.org>
+Reviewed-by: Michael Knyszek <mknyszek@google.com>
+
+Conflict: NA
+Reference: https://go-review.googlesource.com/c/go/+/279994
+---
+ src/runtime/heapdump.go  |  5 ++---
+ src/runtime/mgc.go       |  8 +++-----
+ src/runtime/mgcmark.go   | 32 +++++++++++++++++++-------------
+ src/runtime/mprof.go     | 35 +++++++++++++++++++----------------
+ src/runtime/proc.go      | 40 +++++++++++++++++++++++++++++-----------
+ src/runtime/trace.go     |  5 +++--
+ src/runtime/traceback.go | 21 +++++++++------------
+ 7 files changed, 84 insertions(+), 62 deletions(-)
+
+diff --git a/src/runtime/heapdump.go b/src/runtime/heapdump.go
+index cfd5c251b4..93add0ad5a 100644
+--- a/src/runtime/heapdump.go
++++ b/src/runtime/heapdump.go
+@@ -393,8 +393,7 @@ func dumpgoroutine(gp *g) {
+ 
+ func dumpgs() {
+ 	// goroutines & stacks
+-	for i := 0; uintptr(i) < allglen; i++ {
+-		gp := allgs[i]
++	forEachG(func(gp *g) {
+ 		status := readgstatus(gp) // The world is stopped so gp will not be in a scan state.
+ 		switch status {
+ 		default:
+@@ -407,7 +406,7 @@ func dumpgs() {
+ 			_Gwaiting:
+ 			dumpgoroutine(gp)
+ 		}
+-	}
++	})
+ }
+ 
+ func finq_callback(fn *funcval, obj unsafe.Pointer, nret uintptr, fint *_type, ot *ptrtype) {
+diff --git a/src/runtime/mgc.go b/src/runtime/mgc.go
+index b3499516f6..f7198822aa 100644
+--- a/src/runtime/mgc.go
++++ b/src/runtime/mgc.go
+@@ -2207,14 +2207,12 @@ func gcSweep(mode gcMode) {
+ //
+ //go:systemstack
+ func gcResetMarkState() {
+-	// This may be called during a concurrent phase, so make sure
++	// This may be called during a concurrent phase, so lock to make sure
+ 	// allgs doesn't change.
+-	lock(&allglock)
+-	for _, gp := range allgs {
++	forEachG(func(gp *g) {
+ 		gp.gcscandone = false // set to true in gcphasework
+ 		gp.gcAssistBytes = 0
+-	}
+-	unlock(&allglock)
++	})
+ 
+ 	// Clear page marks. This is just 1MB per 64GB of heap, so the
+ 	// time here is pretty trivial.
+diff --git a/src/runtime/mgcmark.go b/src/runtime/mgcmark.go
+index 6ecc467475..233c4976eb 100644
+--- a/src/runtime/mgcmark.go
++++ b/src/runtime/mgcmark.go
+@@ -127,23 +127,26 @@ func gcMarkRootCheck() {
+ 		throw("left over markroot jobs")
+ 	}
+ 
+-	lock(&allglock)
+ 	// Check that stacks have been scanned.
+-	var gp *g
+-	for i := 0; i < work.nStackRoots; i++ {
+-		gp = allgs[i]
++	//
++	// We only check the first nStackRoots Gs that we should have scanned.
++	// Since we don't care about newer Gs (see comment in
++	// gcMarkRootPrepare), no locking is required.
++	i := 0
++	forEachGRace(func(gp *g) {
++		if i >= work.nStackRoots {
++			return
++		}
++
+ 		if !gp.gcscandone {
+-			goto fail
++			println("gp", gp, "goid", gp.goid,
++				"status", readgstatus(gp),
++				"gcscandone", gp.gcscandone)
++			throw("scan missed a g")
+ 		}
+-	}
+-	unlock(&allglock)
+-	return
+ 
+-fail:
+-	println("gp", gp, "goid", gp.goid,
+-		"status", readgstatus(gp),
+-		"gcscandone", gp.gcscandone)
+-	throw("scan missed a g")
++		i++
++	})
+ }
+ 
+ // ptrmask for an allocation containing a single pointer.
+@@ -200,6 +203,9 @@ func markroot(gcw *gcWork, i uint32) {
+ 		// the rest is scanning goroutine stacks
+ 		var gp *g
+ 		if baseStacks <= i && i < end {
++			// N.B. Atomic read of allglen in gcMarkRootPrepare
++			// acts as a barrier to ensure that allgs must be large
++			// enough to contain all relevant Gs.
+ 			gp = allgs[i-baseStacks]
+ 		} else {
+ 			throw("markroot: bad index")
+diff --git a/src/runtime/mprof.go b/src/runtime/mprof.go
+index 128498d69b..c94b8f7cae 100644
+--- a/src/runtime/mprof.go
++++ b/src/runtime/mprof.go
+@@ -731,12 +731,13 @@ func goroutineProfileWithLabels(p []StackRecord, labels []unsafe.Pointer) (n int
+ 
+ 	stopTheWorld("profile")
+ 
++	// World is stopped, no locking required.
+ 	n = 1
+-	for _, gp1 := range allgs {
++	forEachGRace(func(gp1 *g) {
+ 		if isOK(gp1) {
+ 			n++
+ 		}
+-	}
++	})
+ 
+ 	if n <= len(p) {
+ 		ok = true
+@@ -757,21 +758,23 @@ func goroutineProfileWithLabels(p []StackRecord, labels []unsafe.Pointer) (n int
+ 		}
+ 
+ 		// Save other goroutines.
+-		for _, gp1 := range allgs {
+-			if isOK(gp1) {
+-				if len(r) == 0 {
+-					// Should be impossible, but better to return a
+-					// truncated profile than to crash the entire process.
+-					break
+-				}
+-				saveg(^uintptr(0), ^uintptr(0), gp1, &r[0])
+-				if labels != nil {
+-					lbl[0] = gp1.labels
+-					lbl = lbl[1:]
+-				}
+-				r = r[1:]
++		forEachGRace(func(gp1 *g) {
++			if !isOK(gp1) {
++				return
+ 			}
+-		}
++
++			if len(r) == 0 {
++				// Should be impossible, but better to return a
++				// truncated profile than to crash the entire process.
++				return
++			}
++			saveg(^uintptr(0), ^uintptr(0), gp1, &r[0])
++			if labels != nil {
++				lbl[0] = gp1.labels
++				lbl = lbl[1:]
++			}
++			r = r[1:]
++		})
+ 	}
+ 
+ 	startTheWorld()
+diff --git a/src/runtime/proc.go b/src/runtime/proc.go
+index db49fbf385..e1aafffc93 100644
+--- a/src/runtime/proc.go
++++ b/src/runtime/proc.go
+@@ -511,6 +511,30 @@ func atomicAllGIndex(ptr **g, i uintptr) *g {
+ 	return *(**g)(add(unsafe.Pointer(ptr), i*sys.PtrSize))
+ }
+ 
++// forEachG calls fn on every G from allgs.
++//
++// forEachG takes a lock to exclude concurrent addition of new Gs.
++func forEachG(fn func(gp *g)) {
++	lock(&allglock)
++	for _, gp := range allgs {
++		fn(gp)
++	}
++	unlock(&allglock)
++}
++
++// forEachGRace calls fn on every G from allgs.
++//
++// forEachGRace avoids locking, but does not exclude addition of new Gs during
++// execution, which may be missed.
++func forEachGRace(fn func(gp *g)) {
++	ptr, length := atomicAllG()
++	for i := uintptr(0); i < length; i++ {
++		gp := atomicAllGIndex(ptr, i)
++		fn(gp)
++	}
++	return
++}
++
+ const (
+ 	// Number of goroutine ids to grab from sched.goidgen to local per-P cache at once.
+ 	// 16 seems to provide enough amortization, but other than that it's mostly arbitrary number.
+@@ -4605,11 +4629,9 @@ func checkdead() {
+ 	}
+ 
+ 	grunning := 0
+-	lock(&allglock)
+-	for i := 0; i < len(allgs); i++ {
+-		gp := allgs[i]
++	forEachG(func(gp *g) {
+ 		if isSystemGoroutine(gp, false) {
+-			continue
++			return
+ 		}
+ 		s := readgstatus(gp)
+ 		switch s &^ _Gscan {
+@@ -4622,8 +4644,7 @@ func checkdead() {
+ 			print("runtime: checkdead: find g ", gp.goid, " in status ", s, "\n")
+ 			throw("checkdead: runnable g")
+ 		}
+-	}
+-	unlock(&allglock)
++	})
+ 	if grunning == 0 { // possible if main goroutine calls runtime·Goexit()
+ 		unlock(&sched.lock) // unlock so that GODEBUG=scheddetail=1 doesn't hang
+ 		throw("no goroutines (main called runtime.Goexit) - deadlock!")
+@@ -4993,9 +5014,7 @@ func schedtrace(detailed bool) {
+ 		print("  M", mp.id, ": p=", id1, " curg=", id2, " mallocing=", mp.mallocing, " throwing=", mp.throwing, " preemptoff=", mp.preemptoff, ""+" locks=", mp.locks, " dying=", mp.dying, " spinning=", mp.spinning, " blocked=", mp.blocked, " lockedg=", id3, "\n")
+ 	}
+ 
+-	lock(&allglock)
+-	for gi := 0; gi < len(allgs); gi++ {
+-		gp := allgs[gi]
++	forEachG(func(gp *g) {
+ 		mp := gp.m
+ 		lockedm := gp.lockedm.ptr()
+ 		id1 := int64(-1)
+@@ -5007,8 +5026,7 @@ func schedtrace(detailed bool) {
+ 			id2 = lockedm.id
+ 		}
+ 		print("  G", gp.goid, ": status=", readgstatus(gp), "(", gp.waitreason.String(), ") m=", id1, " lockedm=", id2, "\n")
+-	}
+-	unlock(&allglock)
++	})
+ 	unlock(&sched.lock)
+ }
+ 
+diff --git a/src/runtime/trace.go b/src/runtime/trace.go
+index 169b650eb4..b8794d383a 100644
+--- a/src/runtime/trace.go
++++ b/src/runtime/trace.go
+@@ -220,7 +220,8 @@ func StartTrace() error {
+ 	stackID := traceStackID(mp, stkBuf, 2)
+ 	releasem(mp)
+ 
+-	for _, gp := range allgs {
++	// World is stopped, no need to lock.
++	forEachGRace(func(gp *g) {
+ 		status := readgstatus(gp)
+ 		if status != _Gdead {
+ 			gp.traceseq = 0
+@@ -240,7 +241,7 @@ func StartTrace() error {
+ 		} else {
+ 			gp.sysblocktraced = false
+ 		}
+-	}
++	})
+ 	traceProcStart()
+ 	traceGoStart()
+ 	// Note: ticksStart needs to be set after we emit traceEvGoInSyscall events.
+diff --git a/src/runtime/traceback.go b/src/runtime/traceback.go
+index bf4e02da0e..b57e61712c 100644
+--- a/src/runtime/traceback.go
++++ b/src/runtime/traceback.go
+@@ -925,19 +925,16 @@ func tracebackothers(me *g) {
+ 		traceback(^uintptr(0), ^uintptr(0), 0, curgp)
+ 	}
+ 
+-	// We can't take allglock here because this may be during fatal
+-	// throw/panic, where locking allglock could be out-of-order or a
+-	// direct deadlock.
++	// We can't call locking forEachG here because this may be during fatal
++	// throw/panic, where locking could be out-of-order or a direct
++	// deadlock.
+ 	//
+-	// Instead, use atomic access to allgs which requires no locking. We
+-	// don't lock against concurrent creation of new Gs, but even with
+-	// allglock we may miss Gs created after this loop.
+-	ptr, length := atomicAllG()
+-	for i := uintptr(0); i < length; i++ {
+-		gp := atomicAllGIndex(ptr, i)
+-
++	// Instead, use forEachGRace, which requires no locking. We don't lock
++	// against concurrent creation of new Gs, but even with allglock we may
++	// miss Gs created after this loop.
++	forEachGRace(func(gp *g) {
+ 		if gp == me || gp == curgp || readgstatus(gp) == _Gdead || isSystemGoroutine(gp, false) && level < 2 {
+-			continue
++			return
+ 		}
+ 		print("\n")
+ 		goroutineheader(gp)
+@@ -951,7 +948,7 @@ func tracebackothers(me *g) {
+ 		} else {
+ 			traceback(^uintptr(0), ^uintptr(0), 0, gp)
+ 		}
+-	}
++	})
+ }
+ 
+ // tracebackHexdump hexdumps part of stk around frame.sp and frame.fp
+-- 
+2.33.0
+
