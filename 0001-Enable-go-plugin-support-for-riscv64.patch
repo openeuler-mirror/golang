@@ -1,0 +1,40 @@
+From 019ec52ee5e7dec0c3a7937025948a742822a052 Mon Sep 17 00:00:00 2001
+From: misaka00251 <liuxin@iscas.ac.cn>
+Date: Mon, 27 Mar 2023 10:27:38 +0800
+Subject: [PATCH] Enable go plugin support for riscv64 (based on work by
+ yangjinghua)
+
+---
+ src/cmd/internal/sys/supported.go  | 2 +-
+ src/cmd/link/internal/ld/config.go | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/src/cmd/internal/sys/supported.go b/src/cmd/internal/sys/supported.go
+index 1d74f6b..4fa8ed6 100644
+--- a/src/cmd/internal/sys/supported.go
++++ b/src/cmd/internal/sys/supported.go
+@@ -142,7 +142,7 @@ func BuildModeSupported(compiler, buildmode, goos, goarch string) bool {
+ 
+ 	case "plugin":
+ 		switch platform {
+-		case "linux/amd64", "linux/arm", "linux/arm64", "linux/386", "linux/s390x", "linux/ppc64le",
++		case "linux/amd64", "linux/arm", "linux/arm64", "linux/riscv64", "linux/386", "linux/s390x", "linux/ppc64le",
+ 			"android/amd64", "android/arm", "android/arm64", "android/386",
+ 			"darwin/amd64", "darwin/arm64",
+ 			"freebsd/amd64":
+diff --git a/src/cmd/link/internal/ld/config.go b/src/cmd/link/internal/ld/config.go
+index 4dd43a1..af5d8c5 100644
+--- a/src/cmd/link/internal/ld/config.go
++++ b/src/cmd/link/internal/ld/config.go
+@@ -95,7 +95,7 @@ func (mode *BuildMode) Set(s string) error {
+ 		switch buildcfg.GOOS {
+ 		case "linux":
+ 			switch buildcfg.GOARCH {
+-			case "386", "amd64", "arm", "arm64", "s390x", "ppc64le":
++			case "386", "amd64", "arm", "arm64", "riscv64", "s390x", "ppc64le":
+ 			default:
+ 				return badmode()
+ 			}
+-- 
+2.37.1 (Apple Git-137.1)
+

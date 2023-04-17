@@ -62,11 +62,13 @@
 
 Name:           golang
 Version:        1.19.4
-Release:        1
+Release:        2
 Summary:        The Go Programming Language
 License:        BSD and Public Domain
 URL:            https://golang.org/
 Source0:        https://dl.google.com/go/go1.19.4.src.tar.gz
+Patch0:         0001-Enable-go-plugin-support-for-riscv64.patch
+Patch1:         0002-runtime-support-riscv64-SV57-mode.patch
 
 %if !%{golang_bootstrap}
 BuildRequires:  gcc-go >= 5
@@ -387,6 +389,9 @@ fi
 %files devel -f go-tests.list -f go-misc.list -f go-src.list
 
 %changelog
+* Mon Apr 03 2023 misaka00251 <liuxin@iscas.ac.cn> - 1.19.4-2
+- Enable go plugin support for riscv64 (based on work by yangjinghua)
+- Backport upstream sv57 enablement for riscv64
 
 * Tue Jan 10 2023 hanchao <hanchao47@huawei.com> - 1.19.4-1
 - upgrade to 1.19.4
