@@ -204,6 +204,8 @@ func ParseFlags() {
 
 	Debug.AArch64LdSt = "none"
 
+	Debug.Go119UseJumpTables = 1 // allow to use jump tables by default
+
 	Flag.Cfg.ImportMap = make(map[string]string)
 	flag.BoolVar(&goobj.EnableMappingSymbols, "mappingsymbol", false, "generate mapping symbols for arm64")
 
