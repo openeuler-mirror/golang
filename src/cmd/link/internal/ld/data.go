@@ -2679,6 +2679,10 @@ func assignAddress(ctxt *Link, sect *sym.Section, n int, s loader.Sym, va uint64
 		funcsize = uint64(ldr.SymSize(s))
 	}
 
+	if *padfuncFlag && funcsize < abi.PADMINFUNC {
+		funcsize = abi.PADMINFUNC
+	}
+
 	// If we need to split text sections, and this function doesn't fit in the current
 	// section, then create a new one.
 	//

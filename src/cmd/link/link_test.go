@@ -1095,6 +1095,20 @@ func TestContentAddressableSymbols(t *testing.T) {
 	}
 }
 
+func TestCoreGoPadFunc(t *testing.T) {
+	// Test that the linker handles padfunc correctly.
+	testenv.MustHaveGoBuild(t)
+
+	t.Parallel()
+
+	src := filepath.Join("testdata", "testCoreGo", "padfunc.go")
+	cmd := testenv.Command(t, testenv.GoToolPath(t), "run", "-ldflags=-padfunc", src)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("command %s failed: %v\n%s", cmd, err, out)
+	}
+}
+
 func TestReadOnly(t *testing.T) {
 	// Test that read-only data is indeed read-only.
 	testenv.MustHaveGoBuild(t)
