@@ -129,6 +129,9 @@ type Flags struct {
 	// Synctest enables the testing/synctest package.
 	Synctest bool
 
+	// MemmoveOpt enables fast memmove
+	MemmoveOpt bool
+
 	// WideTrie uses larger children group in sync.hashtriemap
 	WideTrie bool
 
