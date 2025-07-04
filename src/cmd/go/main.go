@@ -19,6 +19,7 @@ import (
 	"runtime"
 	rtrace "runtime/trace"
 	"slices"
+	"strconv"
 	"strings"
 
 	"cmd/go/internal/base"
@@ -92,6 +93,8 @@ func init() {
 var _ = go11tag
 
 func main() {
+	optimizeDecision := GetOptimizeDecision()
+	os.Setenv("KP_AI_OPT", strconv.Itoa(optimizeDecision))
 	log.SetFlags(0)
 	handleChdirFlag()
 	toolchain.Select()
