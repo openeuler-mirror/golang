@@ -81,6 +81,13 @@ type CallStat struct {
 // The primary benefit of this transformation is enabling inlining of the
 // direct call.
 func ProfileGuided(fn *ir.Func, p *pgo.Profile) {
+	debug, _, _, _, _ := base.CFGOSwitch()
+	var pgoStr string
+	if base.ENABLE_CFGO {
+		pgoStr = "CFGO"
+	} else {
+		pgoStr = "PGO"
+	}
 	ir.CurFunc = fn
 
 	name := ir.LinkFuncName(fn)
@@ -89,7 +96,7 @@ func ProfileGuided(fn *ir.Func, p *pgo.Profile) {
 	goDeferCall := make(map[*ir.CallExpr]bool)
 
 	var jsonW *json.Encoder
-	if base.Debug.PGODebug >= 3 {
+	if *debug >= 3 {
 		jsonW = json.NewEncoder(os.Stdout)
 	}
 
@@ -113,7 +120,7 @@ func ProfileGuided(fn *ir.Func, p *pgo.Profile) {
 		}
 
 		var stat *CallStat
-		if base.Debug.PGODebug >= 3 {
+		if *debug >= 3 {
 			// Statistics about every single call. Handy for external data analysis.
 			//
 			// TODO(prattmic): Log via logopt?
@@ -129,13 +136,13 @@ func ProfileGuided(fn *ir.Func, p *pgo.Profile) {
 			return n
 		}
 
-		if base.Debug.PGODebug >= 2 {
-			fmt.Printf("%v: PGO devirtualize considering call %v\n", ir.Line(call), call)
+		if *debug >= 2 {
+			fmt.Printf("%v: %s devirtualize considering call %v\n", ir.Line(call), pgoStr, call)
 		}
 
 		if goDeferCall[call] {
-			if base.Debug.PGODebug >= 2 {
-				fmt.Printf("%v: can't PGO devirtualize go/defer call %v\n", ir.Line(call), call)
+			if *debug >= 2 {
+				fmt.Printf("%v: can't %s devirtualize go/defer call %v\n", ir.Line(call), pgoStr, call)
 			}
 			return n
 		}
@@ -176,11 +183,17 @@ func shouldPGODevirt(fn *ir.Func) bool {
 	if base.Flag.LowerM > 1 || logopt.Enabled() {
 		defer func() {
 			if reason != "" {
+				var pgoStr string
+				if base.ENABLE_CFGO {
+					pgoStr = "CFGO"
+				} else {
+					pgoStr = "PGO"
+				}
 				if base.Flag.LowerM > 1 {
-					fmt.Printf("%v: should not PGO devirtualize %v: %s\n", ir.Line(fn), ir.FuncName(fn), reason)
+					fmt.Printf("%v: should not %s devirtualize %v: %s\n", pgoStr, ir.Line(fn), ir.FuncName(fn), reason)
 				}
 				if logopt.Enabled() {
-					logopt.LogOpt(fn.Pos(), ": should not PGO devirtualize function", "pgo-devirtualize", ir.FuncName(fn), reason)
+					logopt.LogOpt(fn.Pos(), ": should not %s devirtualize function", "cfgo-devirtualize", pgoStr, ir.FuncName(fn), reason)
 				}
 			}
 		}()
@@ -266,7 +279,13 @@ func constructCallStat(p *pgo.Profile, fn *ir.Func, name string, call *ir.CallEx
 // concretetyp.
 func rewriteCondCall(call *ir.CallExpr, curfn, callee *ir.Func, concretetyp *types.Type) ir.Node {
 	if base.Flag.LowerM != 0 {
-		fmt.Printf("%v: PGO devirtualizing %v to %v\n", ir.Line(call), call.X, callee)
+		var pgoStr string
+		if base.ENABLE_CFGO {
+			pgoStr = "CFGO"
+		} else {
+			pgoStr = "PGO"
+		}
+		fmt.Printf("%v: %s devirtualizing %v to %v\n", ir.Line(call), pgoStr, call.X, callee)
 	}
 
 	// We generate an OINCALL of:
@@ -379,9 +398,17 @@ func rewriteCondCall(call *ir.CallExpr, curfn, callee *ir.Func, concretetyp *typ
 	res := ir.NewInlinedCallExpr(pos, body, retvars)
 	res.SetType(call.Type())
 	res.SetTypecheck(1)
+	
+	debug, _, _, _, _ := base.CFGOSwitch()
 
-	if base.Debug.PGODebug >= 3 {
-		fmt.Printf("PGO devirtualizing call to %+v. After: %+v\n", concretetyp, res)
+	if *debug >= 3 {
+		var pgoStr string
+		if base.ENABLE_CFGO {
+			pgoStr = "CFGO"
+		} else {
+			pgoStr = "PGO"
+		}
+		fmt.Printf("%s devirtualizing call to %+v. After: %+v\n", pgoStr, concretetyp, res)
 	}
 
 	return res
@@ -415,6 +442,7 @@ func interfaceCallRecvTypeAndMethod(call *ir.CallExpr) (*types.Type, *types.Sym)
 // findHotConcreteCallee returns the *ir.Func of the hottest callee of an
 // indirect call, if available, and its edge weight.
 func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (*ir.Func, int64) {
+	debug, _, _, _, _ := base.CFGOSwitch()
 	callerName := ir.LinkFuncName(caller)
 	callerNode := p.WeightedCG.IRNodes[callerName]
 	callOffset := pgo.NodeLineOffset(call, caller)
@@ -461,7 +489,7 @@ func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (
 			// maybe don't devirtualize? Similarly, if this is call
 			// is globally very cold, there is not much value in
 			// devirtualizing.
-			if base.Debug.PGODebug >= 2 {
+			if *debug >= 2 {
 				fmt.Printf("%v: edge %s:%d -> %s (weight %d): too cold (hottest %d)\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight, hottest.Weight)
 			}
 			continue
@@ -477,7 +505,7 @@ func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (
 			// because we only want to return the #1 hottest
 			// callee. If we skip this then we'd return the #2
 			// hottest callee.
-			if base.Debug.PGODebug >= 2 {
+			if *debug >= 2 {
 				fmt.Printf("%v: edge %s:%d -> %s (weight %d) (missing IR): hottest so far\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight)
 			}
 			hottest = e
@@ -488,7 +516,7 @@ func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (
 		if ctyp == nil {
 			// Not a method.
 			// TODO(prattmic): Support non-interface indirect calls.
-			if base.Debug.PGODebug >= 2 {
+			if *debug >= 2 {
 				fmt.Printf("%v: edge %s:%d -> %s (weight %d): callee not a method\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight)
 			}
 			continue
@@ -506,7 +534,7 @@ func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (
 			// What we'd need to do is check that the function
 			// pointer in the itab matches the method we want,
 			// rather than doing a full type assertion.
-			if base.Debug.PGODebug >= 2 {
+			if *debug >= 2 {
 				why := typecheck.ImplementsExplain(ctyp, inter)
 				fmt.Printf("%v: edge %s:%d -> %s (weight %d): %v doesn't implement %v (%s)\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight, ctyp, inter, why)
 			}
@@ -516,26 +544,26 @@ func findHotConcreteCallee(p *pgo.Profile, caller *ir.Func, call *ir.CallExpr) (
 		// If the method name is different it is most likely from a
 		// different call on the same line
 		if !strings.HasSuffix(e.Dst.Name(), "."+method.Name) {
-			if base.Debug.PGODebug >= 2 {
+			if *debug >= 2 {
 				fmt.Printf("%v: edge %s:%d -> %s (weight %d): callee is a different method\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight)
 			}
 			continue
 		}
 
-		if base.Debug.PGODebug >= 2 {
+		if *debug >= 2 {
 			fmt.Printf("%v: edge %s:%d -> %s (weight %d): hottest so far\n", ir.Line(call), callerName, callOffset, e.Dst.Name(), e.Weight)
 		}
 		hottest = e
 	}
 
 	if hottest == nil {
-		if base.Debug.PGODebug >= 2 {
+		if *debug >= 2 {
 			fmt.Printf("%v: call %s:%d: no hot callee\n", ir.Line(call), callerName, callOffset)
 		}
 		return nil, 0
 	}
 
-	if base.Debug.PGODebug >= 2 {
+	if *debug >= 2 {
 		fmt.Printf("%v call %s:%d: hottest callee %s (weight %d)\n", ir.Line(call), callerName, callOffset, hottest.Dst.Name(), hottest.Weight)
 	}
 	return hottest.Dst.AST, hottest.Weight

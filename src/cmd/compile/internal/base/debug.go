@@ -55,6 +55,11 @@ type DebugFlags struct {
 	PGOInlineCDFThreshold string `help:"cumulative threshold percentage for determining call sites as hot candidates for inlining" concurrent:"ok"`
 	PGOInlineBudget       int    `help:"inline budget for hot functions" concurrent:"ok"`
 	PGODevirtualize       int    `help:"enable profile-guided devirtualization" concurrent:"ok"`
+	CFGODebug             int    `help:"debug continuous feature guided optimizations"`
+	CFGOInline            int    `help:"enable continuous feature guided inlining: concurrent:"ok"`
+	CFGOInlineCDFThreshold string `help:"cumulative threshold percentage for determining call sites as hot candidates for inlining: concurrent:"ok"`
+	CFGOInlineBudget      int    `help:"inline budget for hot functions" concurrent:"ok"`
+	CFGODevirtualize      int    `help:"enable continuous feature guided devirtualization" concurrent:"ok"`
 	WrapGlobalMapDbg      int    `help:"debug trace output for global map init wrapping"`
 	WrapGlobalMapCtl      int    `help:"global map init wrap control (0 => default, 1 => off, 2 => stress mode, no size cutoff)"`
 

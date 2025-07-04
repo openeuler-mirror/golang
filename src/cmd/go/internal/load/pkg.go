@@ -51,6 +51,8 @@ import (
 	"golang.org/x/mod/module"
 )
 
+var ENABLE_CFGO = true
+
 // A Package describes a single package found in a directory.
 type Package struct {
 	PackagePublic                 // visible in 'go list'
@@ -238,6 +240,7 @@ type PackageInternal struct {
 	Embed             map[string][]string  // //go:embed comment mapping
 	OrigImportPath    string               // original import path before adding '_test' suffix
 	PGOProfile        string               // path to PGO profile
+	CFGOProfile       string               // path to CFGO profile
 	ForMain           string               // the main package if this package is built specifically for it
 
 	Asmflags   []string // -asmflags for this package
@@ -2925,14 +2928,42 @@ func setPGOProfilePath(pkgs []*Package) {
 			return
 		}
 
-		if cfg.BuildTrimpath {
-			appendBuildSetting(p.Internal.BuildInfo, "-pgo", filepath.Base(file))
+		if ENABLE_CFGO {
+			if cfg.BuildTrimpath {
+				appendBuildSetting(p.Internal.BuildInfo, "-cfgo", filepath.Base(file))
+			} else {
+				appendBuildSetting(p.Internal.BuildInfo, "-cfgo", file)
+			}
 		} else {
-			appendBuildSetting(p.Internal.BuildInfo, "-pgo", file)
+			if cfg.BuildTrimpath {
+				appendBuildSetting(p.Internal.BuildInfo, "-pgo", filepath.Base(file))
+			} else {
+				appendBuildSetting(p.Internal.BuildInfo, "-pgo", file)
+			}
 		}
 	}
 
-	switch cfg.BuildPGO {
+	if cfg.BuildCFGO != "off" && cfg.BuildCFGO != "auto" {
+		cfg.BuildPGO = "off"
+	} else if cfg.BuildCFGO == "off" {
+		ENABLE_CFGO = false
+	} else if cfg.BuildCFGO == "auto" && cfg.BuildPGO != "off" {
+		cfg.BuildCFGO = "off"
+		ENABLE_CFGO = false
+	}
+
+	var build string
+	var pgoStr string
+
+	if ENABLE_CFGO {
+		build = cfg.BuildCFGO
+		pgoStr = "CFGO"
+	} else {
+		build = cfg.BuildPGO
+		pgoStr = "PGO"
+	}
+
+	switch build {
 	case "off":
 		return
 
@@ -2969,8 +3000,14 @@ func setPGOProfilePath(pkgs []*Package) {
 					// No need to copy if there is only one root package (we can
 					// attach profile directly in-place).
 					// Also no need to copy the main package.
-					if p.Internal.PGOProfile != "" {
-						panic("setPGOProfilePath: already have profile")
+					if ENABLE_CFGO {
+						if p.Internal.CFGOProfile != "" {
+							panic("setPGOProfilePath: already have profile")
+						}
+					} else {
+						if p.Internal.PGOProfile != "" {
+							panic("setPGOProfilePath: already have profile")
+						}
 					}
 					p1 := new(Package)
 					*p1 = *p
@@ -2983,7 +3020,11 @@ func setPGOProfilePath(pkgs []*Package) {
 				} else {
 					visited[p] = p
 				}
-				p.Internal.PGOProfile = file
+				if ENABLE_CFGO {
+					p.Internal.CFGOProfile = file
+				} else {
+					p.Internal.PGOProfile = file
+				}
 				updateBuildInfo(p, file)
 				// Recurse to dependencies.
 				for i, pp := range p.Internal.Imports {
@@ -2999,13 +3040,17 @@ func setPGOProfilePath(pkgs []*Package) {
 	default:
 		// Profile specified from the command line.
 		// Make it absolute path, as the compiler runs on various directories.
-		file, err := filepath.Abs(cfg.BuildPGO)
+		file, err := filepath.Abs(build)
 		if err != nil {
-			base.Fatalf("fail to get absolute path of PGO file %s: %v", cfg.BuildPGO, err)
+			base.Fatalf("fail to get absolute path of %s file %s: %v", pgoStr, build, err)
 		}
 
 		for _, p := range PackageList(pkgs) {
-			p.Internal.PGOProfile = file
+			if ENABLE_CFGO {
+				p.Internal.CFGOProfile = file
+			} else {
+				p.Internal.PGOProfile = file
+			}
 			updateBuildInfo(p, file)
 		}
 	}
@@ -3042,8 +3087,14 @@ func CheckPackageErrors(pkgs []*Package) {
 		// built multiple times (with different profiles).
 		// We check that package import path + profile path is unique.
 		key := pkg.ImportPath
-		if pkg.Internal.PGOProfile != "" {
-			key += " pgo:" + pkg.Internal.PGOProfile
+		if ENABLE_CFGO {
+			if pkg.Internal.CFGOProfile != "" {
+				key += " cfgo:" + pkg.Internal.CFGOProfile
+			}
+		} else {
+			if pkg.Internal.PGOProfile != "" {
+				key += " pgo:" + pkg.Internal.PGOProfile
+			}
 		}
 		if seen[key] && !reported[key] {
 			reported[key] = true

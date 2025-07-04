@@ -393,6 +393,9 @@ func (b *Builder) buildActionID(a *Action) cache.ActionID {
 	if p.Internal.PGOProfile != "" {
 		fmt.Fprintf(h, "pgofile %s\n", b.fileHash(p.Internal.PGOProfile))
 	}
+	if p.Internal.CFGOProfile != "" {
+		fmt.Fprintf(h, "cfgofile %s\n", b.fileHash(p.Internal.CFGOProfile))
+	}
 	for _, a1 := range a.Deps {
 		p1 := a1.Package
 		if p1 != nil {

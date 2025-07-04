@@ -747,41 +747,75 @@ func runList(ctx context.Context, cmd *base.Command, args []string) {
 		}
 	}
 
-	if *listTest || (cfg.BuildPGO == "auto" && len(cmdline) > 1) {
-		all := pkgs
-		if !*listDeps {
-			all = loadPackageList(pkgs)
-		}
-		// Update import paths to distinguish the real package p
-		// from p recompiled for q.test, or to distinguish between
-		// p compiled with different PGO profiles.
-		// This must happen only once the build code is done
-		// looking at import paths, because it will get very confused
-		// if it sees these.
-		old := make(map[string]string)
-		for _, p := range all {
-			if p.ForTest != "" || p.Internal.ForMain != "" {
-				new := p.Desc()
-				old[new] = p.ImportPath
-				p.ImportPath = new
+	if load.ENABLE_CFGO {
+		if *listTest || (cfg.BuildCFGO == "auto" && len(cmdline) > 1) {
+			all := pkgs
+			if !*listDeps {
+				all = loadPackageList(pkgs)
 			}
-			p.DepOnly = !cmdline[p]
-		}
-		// Update import path lists to use new strings.
-		m := make(map[string]string)
-		for _, p := range all {
-			for _, p1 := range p.Internal.Imports {
-				if p1.ForTest != "" || p1.Internal.ForMain != "" {
-					m[old[p1.ImportPath]] = p1.ImportPath
+			old := make(map[string]string)
+			for _, p := range all {
+				if p.ForTest != "" || p.Internal.ForMain != "" {
+					new := p.Desc()
+					old[new] = p.ImportPath
+					p.ImportPath = new
+				}
+				p.DepOnly = !cmdline[p]
+			}
+			m := make(map[string]string)
+			for _, p := range all {
+				for _, p1 := range p.Internal.Imports {
+					if p1.ForTest != "" || p1.Internal.ForMain != "" {
+						m[old[p1.ImportPath]] = p1.ImportPath
+					}
+				}
+				for i, old := range p.Imports {
+					if new := m[old]; new != "" {
+						p.Imports[i] = new
+					}
+				}
+				for old := range m {
+					delete(m, old)
 				}
 			}
-			for i, old := range p.Imports {
-				if new := m[old]; new != "" {
-					p.Imports[i] = new
-				}
+		}
+	} else {
+		if *listTest || (cfg.BuildPGO == "auto" && len(cmdline) > 1) {
+			all := pkgs
+			if !*listDeps {
+				all = loadPackageList(pkgs)
 			}
-			for old := range m {
-				delete(m, old)
+			// Update import paths to distinguish the real package p
+			// from p recompiled for q.test, or to distinguish between
+			// p compiled with different PGO profiles.
+			// This must happen only once the build code is done
+			// looking at import paths, because it will get very confused
+			// if it sees these.
+			old := make(map[string]string)
+			for _, p := range all {
+				if p.ForTest != "" || p.Internal.ForMain != "" {
+					new := p.Desc()
+					old[new] = p.ImportPath
+					p.ImportPath = new
+				}
+				p.DepOnly = !cmdline[p]
+			}
+			// Update import path lists to use new strings.
+			m := make(map[string]string)
+			for _, p := range all {
+				for _, p1 := range p.Internal.Imports {
+					if p1.ForTest != "" || p1.Internal.ForMain != "" {
+						m[old[p1.ImportPath]] = p1.ImportPath
+					}
+				}
+				for i, old := range p.Imports {
+					if new := m[old]; new != "" {
+						p.Imports[i] = new
+					}
+				}
+				for old := range m {
+					delete(m, old)
+				}
 			}
 		}
 	}

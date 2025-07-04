@@ -36,6 +36,7 @@ func layoutOrder(f *Func) []*Block {
 	// scheduled block.
 	var succs []ID
 	exit := f.newSparseSet(f.NumBlocks()) // exit blocks
+	likelyPath := false
 	defer f.retSparseSet(exit)
 
 	// Populate idToBlock and find exit blocks.
@@ -131,9 +132,20 @@ blockloop:
 			likely = b.Succs[1].b
 		}
 		if likely != nil && !scheduled[likely.ID] {
+			likelyPath = true
 			bid = likely.ID
 			continue
 		}
+
+		if likelyPath && len(b.Succs) == 1 {
+			likelyBlock := b.Succs[0].b
+			if !scheduled[likelyBlock.ID] {
+				bid = likelyBlock.ID
+				continue blockloop
+			}
+		}
+
+		likelyPath = false
 
 		// Use degree for now.
 		bid = 0
