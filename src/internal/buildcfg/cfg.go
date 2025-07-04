@@ -27,6 +27,7 @@ var (
 	GO386    = envOr("GO386", defaultGO386)
 	GOAMD64  = goamd64()
 	GOARM    = goarm()
+	GOARM64  = goarm64()
 	GOMIPS   = gomips()
 	GOMIPS64 = gomips64()
 	GOPPC64  = goppc64()
@@ -85,6 +86,98 @@ func goarm() int {
 	}
 	Error = fmt.Errorf("invalid GOARM: must be 5, 6, 7")
 	return int(def[0] - '0')
+}
+
+type Goarm64Features struct {
+	Version string
+	// Large System Extension
+	LSE bool
+	// Kunpeng atomic optimize
+	KPAtomicOpt bool
+}
+
+func (g Goarm64Features) String() string {
+	arm64Str := g.Version
+	if g.LSE {
+		arm64Str += ",lse"
+	}
+
+	if g.KPAtomicOpt {
+		arm64Str += ",kpatomicopt"
+	}
+
+	return arm64Str
+}
+
+func ParseGoarm64(v string) (g Goarm64Features, e error) {
+	const (
+		lseOpt      = ",lse"
+		kpAtomicOpt = ",kpatomicopt"
+	)
+
+	g.LSE = false
+	g.KPAtomicOpt = false
+
+	// We allow any combination of suffixes, in any order
+	for {
+		if strings.HasSuffix(v, lseOpt) {
+			g.LSE = true
+			v = v[:len(v)-len(lseOpt)]
+			continue
+		}
+
+		if strings.HasSuffix(v, kpAtomicOpt) {
+			if os.Getenv("KP_ATOMIC_OPT") == "1" {
+				g.KPAtomicOpt = true
+			}
+			v = v[:len(v)-len(kpAtomicOpt)]
+			continue
+		}
+
+		break
+	}
+
+	switch v {
+	case "v8.0", "v8.1", "v8.2", "v8.3", "v8.4", "v8.5", "v8.6", "v8.7", "v8.8", "v8.9",
+	    "v9.0", "v9.1", "v9.2", "v9.4", "v9.5":
+		g.Version = v
+	default:
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q and/or %q",
+			lseOpt, kpAtomicOpt)
+		g.Version = defaultGOARM64
+	}
+
+	return
+}
+
+func goarm64() (g Goarm64Features) {
+	g, Error = ParseGoarm64(envOr("GOARM64", defaultGOARM64))
+	return
+}
+
+func (g Goarm64Features) Supports(s string) bool {
+	// We only accept "v{8-9}.{0-9}. Everything else is malformed.
+	if len(s) != 4 {
+		return false
+	}
+
+	major := s[1]
+	minor := s[3]
+
+	if major < '8' || major > '9' ||
+	minor < '0' || minor > '9' ||
+	s[0] != 'v' || s[2] != '.' {return false}
+
+	g_major := g.Version[1]
+	g_minor := g.Version[3]
+
+	if major == g_major {
+		return minor <= g_minor
+	} else if g_major == '9' {
+		return minor <= g_minor+5
+	} else {
+		return false
+	}
 }
 
 func gomips() string {
@@ -183,6 +276,8 @@ func GOGOARCH() (name, value string) {
 		return "GOAMD64", fmt.Sprintf("v%d", GOAMD64)
 	case "arm":
 		return "GOARM", strconv.Itoa(GOARM)
+	case "arm64":
+		return "GOARM64", GOARM64.String()
 	case "mips", "mipsle":
 		return "GOMIPS", GOMIPS
 	case "mips64", "mips64le":
@@ -209,6 +304,19 @@ func gogoarchTags() []string {
 		var list []string
 		for i := 5; i <= GOARM; i++ {
 			list = append(list, fmt.Sprintf("%s.%d", GOARCH, i))
+		}
+		return list
+	case "arm64":
+		var list []string
+		major := int(GOARM64.Version[1] - '0')
+		minor := int(GOARM64.Version[3] - '0')
+		for i := 0; i <= minor; i++ {
+			list = append(list, fmt.Sprintf("%s.v%d.%d", GOARCH, major, i))
+		}
+		if major == 9 {
+			for i := 0; i <= minor+5 && i <= 9; i++ {
+				list = append(list, fmt.Sprint("%s.v%d.%d", GOARCH, 8, i))
+			}
 		}
 		return list
 	case "mips", "mipsle":
