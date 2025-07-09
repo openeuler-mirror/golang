@@ -127,7 +127,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		}
 
 		if strings.HasSuffix(v, kpAtomicOpt) {
-			if os.Getenv("KP_ATOMIC_OPT") == "1" {
+			if os.Getenv("KP_AI_OPT") == "1" {
 				g.KPAtomicOpt = true
 			}
 			v = v[:len(v)-len(kpAtomicOpt)]
@@ -165,8 +165,10 @@ func (g Goarm64Features) Supports(s string) bool {
 	minor := s[3]
 
 	if major < '8' || major > '9' ||
-	minor < '0' || minor > '9' ||
-	s[0] != 'v' || s[2] != '.' {return false}
+		minor < '0' || minor > '9' ||
+		s[0] != 'v' || s[2] != '.' {
+		return false
+	}
 
 	g_major := g.Version[1]
 	g_minor := g.Version[3]
