@@ -1483,7 +1483,7 @@ func cmdbootstrap() {
 	// Now that cmd/go is in charge of the build process, enable GOEXPERIMENT.
 	os.Setenv("GOEXPERIMENT", goexperiment)
 	// No need to enable PGO for toolchain2.
-	goInstall(toolenv(), goBootstrap, append([]string{"-pgo=off"}, toolchain...)...)
+	goInstall(toolenv(), goBootstrap, append([]string{"-pgo=off", "-cfgo=off"}, toolchain...)...)
 	if debug {
 		run("", ShowOutput|CheckExit, pathf("%s/compile", tooldir), "-V=full")
 		copyfile(pathf("%s/compile2", tooldir), pathf("%s/compile", tooldir), writeExec)

@@ -124,6 +124,7 @@ type CmdFlags struct {
 	TrimPath           string       "help:\"remove `prefix` from recorded source file paths\""
 	WB                 bool         "help:\"enable write barrier\"" // TODO: remove
 	PgoProfile         string       "help:\"read profile from `file`\""
+	CfgoProfile        string       "help:\"read profile from `file`\""
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
 
 	// Configuration derived from flags; not a flag itself.
@@ -141,6 +142,15 @@ type CmdFlags struct {
 		// when the race detector is enabled.
 		Instrumenting bool
 	}
+}
+
+var ENABLE_CFGO = true
+
+func CFGOSwitch() (*int, *int, *string, *int, *int) {
+	if ENABLE_CFGO {
+		return &Debug.CFGODebug, &Debug.CFGOInline, &Debug.CFGOInlineCDFThreshold, &Debug.CFGOInlineBudget, &Debug.CFGODevirtualize
+	}
+	return &Debug.PGODebug, &Debug.PGOInline, &Debug.PGOInlineCDFThreshold, &Debug.PGOInlineBudget, &Debug.PGODevirtualize
 }
 
 // ParseFlags parses the command-line flags into Flag.
@@ -170,6 +180,8 @@ func ParseFlags() {
 	Debug.InlStaticInit = 1
 	Debug.PGOInline = 1
 	Debug.PGODevirtualize = 1
+	Debug.CFGOInline = 1
+	Debug.CFGODevirtualize = 1
 	Debug.SyncFrames = -1 // disable sync markers by default
 
 	Debug.Checkptr = -1 // so we can tell whether it is set explicitly

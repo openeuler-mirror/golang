@@ -254,17 +254,35 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 
 	// Read profile file and build profile-graph and weighted-call-graph.
 	base.Timer.Start("fe", "pgo-load-profile")
+	base.Timer.Start("fe", "cfgo-load-profile")
 	var profile *pgo.Profile
 	if base.Flag.PgoProfile != "" {
 		var err error
+		base.ENABLE_CFGO = false
 		profile, err = pgo.New(base.Flag.PgoProfile)
 		if err != nil {
 			log.Fatalf("%s: PGO error: %v", base.Flag.PgoProfile, err)
 		}
+	} else if base.Flag.CfgoProfile != "" {
+		result := os.Getenv("KP_AI_OPT")
+		if result == "1" {
+			base.ENABLE_CFGO = true
+			var err error
+			profile, err = pgo.New(base.Flag.CfgoProfile)
+			if err != nil {
+				log.Fatalf("%s: CFGO error: %v", base.Flag.CfgoProfile, err)
+			}
+		} else {
+			base.ENABLE_CFGO = false
+		}
+	} else {
+		base.ENABLE_CFGO = false
 	}
 
+	_, _, _, _, godevirtualize := base.CFGOSwitch()
 	base.Timer.Start("fe", "pgo-devirtualization")
-	if profile != nil && base.Debug.PGODevirtualize > 0 {
+	base.Timer.Start("fe", "cfgo-devirtualization")
+	if profile != nil && *godevirtualize > 0 {
 		// TODO(prattmic): No need to use bottom-up visit order. This
 		// is mirroring the PGO IRGraph visit order, which also need
 		// not be bottom-up.

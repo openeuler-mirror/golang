@@ -78,20 +78,27 @@ var (
 
 // pgoInlinePrologue records the hot callsites from ir-graph.
 func pgoInlinePrologue(p *pgo.Profile, decls []ir.Node) {
-	if base.Debug.PGOInlineCDFThreshold != "" {
-		if s, err := strconv.ParseFloat(base.Debug.PGOInlineCDFThreshold, 64); err == nil && s >= 0 && s <= 100 {
+	debug, _, inlineCDFThreshold, inlineBudget, _ := base.CFGOSwitch()
+	if *inlineCDFThreshold != "" {
+		if s, err := strconv.ParseFloat(*inlineCDFThreshold, 64); err == nil && s >= 0 && s <= 100 {
 			inlineCDFHotCallSiteThresholdPercent = s
 		} else {
-			base.Fatalf("invalid PGOInlineCDFThreshold, must be between 0 and 100")
+			var pgoStr string
+			if base.ENABLE_CFGO {
+				pgoStr = "CFGO"
+			} else {
+				pgoStr = "PGO"
+			}
+			base.Fatalf("invalid %sInlineCDFThreshold, must be between 0 and 100\n", pgoStr)
 		}
 	}
 	var hotCallsites []pgo.NodeMapKey
 	inlineHotCallSiteThresholdPercent, hotCallsites = hotNodesFromCDF(p)
-	if base.Debug.PGODebug > 0 {
+	if *debug > 0 {
 		fmt.Printf("hot-callsite-thres-from-CDF=%v\n", inlineHotCallSiteThresholdPercent)
 	}
 
-	if x := base.Debug.PGOInlineBudget; x != 0 {
+	if x := *inlineBudget; x != 0 {
 		inlineHotMaxBudget = int32(x)
 	}
 
@@ -107,7 +114,7 @@ func pgoInlinePrologue(p *pgo.Profile, decls []ir.Node) {
 		}
 	}
 
-	if base.Debug.PGODebug >= 3 {
+	if *debug >= 3 {
 		fmt.Printf("hot-cg before inline in dot format:")
 		p.PrintWeightedCallGraphDOT(inlineHotCallSiteThresholdPercent)
 	}
@@ -156,7 +163,8 @@ func hotNodesFromCDF(p *pgo.Profile) (float64, []pgo.NodeMapKey) {
 
 // InlinePackage finds functions that can be inlined and clones them before walk expands them.
 func InlinePackage(p *pgo.Profile) {
-	if base.Debug.PGOInline == 0 {
+	_, inline, _, _, _ := base.CFGOSwitch()
+	if *inline == 0 {
 		p = nil
 	}
 
@@ -308,7 +316,8 @@ func CanInline(fn *ir.Func, profile *pgo.Profile) {
 		if n, ok := profile.WeightedCG.IRNodes[ir.LinkFuncName(fn)]; ok {
 			if _, ok := candHotCalleeMap[n]; ok {
 				budget = int32(inlineHotMaxBudget)
-				if base.Debug.PGODebug > 0 {
+				debug, _, _, _, _ := base.CFGOSwitch()
+				if *debug > 0 {
 					fmt.Printf("hot-node enabled increased budget=%v for func=%v\n", budget, ir.PkgFuncName(fn))
 				}
 			}
@@ -577,7 +586,8 @@ func (v *hairyVisitor) doNode(n ir.Node) bool {
 				lineOffset := pgo.NodeLineOffset(n, fn)
 				csi := pgo.CallSiteInfo{LineOffset: lineOffset, Caller: v.curFunc}
 				if _, o := candHotEdgeMap[csi]; o {
-					if base.Debug.PGODebug > 0 {
+					debug, _, _, _, _ := base.CFGOSwitch()
+					if *debug > 0 {
 						fmt.Printf("hot-callsite identified at line=%v for func=%v\n", ir.Line(n), ir.PkgFuncName(v.curFunc))
 					}
 				}
@@ -1009,9 +1019,9 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller bool) (bool
 	}
 
 	// Hot
-
+	debug, _, _, _, _ := base.CFGOSwitch()
 	if bigCaller {
-		if base.Debug.PGODebug > 0 {
+		if *debug > 0 {
 			fmt.Printf("hot-big check disallows inlining for call %s (cost %d) at %v in big function %s\n", ir.PkgFuncName(callee), callee.Inl.Cost, ir.Line(n), ir.PkgFuncName(caller))
 		}
 		return false, maxCost
@@ -1021,7 +1031,7 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller bool) (bool
 		return false, inlineHotMaxBudget
 	}
 
-	if base.Debug.PGODebug > 0 {
+	if *debug > 0 {
 		fmt.Printf("hot-budget check allows inlining for call %s (cost %d) at %v in function %s\n", ir.PkgFuncName(callee), callee.Inl.Cost, ir.Line(n), ir.PkgFuncName(caller))
 	}
 
