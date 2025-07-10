@@ -1258,6 +1258,8 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		// Maybe just all noscan objects?
 		x = add(x, size-dataSize)
 	}
+	
+	sys.Prefetch(uintptr(unsafe.Add(x, size)))
 
 	return x
 }

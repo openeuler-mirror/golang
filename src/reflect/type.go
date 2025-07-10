@@ -1714,9 +1714,18 @@ func MapOf(key, elem Type) Type {
 }
 
 var funcTypes []Type
-var funcTypesMutex sync.Mutex
+var funcTypesMutex sync.RWMutex
+var kpAtomicOpt bool
 
 func initFuncTypes(n int) Type {
+	if kpAtomicOpt {
+		funcTypesMutex.RLock()
+		if n < len(funcTypes) && funcTypes[n] != nil {
+			defer funcTypesMutex.RUnlock()
+			return funcTypes[n]
+		}
+		funcTypesMutex.RUnlock()
+	}
 	funcTypesMutex.Lock()
 	defer funcTypesMutex.Unlock()
 	if n >= len(funcTypes) {
