@@ -94,7 +94,7 @@ var _ = go11tag
 
 func main() {
 	optimizeDecision := GetOptimizeDecision()
-	os.Setenv("KP_AI_OPT", strconv.Itoa(optimizeDecision))
+	os.Setenv("AI_OPT", strconv.Itoa(optimizeDecision))
 	log.SetFlags(0)
 	handleChdirFlag()
 	toolchain.Select()
