@@ -127,7 +127,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		}
 
 		if strings.HasSuffix(v, kpAtomicOpt) {
-			if os.Getenv("KP_AI_OPT") == "1" {
+			if os.Getenv("AI_OPT") == "1" {
 				g.KPAtomicOpt = true
 			}
 			v = v[:len(v)-len(kpAtomicOpt)]
@@ -139,7 +139,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 
 	switch v {
 	case "v8.0", "v8.1", "v8.2", "v8.3", "v8.4", "v8.5", "v8.6", "v8.7", "v8.8", "v8.9",
-	    "v9.0", "v9.1", "v9.2", "v9.4", "v9.5":
+		"v9.0", "v9.1", "v9.2", "v9.4", "v9.5":
 		g.Version = v
 	default:
 		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q and/or %q",

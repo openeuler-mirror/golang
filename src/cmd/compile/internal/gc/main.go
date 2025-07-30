@@ -264,7 +264,7 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 			log.Fatalf("%s: PGO error: %v", base.Flag.PgoProfile, err)
 		}
 	} else if base.Flag.CfgoProfile != "" {
-		result := os.Getenv("KP_AI_OPT")
+		result := os.Getenv("AI_OPT")
 		if result == "1" {
 			base.ENABLE_CFGO = true
 			var err error
