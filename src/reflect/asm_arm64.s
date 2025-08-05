@@ -19,6 +19,13 @@
 #define LOCAL_RETVALID 40
 #define LOCAL_REGARGS 48
 
+GLOBL ·kpAtomicOpt(SB),(NOPTR|WRAPPER),$1
+#ifndef KPAtomicOpt
+DATA ·kpAtomicOpt(SB)/1,$0
+#else
+DATA ·kpAtomicOpt(SB)/1,$1
+#endif
+
 // The frame size of the functions below is
 // 32 (args of callReflect) + 8 (bool + padding) + 392 (abi.RegArgs) = 432.
 
