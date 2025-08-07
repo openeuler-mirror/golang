@@ -752,7 +752,7 @@ func runList(ctx context.Context, cmd *base.Command, args []string) {
 		}
 	}
 
-	if *listTest || (cfg.BuildPGO == "auto" && len(cmdline) > 1) {
+	if *listTest || ((cfg.BuildPGO == "auto"|| cfg.BuildCFGO == "auto") && len(cmdline) > 1) {
 		all := pkgs
 		if !*listDeps {
 			all = loadPackageList(pkgs)

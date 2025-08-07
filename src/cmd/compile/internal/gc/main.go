@@ -229,11 +229,31 @@ func Main(archInit func(*ssagen.ArchInfo)) {
 	var profile *pgoir.Profile
 	if base.Flag.PgoProfile != "" {
 		var err error
+		base.ENABLE_CFGO = false
 		profile, err = pgoir.New(base.Flag.PgoProfile)
 		if err != nil {
 			log.Fatalf("%s: PGO error: %v", base.Flag.PgoProfile, err)
 		}
 	}
+	base.Timer.Start("fe", "cfgo-load-profile")
+	if base.Flag.CfgoProfile != "" {
+		result := os.Getenv("AI_OPT")
+		// result := "1"
+		if result == "1" {
+			var err error
+			base.ENABLE_CFGO = true
+			profile, err = pgoir.New(base.Flag.CfgoProfile)
+			if err != nil {
+				log.Fatalf("%s: CFGO error: %v", base.Flag.CfgoProfile, err)
+			}
+		} else {
+			base.ENABLE_CFGO = false
+		}
+	} else {
+		base.ENABLE_CFGO = false
+	}
+
+	// fmt.Printf("CfgoProfile: %s, PgoProfile: %s, ENABLE_CFGO: %t, profile: %t\n", base.Flag.CfgoProfile, base.Flag.PgoProfile, base.ENABLE_CFGO, profile != nil)
 
 	// Interleaved devirtualization and inlining.
 	base.Timer.Start("fe", "devirtualize-and-inline")

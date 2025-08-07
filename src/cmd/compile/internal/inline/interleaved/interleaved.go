@@ -17,10 +17,13 @@ import (
 	"fmt"
 )
 
+var dv, il *int
+
 // DevirtualizeAndInlinePackage interleaves devirtualization and inlining on
 // all functions within pkg.
 func DevirtualizeAndInlinePackage(pkg *ir.Package, profile *pgoir.Profile) {
-	if profile != nil && base.Debug.PGODevirtualize > 0 {
+	_, _, il, _, _, dv, _ = base.CFGOSwitch()
+	if profile != nil && *dv > 0 {
 		// TODO(mdempsky): Integrate into DevirtualizeAndInlineFunc below.
 		ir.VisitFuncsBottomUp(typecheck.Target.Funcs, func(list []*ir.Func, recursive bool) {
 			for _, fn := range list {
@@ -35,7 +38,7 @@ func DevirtualizeAndInlinePackage(pkg *ir.Package, profile *pgoir.Profile) {
 	}
 
 	var inlProfile *pgoir.Profile // copy of profile for inlining
-	if base.Debug.PGOInline != 0 {
+	if *il != 0 {
 		inlProfile = profile
 	}
 

@@ -468,9 +468,15 @@ func (ba *buildActor) Act(b *Builder, ctx context.Context, a *Action) error {
 
 // pgoActionID computes the action ID for a preprocess PGO action.
 func (b *Builder) pgoActionID(input string) cache.ActionID {
-	h := cache.NewHash("preprocess PGO profile " + input)
+	var mode string
+	if load.ENABLE_CFGO {
+		mode = "CFGO"
+	} else {
+		mode = "PGO"
+	}
+	h := cache.NewHash("preprocess "+ mode + " profile " + input)
 
-	fmt.Fprintf(h, "preprocess PGO profile\n")
+	fmt.Fprintf(h, "preprocess %s profile\n", mode)
 	fmt.Fprintf(h, "preprofile %s\n", b.toolID("preprofile"))
 	fmt.Fprintf(h, "input %q\n", b.fileHash(input))
 
@@ -574,6 +580,20 @@ func (b *Builder) CompileAction(mode, depMode BuildMode, p *load.Package) *Actio
 				return a
 			})
 			a.Deps = append(a.Deps, pgoAction)
+		}
+
+		if p.Internal.CFGOProfile != "" {
+			cfgoAction := b.cacheAction("preprocess CFGO profile "+p.Internal.CFGOProfile, nil, func() *Action {
+				a := &Action{
+					Mode: "preprocess CFGO profile",
+					Actor: &pgoActor{input: p.Internal.CFGOProfile},
+					Objdir: b.NewObjdir(),
+				}
+				a.Target = filepath.Join(a.Objdir, "cfgo.preprofile")
+
+				return a
+			})
+			a.Deps = append(a.Deps, cfgoAction)
 		}
 
 		if p.Standard {

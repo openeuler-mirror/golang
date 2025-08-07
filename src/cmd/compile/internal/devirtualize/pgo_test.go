@@ -27,6 +27,7 @@ func init() {
 	base.Ctxt = &obj.Link{Arch: &obj.LinkArch{Arch: &sys.Arch{Alignment: 1, CanMergeLoads: true}}}
 	typecheck.InitUniverse()
 	base.Debug.PGODebug = 3
+	base.Debug.CFGODebug = 3
 }
 
 func makePos(b *src.PosBase, line, col uint) src.XPos {
