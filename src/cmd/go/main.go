@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	rtrace "runtime/trace"
 	"slices"
+	"strconv"
 	"strings"
 
 	"cmd/go/internal/base"
@@ -97,6 +98,8 @@ var _ = go11tag
 var counterErrorsGOPATHEntryRelative = counter.New("go/errors:gopath-entry-relative")
 
 func main() {
+	optimizeDecision := GetOptimizeDecision()
+	os.Setenv("AI_OPT", strconv.Itoa(optimizeDecision))
 	log.SetFlags(0)
 	telemetry.MaybeChild() // Run in child mode if this is the telemetry sidecar child process.
 	cmdIsGoTelemetryOff := cmdIsGoTelemetryOff()
