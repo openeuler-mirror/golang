@@ -52,6 +52,11 @@ import (
 	"golang.org/x/mod/module"
 )
 
+var (
+	ENABLE_CFGO = true
+	mode string
+)
+
 // A Package describes a single package found in a directory.
 type Package struct {
 	PackagePublic                 // visible in 'go list'
@@ -238,6 +243,7 @@ type PackageInternal struct {
 	Embed             map[string][]string  // //go:embed comment mapping
 	OrigImportPath    string               // original import path before adding '_test' suffix
 	PGOProfile        string               // path to PGO profile
+	CFGOProfile       string               // path to CFGO profile
 	ForMain           string               // the main package if this package is built specifically for it
 
 	Asmflags   []string // -asmflags for this package
@@ -2973,10 +2979,16 @@ func setPGOProfilePath(pkgs []*Package) {
 			return
 		}
 
-		if cfg.BuildTrimpath {
-			appendBuildSetting(p.Internal.BuildInfo, "-pgo", filepath.Base(file))
+		if ENABLE_CFGO {
+			mode = "-cfgo"
 		} else {
-			appendBuildSetting(p.Internal.BuildInfo, "-pgo", file)
+			mode = "-pgo"
+		}
+
+		if cfg.BuildTrimpath {
+			appendBuildSetting(p.Internal.BuildInfo, mode, filepath.Base(file))
+		} else {
+			appendBuildSetting(p.Internal.BuildInfo, mode, file)
 		}
 		// Adding -pgo breaks the sort order in BuildInfo.Settings. Restore it.
 		slices.SortFunc(p.Internal.BuildInfo.Settings, func(x, y debug.BuildSetting) int {
@@ -2984,7 +2996,25 @@ func setPGOProfilePath(pkgs []*Package) {
 		})
 	}
 
-	switch cfg.BuildPGO {
+	if !(cfg.BuildCFGO == "off" || cfg.BuildCFGO == "auto") {
+		cfg.BuildPGO = "off"
+	} else if cfg.BuildCFGO == "off" {
+		ENABLE_CFGO = false
+	} else if cfg.BuildPGO != "off" {
+		cfg.BuildCFGO = "off"
+		ENABLE_CFGO = false
+	}
+
+	var build string
+	if ENABLE_CFGO {
+		build = cfg.BuildCFGO
+		mode = "CFGO"
+	} else {
+		build = cfg.BuildPGO
+		mode = "PGO"
+	}
+
+	switch build {
 	case "off":
 		return
 
@@ -3021,7 +3051,7 @@ func setPGOProfilePath(pkgs []*Package) {
 					// No need to copy if there is only one root package (we can
 					// attach profile directly in-place).
 					// Also no need to copy the main package.
-					if p.Internal.PGOProfile != "" {
+					if p.Internal.PGOProfile != "" || p.Internal.CFGOProfile != "" {
 						panic("setPGOProfilePath: already have profile")
 					}
 					p1 := new(Package)
@@ -3037,7 +3067,11 @@ func setPGOProfilePath(pkgs []*Package) {
 				} else {
 					visited[p] = p
 				}
-				p.Internal.PGOProfile = file
+				if ENABLE_CFGO {
+					p.Internal.CFGOProfile = file
+				} else {
+					p.Internal.PGOProfile = file
+				}
 				updateBuildInfo(p, file)
 				// Recurse to dependencies.
 				for i, pp := range p.Internal.Imports {
@@ -3053,13 +3087,17 @@ func setPGOProfilePath(pkgs []*Package) {
 	default:
 		// Profile specified from the command line.
 		// Make it absolute path, as the compiler runs on various directories.
-		file, err := filepath.Abs(cfg.BuildPGO)
+		file, err := filepath.Abs(build)
 		if err != nil {
-			base.Fatalf("fail to get absolute path of PGO file %s: %v", cfg.BuildPGO, err)
+			base.Fatalf("fail to get absolute path of %s file %s: %v", mode, build, err)
 		}
 
 		for _, p := range PackageList(pkgs) {
-			p.Internal.PGOProfile = file
+			if ENABLE_CFGO {
+				p.Internal.CFGOProfile = file
+			} else {
+				p.Internal.PGOProfile = file
+			}
 			updateBuildInfo(p, file)
 		}
 	}
@@ -3109,6 +3147,9 @@ func PackageErrors(pkgs []*Package, report func(*Package)) {
 		key := pkg.ImportPath
 		if pkg.Internal.PGOProfile != "" {
 			key += " pgo:" + pkg.Internal.PGOProfile
+		}
+		if pkg.Internal.CFGOProfile != "" {
+			key += " cfgo:" + pkg.Internal.CFGOProfile
 		}
 		if seen[key] && !reported[key] {
 			reported[key] = true

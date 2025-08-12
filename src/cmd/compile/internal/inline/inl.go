@@ -85,6 +85,10 @@ var (
 	inlineHotMaxBudget int32 = 2000
 )
 
+var db, ib *int
+var h **base.HashDebug
+var ict *string
+
 func IsPgoHotFunc(fn *ir.Func, profile *pgoir.Profile) bool {
 	if profile == nil {
 		return false
@@ -103,20 +107,25 @@ func HasPgoHotInline(fn *ir.Func) bool {
 
 // PGOInlinePrologue records the hot callsites from ir-graph.
 func PGOInlinePrologue(p *pgoir.Profile) {
-	if base.Debug.PGOInlineCDFThreshold != "" {
-		if s, err := strconv.ParseFloat(base.Debug.PGOInlineCDFThreshold, 64); err == nil && s >= 0 && s <= 100 {
+	db, _, _, ict, ib, _, _ = base.CFGOSwitch()
+	if *ict != "" {
+		if s, err := strconv.ParseFloat(*ict, 64); err == nil && s >= 0 && s <= 100 {
 			inlineCDFHotCallSiteThresholdPercent = s
 		} else {
-			base.Fatalf("invalid PGOInlineCDFThreshold, must be between 0 and 100")
+			if base.ENABLE_CFGO {
+				base.Fatalf("invalid CFGOInlineCDFThreshold, must be between 0 and 100")
+			} else {
+				base.Fatalf("invalid PGOInlineCDFThreshold, must be between 0 and 100")
+			}
 		}
 	}
 	var hotCallsites []pgo.NamedCallEdge
 	inlineHotCallSiteThresholdPercent, hotCallsites = hotNodesFromCDF(p)
-	if base.Debug.PGODebug > 0 {
+	if *db > 0 {
 		fmt.Printf("hot-callsite-thres-from-CDF=%v\n", inlineHotCallSiteThresholdPercent)
 	}
 
-	if x := base.Debug.PGOInlineBudget; x != 0 {
+	if x := *ib; x != 0 {
 		inlineHotMaxBudget = int32(x)
 	}
 
@@ -132,7 +141,7 @@ func PGOInlinePrologue(p *pgoir.Profile) {
 		}
 	}
 
-	if base.Debug.PGODebug >= 3 {
+	if *db >= 3 {
 		fmt.Printf("hot-cg before inline in dot format:")
 		p.PrintWeightedCallGraphDOT(inlineHotCallSiteThresholdPercent)
 	}
@@ -220,6 +229,7 @@ func inlineBudget(fn *ir.Func, profile *pgoir.Profile, relaxed bool, verbose boo
 // If so, CanInline saves copies of fn.Body and fn.Dcl in fn.Inl.
 // fn and fn.Body will already have been typechecked.
 func CanInline(fn *ir.Func, profile *pgoir.Profile) {
+	db, _, _, _, _, _, _ = base.CFGOSwitch()
 	if fn.Nname == nil {
 		base.Fatalf("CanInline no nname %+v", fn)
 	}
@@ -261,7 +271,7 @@ func CanInline(fn *ir.Func, profile *pgoir.Profile) {
 	relaxed := inlheur.Enabled()
 
 	// Compute the inline budget for this func.
-	budget := inlineBudget(fn, profile, relaxed, base.Debug.PGODebug > 0)
+	budget := inlineBudget(fn, profile, relaxed, *db > 0)
 
 	// At this point in the game the function we're looking at may
 	// have "stale" autos, vars that still appear in the Dcl list, but
@@ -910,6 +920,7 @@ var InlineCall = func(callerfn *ir.Func, call *ir.CallExpr, fn *ir.Func, inlInde
 //   - the score assigned to this specific callsite
 //   - whether the inlined function is "hot" according to PGO.
 func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCalledOnce bool) (bool, int32, int32, bool) {
+	db, _, _, _, _, _, h = base.CFGOSwitch()
 	maxCost := int32(inlineMaxBudget)
 
 	if bigCaller {
@@ -953,7 +964,7 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 	// Hot
 
 	if bigCaller {
-		if base.Debug.PGODebug > 0 {
+		if *db > 0 {
 			fmt.Printf("hot-big check disallows inlining for call %s (cost %d) at %v in big function %s\n", ir.PkgFuncName(callee), callee.Inl.Cost, ir.Line(n), ir.PkgFuncName(caller))
 		}
 		return false, maxCost, metric, false
@@ -963,12 +974,12 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 		return false, inlineHotMaxBudget, metric, false
 	}
 
-	if !base.PGOHash.MatchPosWithInfo(n.Pos(), "inline", nil) {
+	if !(*h).MatchPosWithInfo(n.Pos(), "inline", nil) {
 		// De-selected by PGO Hash.
 		return false, maxCost, metric, false
 	}
 
-	if base.Debug.PGODebug > 0 {
+	if *db > 0 {
 		fmt.Printf("hot-budget check allows inlining for call %s (cost %d) at %v in function %s\n", ir.PkgFuncName(callee), callee.Inl.Cost, ir.Line(n), ir.PkgFuncName(caller))
 	}
 

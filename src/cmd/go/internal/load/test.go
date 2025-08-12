@@ -221,6 +221,7 @@ func TestPackagesAndErrors(ctx context.Context, done func(), opts PackageOpts, p
 		ptest.EmbedFiles = str.StringList(p.EmbedFiles, p.TestEmbedFiles)
 		ptest.Internal.OrigImportPath = p.Internal.OrigImportPath
 		ptest.Internal.PGOProfile = p.Internal.PGOProfile
+		ptest.Internal.CFGOProfile = p.Internal.CFGOProfile
 		ptest.Internal.Build.Directives = append(slices.Clip(p.Internal.Build.Directives), p.Internal.Build.TestDirectives...)
 	} else {
 		ptest = p
@@ -259,6 +260,7 @@ func TestPackagesAndErrors(ctx context.Context, done func(), opts PackageOpts, p
 				Embed:          xtestEmbed,
 				OrigImportPath: p.Internal.OrigImportPath,
 				PGOProfile:     p.Internal.PGOProfile,
+				CFGOProfile:    p.Internal.CFGOProfile,
 			},
 		}
 		if pxtestNeedsPtest {
@@ -290,6 +292,7 @@ func TestPackagesAndErrors(ctx context.Context, done func(), opts PackageOpts, p
 			Gccgoflags:     gccgoflags,
 			OrigImportPath: p.Internal.OrigImportPath,
 			PGOProfile:     p.Internal.PGOProfile,
+			CFGOProfile:    p.Internal.CFGOProfile,
 		},
 	}
 
@@ -492,6 +495,7 @@ func recompileForTest(pmain, preal, ptest, pxtest *Package) *PackageError {
 			p.Internal.BuildInfo = nil
 			p.Internal.ForceLibrary = true
 			p.Internal.PGOProfile = preal.Internal.PGOProfile
+			p.Internal.CFGOProfile = preal.Internal.CFGOProfile
 		}
 
 		// Update p.Internal.Imports to use test copies.
@@ -518,6 +522,9 @@ func recompileForTest(pmain, preal, ptest, pxtest *Package) *PackageError {
 		// Split and attach PGO information to test dependencies if preal
 		// is built with PGO.
 		if preal.Internal.PGOProfile != "" && p.Internal.PGOProfile == "" {
+			split()
+		}
+		if preal.Internal.CFGOProfile != "" && p.Internal.CFGOProfile == "" {
 			split()
 		}
 	}

@@ -83,6 +83,8 @@ type IRNode struct {
 	OutEdges map[pgo.NamedCallEdge]*IREdge
 }
 
+var db *int
+
 // Name returns the symbol name of this function.
 func (i *IRNode) Name() string {
 	if i.AST != nil {
@@ -132,28 +134,34 @@ func New(profileFile string) (*Profile, error) {
 		return nil, fmt.Errorf("error processing profile header: %w", err)
 	}
 
-	var base *pgo.Profile
+	var pbase *pgo.Profile
+	var mode string
+	if base.ENABLE_CFGO {
+		mode = "CFGO"
+	} else {
+		mode = "PGO"
+	}
 	if isSerialized {
-		base, err = pgo.FromSerialized(r)
+		pbase, err = pgo.FromSerialized(r)
 		if err != nil {
-			return nil, fmt.Errorf("error processing serialized PGO profile: %w", err)
+			return nil, fmt.Errorf("error processing serialized %s profile: %w", mode, err)
 		}
 	} else {
-		base, err = pgo.FromPProf(r)
+		pbase, err = pgo.FromPProf(r)
 		if err != nil {
-			return nil, fmt.Errorf("error processing pprof PGO profile: %w", err)
+			return nil, fmt.Errorf("error processing pprof %s profile: %w", mode, err)
 		}
 	}
 
-	if base.TotalWeight == 0 {
+	if pbase.TotalWeight == 0 {
 		return nil, nil // accept but ignore profile with no samples.
 	}
 
 	// Create package-level call graph with weights from profile and IR.
-	wg := createIRGraph(base.NamedEdgeMap)
+	wg := createIRGraph(pbase.NamedEdgeMap)
 
 	return &Profile{
-		Profile:    base,
+		Profile:    pbase,
 		WeightedCG: wg,
 	}, nil
 }
@@ -293,6 +301,7 @@ var PostLookupCleanup = func() {
 // calls inside inlined call bodies. If we did add that, we'd need edges from
 // inlined bodies as well.
 func addIndirectEdges(g *IRGraph, namedEdgeMap pgo.NamedEdgeMap) {
+	db, _, _, _, _, _, _ = base.CFGOSwitch()
 	// g.IRNodes is populated with the set of functions in the local
 	// package build by VisitIR. We want to filter for local functions
 	// below, but we also add unknown callees to IRNodes as we go. So make
@@ -340,12 +349,12 @@ func addIndirectEdges(g *IRGraph, namedEdgeMap pgo.NamedEdgeMap) {
 			// devirtualization. Instantiation of generic functions
 			// will likely need to be done at the devirtualization
 			// site, if at all.
-			if base.Debug.PGODebug >= 3 {
+			if *db >= 3 {
 				fmt.Printf("addIndirectEdges: %s attempting export data lookup\n", key.CalleeName)
 			}
 			fn, err := LookupFunc(key.CalleeName)
 			if err == nil {
-				if base.Debug.PGODebug >= 3 {
+				if *db >= 3 {
 					fmt.Printf("addIndirectEdges: %s found in export data\n", key.CalleeName)
 				}
 				calleeNode = &IRNode{AST: fn}

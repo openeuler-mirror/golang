@@ -126,6 +126,7 @@ type CmdFlags struct {
 	TrimPath           string       "help:\"remove `prefix` from recorded source file paths\""
 	WB                 bool         "help:\"enable write barrier\"" // TODO: remove
 	PgoProfile         string       "help:\"read profile or pre-process profile from `file`\""
+	CfgoProfile        string       "help:\"read profile or pre-process profile from `file`\""
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
 
 	// Configuration derived from flags; not a flag itself.
@@ -142,6 +143,18 @@ type CmdFlags struct {
 		// Whether we are adding any sort of code instrumentation, such as
 		// when the race detector is enabled.
 		Instrumenting bool
+	}
+}
+
+var (
+	ENABLE_CFGO = true
+)
+
+func CFGOSwitch() (*int, *string, *int, *string, *int, *int, **HashDebug) {
+	if ENABLE_CFGO {
+		return &Debug.CFGODebug, &Debug.CFGOHash, &Debug.CFGOInline, &Debug.CFGOInlineCDFThreshold, &Debug.CFGOInlineBudget, &Debug.CFGODevirtualize, &CFGOHash
+	} else {
+		return &Debug.PGODebug, &Debug.PGOHash, &Debug.PGOInline, &Debug.PGOInlineCDFThreshold, &Debug.PGOInlineBudget, &Debug.PGODevirtualize, &PGOHash
 	}
 }
 
@@ -183,6 +196,8 @@ func ParseFlags() {
 	Debug.InlStaticInit = 1
 	Debug.PGOInline = 1
 	Debug.PGODevirtualize = 2
+	Debug.CFGOInline = 1
+	Debug.CFGODevirtualize = 2
 	Debug.SyncFrames = -1 // disable sync markers by default
 	Debug.ZeroCopy = 1
 	Debug.RangeFuncCheck = 1
@@ -266,6 +281,9 @@ func ParseFlags() {
 	}
 	if Debug.PGOHash != "" {
 		PGOHash = NewHashDebug("pgohash", Debug.PGOHash, nil)
+	}
+	if Debug.CFGOHash != "" {
+		CFGOHash = NewHashDebug("cfgohash", Debug.CFGOHash, nil)
 	}
 	if Debug.MergeLocalsHash != "" {
 		MergeLocalsHash = NewHashDebug("mergelocals", Debug.MergeLocalsHash, nil)
