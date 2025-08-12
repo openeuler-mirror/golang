@@ -1092,6 +1092,9 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	if debug.malloc {
 		postMallocgcDebug(x, elemsize, typ)
 	}
+
+	sys.Prefetch(uintptr(unsafe.Add(x, size)))
+
 	return x
 }
 
