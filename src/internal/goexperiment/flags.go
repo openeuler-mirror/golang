@@ -128,4 +128,7 @@ type Flags struct {
 
 	// Synctest enables the testing/synctest package.
 	Synctest bool
+
+	// Kunpeng malloc prefetch optimization.
+	PrefetchMalloc bool
 }
