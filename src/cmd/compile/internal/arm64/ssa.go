@@ -1085,6 +1085,27 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.To.Name = obj.NAME_EXTERN
 		p.To.Sym = ir.Syms.Duffzero
 		p.To.Offset = v.AuxInt
+	case ssa.OpARM64CCMP,
+		ssa.OpARM64CCMN,
+		ssa.OpARM64CCMPconst,
+		ssa.OpARM64CCMNconst,
+		ssa.OpARM64CCMPW,
+		ssa.OpARM64CCMNW,
+		ssa.OpARM64CCMPWconst,
+		ssa.OpARM64CCMNWconst:
+		p := s.Prog(v.Op.Asm())
+		p.Reg = v.Args[0].Reg()
+		params := v.AuxArm64ConditionalParams()
+		p.From.Type = obj.TYPE_SPECIAL // assembler encodes conditional bits in Offset
+		p.From.Offset = int64(condBits[params.Cond()])
+		constValue, ok := params.ConstValue()
+		if ok {
+			p.AddRestSourceConst(constValue)
+		} else {
+			p.AddRestSourceReg(v.Args[1].Reg())
+		}
+		p.To.Type = obj.TYPE_CONST
+		p.To.Offset = params.Nzcv()
 	case ssa.OpARM64LoweredZero:
 		// STP.P	(ZR,ZR), 16(R16)
 		// CMP	Rarg1, R16
