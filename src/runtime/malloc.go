@@ -102,6 +102,7 @@ package runtime
 
 import (
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/goos"
 	"runtime/internal/atomic"
 	"runtime/internal/math"
@@ -1259,7 +1260,9 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 		x = add(x, size-dataSize)
 	}
 	
-	sys.Prefetch(uintptr(unsafe.Add(x, size)))
+	if goexperiment.PrefetchMalloc {
+		sys.Prefetch(uintptr(unsafe.Add(x, size)))
+	}
 
 	return x
 }
