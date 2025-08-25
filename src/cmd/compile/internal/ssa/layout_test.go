@@ -33,7 +33,7 @@ func TestLayoutPredicatedBranch(t *testing.T) {
 
 	for i, b := range fun.f.Blocks {
 		if b.ID != expectedOrder[i] {
-			t.Errof("block layout order want %d, got %d", expectedOrder[i], b.ID)
+			t.Errorf("block layout order want %d, got %d", expectedOrder[i], b.ID)
 		}
 	}
 }
