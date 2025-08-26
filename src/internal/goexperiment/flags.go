@@ -109,4 +109,7 @@ type Flags struct {
 	// CacheProg adds support to cmd/go to use a child process to implement
 	// the build cache; see https://github.com/golang/go/issues/59719.
 	CacheProg bool
+
+	// Kunpeng malloc prefetch optimization.
+	PrefetchMalloc bool
 }
