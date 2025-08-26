@@ -73,7 +73,7 @@ var gcGoalUtilization = gcController.gcRatio
 var gcController gcControllerState
 
 type gcControllerState struct {
-	// gcBackgroundUtilization be optional, value equals gcratio/100.0.
+	// gcController.gcRatio be optional, value equals gcratio/100.0.
 	// Initialized from GOGCRATIO, which in the range of (1, 99).
 	// Default GOGCRATIO is 25.
 	gcRatio float64
@@ -395,7 +395,7 @@ func (c *gcControllerState) startCycle(markStartTime int64, procs int, trigger g
 	const maxUtilError = 0.3
 	if utilError < -maxUtilError || utilError > maxUtilError {
 		// Rounding put us more than 30% off our goal. With
-		// gcBackgroundUtilization of 25%, this happens for
+		// gcController.gcRatio of 25%, this happens for
 		// GOMAXPROCS<=3 or GOMAXPROCS=6. Enable fractional
 		// workers to compensate.
 		if float64(dedicatedMarkWorkersNeeded) > totalUtilizationGoal {

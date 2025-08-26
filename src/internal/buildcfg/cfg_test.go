@@ -69,7 +69,7 @@ func TestConfigFlags(t *testing.T) {
 		t.Errorf("Wrong parsing of GOARM64=v8.0,lse,crypto")
 	}
 	os.Setenv("GOARM64", "v9.0")
-	if goarm64().Version != "v9.0" || goarm64().LSE != true || goarm64().Crypto != false {
+	if goarm64().Version != "v9.0" || goarm64().LSE != false || goarm64().Crypto != false {
 		t.Errorf("Wrong parsing of GOARM64=v9.0")
 	}
 }

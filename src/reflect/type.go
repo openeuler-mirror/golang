@@ -1808,17 +1808,18 @@ func ChanOf(dir ChanDir, t Type) Type {
 }
 
 var funcTypes []Type
-var funcTypesMutex sync.RWMutex
+var funcTypesMutex sync.Mutex
+var funcTypesRWMutex sync.RWMutex
 var kpAtomicOpt bool
 
 func initFuncTypes(n int) Type {
 	if kpAtomicOpt {
-		funcTypesMutex.RLock()
+		funcTypesRWMutex.RLock()
 		if n < len(funcTypes) && funcTypes[n] != nil {
-			defer funcTypesMutex.RUnlock()
+			defer funcTypesRWMutex.RUnlock()
 			return funcTypes[n]
 		}
-		funcTypesMutex.RUnlock()
+		funcTypesRWMutex.RUnlock()
 	}
 	funcTypesMutex.Lock()
 	defer funcTypesMutex.Unlock()
