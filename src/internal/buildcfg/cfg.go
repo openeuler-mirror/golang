@@ -317,7 +317,7 @@ func gogoarchTags() []string {
 		}
 		if major == 9 {
 			for i := 0; i <= minor+5 && i <= 9; i++ {
-				list = append(list, fmt.Sprint("%s.v%d.%d", GOARCH, 8, i))
+				list = append(list, fmt.Sprintf("%s.v%d.%d", GOARCH, 8, i))
 			}
 		}
 		return list
