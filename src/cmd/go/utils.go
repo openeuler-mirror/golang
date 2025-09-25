@@ -98,26 +98,28 @@ func getSha256(input string) string {
 	return hex.EncodeToString(hashBytes)
 }
 
-func readFloatFromFile(file *os.File) float32 {
+func readFloatFromOnnx(readPos int) (float32, int) {
 	var hexFloat [4]byte
 	for i := 0; i < 4; i++ {
-		_, err := fmt.Fscanf(file, "%2x", &hexFloat[i])
+		_, err := fmt.Sscanf(onnx[readPos:], "%2x", &hexFloat[i])
 		if err != nil {
-			return 0
+			return 0, len(onnx)
 		}
+		readPos += 2
 	}
 	uint32Float := binary.LittleEndian.Uint32(hexFloat[:])
 	xFloat := math.Float32frombits(uint32Float)
-	return xFloat
+	return xFloat, readPos
 }
 
-func readByteFromFile(file *os.File) byte {
+func readByteFromOnnx(readPos int) (byte, int) {
 	var xByte byte
-	_, err := fmt.Fscanf(file, "%2x", &xByte)
+	_, err := fmt.Sscanf(onnx[readPos:], "%2x", &xByte)
 	if err != nil {
-		return 0
+		return 0, len(onnx)
 	}
-	return xByte
+	readPos += 2
+	return xByte, readPos
 }
 
 func parseValue(data string) int64 {

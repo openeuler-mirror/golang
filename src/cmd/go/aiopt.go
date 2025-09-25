@@ -1,9 +1,6 @@
 package main
 
 import (
-	"os"
-	"path/filepath"
-	"runtime"
 	"unsafe"
 )
 
@@ -36,56 +33,51 @@ var (
 	intercepts1  [intercepts1Row]float32
 )
 
-func fillNode(file *os.File) {
+func fillNode() {
+	readPos := 0
 	for i := 0; i < catsStringsRow; i++ {
 		var str [sha256sumOutputSize]byte
 		for j := 0; j < sha256sumOutputSize; j++ {
-			str[j] = readByteFromFile(file)
+			str[j], readPos = readByteFromOnnx(readPos)
 		}
 		catsStrings[i] = string(str[:])
 	}
 	for i := 0; i < catsStrings1Row; i++ {
 		var str [sha256sumOutputSize]byte
 		for j := 0; j < sha256sumOutputSize; j++ {
-			str[j] = readByteFromFile(file)
+			str[j], readPos = readByteFromOnnx(readPos)
 		}
 		catsStrings1[i] = string(str[:])
 	}
 	for i := 0; i < offsetRow; i++ {
-		offset[i] = readFloatFromFile(file)
+		offset[i], readPos = readFloatFromOnnx(readPos)
 	}
 	for i := 0; i < scaleRow; i++ {
-		scale[i] = readFloatFromFile(file)
+		scale[i], readPos = readFloatFromOnnx(readPos)
 	}
 	for i := 0; i < unityRow; i++ {
-		unity[i] = readFloatFromFile(file)
+		unity[i], readPos = readFloatFromOnnx(readPos)
 	}
 	for i := 0; i < coefficientRow; i++ {
 		for j := 0; j < coefficientCol; j++ {
-			coefficient[i][j] = readFloatFromFile(file)
+			coefficient[i][j], readPos = readFloatFromOnnx(readPos)
 		}
 	}
 	for i := 0; i < coefficient1Row; i++ {
 		for j := 0; j < coefficient1Col; j++ {
-			coefficient1[i][j] = readFloatFromFile(file)
+			coefficient1[i][j], readPos = readFloatFromOnnx(readPos)
 		}
 	}
 	for i := 0; i < interceptsRow; i++ {
-		intercepts[i] = readFloatFromFile(file)
+		intercepts[i], readPos = readFloatFromOnnx(readPos)
 	}
 	for i := 0; i < intercepts1Row; i++ {
-		intercepts1[i] = readFloatFromFile(file)
+		intercepts1[i], readPos = readFloatFromOnnx(readPos)
 	}
 }
 
 func graphInfer(mops string, modes []int64) int {
-	fileName := filepath.Join(runtime.GOROOT(), "src", "cmd", "go", "data", "onnx.fdata")
-	file, err := os.Open(fileName)
-	if err != nil {
-		return -1
-	}
-	defer file.Close()
-	fillNode(file)
+	fillNode()
 	var inModes [mModeSize]int64
 	var inOptions [mOptionSize]string
 	inOptions[0] = mops
