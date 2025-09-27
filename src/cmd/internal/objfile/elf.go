@@ -29,7 +29,11 @@ func openElf(r io.ReaderAt) (rawFile, error) {
 func (f *elfFile) symbols() ([]Sym, error) {
 	elfSyms, err := f.elf.Symbols()
 	if err != nil {
-		return nil, err
+		elfDSyms, err2 := f.elf.DynamicSymbols()
+		if err2 != nil {
+			return nil, err2
+		}
+		elfSyms = elfDSyms
 	}
 
 	var syms []Sym
@@ -158,7 +162,11 @@ func (f *elfFile) dwarf() (*dwarf.Data, error) {
 func (f *elfFile) symbolData(start, end string) []byte {
 	elfSyms, err := f.elf.Symbols()
 	if err != nil {
-		return nil
+		elfDSyms, err2 := f.elf.DynamicSymbols()
+		if err2 != nil {
+			return nil
+		}
+		elfSyms = elfDSyms
 	}
 	var addr, eaddr uint64
 	for _, s := range elfSyms {
