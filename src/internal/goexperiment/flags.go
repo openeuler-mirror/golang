@@ -131,4 +131,7 @@ type Flags struct {
 
 	// WideTrie uses larger children group in sync.hashtriemap
 	WideTrie bool
+
+	// Clear the span if necessary
+	ClearSpan bool
 }
