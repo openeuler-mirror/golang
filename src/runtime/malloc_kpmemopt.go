@@ -12,6 +12,8 @@ import (
 	"internal/cpu"
 )
 
+var minSizeForMallocHeader uintptr
+
 func memMinSizeCalKp(arr *[68]uint16, len uint64) int
 
 func findMinSize(class uintptr, size uint64, min uint64) int64

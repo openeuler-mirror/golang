@@ -2540,3 +2540,7 @@ func isEnableBytesStringBytesOpt() bool {
 func isEnableAggressivePatterns() bool {
 	return base.Flag.AggressivePatterns
 }
+
+func isEnableAggressiveProve() bool {
+	return base.Flag.AggressiveProve
+}

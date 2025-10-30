@@ -13519,6 +13519,7 @@ func rewriteValuegeneric_OpLoad(v *Value) bool {
 	v_0 := v.Args[0]
 	b := v.Block
 	config := b.Func.Config
+	typ := &b.Func.Config.Types
 	// match: (Load <t1> p1 (Store {t2} p2 x _))
 	// cond: !isEnableAggressiveDse() && isSamePtr(p1, p2) && t1.Compare(x.Type) == types.CMPeq && t1.Size() == t2.Size()
 	// result: x
@@ -13745,6 +13746,48 @@ func rewriteValuegeneric_OpLoad(v *Value) bool {
 			break
 		}
 		v.copyOf(x)
+		return true
+	}
+	// match: (Load <typ.UInt8> p1 (Store {typ.Bool} p2 x _))
+	// cond: isEnableAggressiveProve() && isSamePtr(p1, p2)
+	// result: (CvtBoolToUint8 x)
+	for {
+		if v.Type != typ.UInt8 {
+			break
+		}
+		p1 := v_0
+		if v_1.Op != OpStore || auxToType(v_1.Aux) != typ.Bool {
+			break
+		}
+		x := v_1.Args[1]
+		p2 := v_1.Args[0]
+		if !(isEnableAggressiveProve() && isSamePtr(p1, p2)) {
+			break
+		}
+		v.reset(OpCvtBoolToUint8)
+		v.AddArg(x)
+		return true
+	}
+	// match: (Load <typ.UInt8> (NilCheck p1 st:(Store {typ.Bool} p2 x _)) st)
+	// cond: isEnableAggressiveProve() && isSamePtr(p1, p2)
+	// result: (CvtBoolToUint8 x)
+	for {
+		if v.Type != typ.UInt8 || v_0.Op != OpNilCheck {
+			break
+		}
+		_ = v_0.Args[1]
+		p1 := v_0.Args[0]
+		st := v_0.Args[1]
+		if st.Op != OpStore || auxToType(st.Aux) != typ.Bool {
+			break
+		}
+		x := st.Args[1]
+		p2 := st.Args[0]
+		if st != v_1 || !(isEnableAggressiveProve() && isSamePtr(p1, p2)) {
+			break
+		}
+		v.reset(OpCvtBoolToUint8)
+		v.AddArg(x)
 		return true
 	}
 	// match: (Load <t1> p1 (Store {t2} p2 (Const64 [x]) _))

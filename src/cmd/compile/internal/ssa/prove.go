@@ -5,6 +5,7 @@
 package ssa
 
 import (
+	"cmd/internal/obj"
 	"cmd/internal/src"
 	"fmt"
 	"math"
@@ -1028,9 +1029,9 @@ func (ft *factsTable) update(parent *Block, v, w *Value, d domain, r relation) {
 		}
 	}
 
-	// Process: x+delta > w (with delta constant)
-	// Only signed domain for now (useful for accesses to slices in loops).
 	if r == gt || r == gt|eq {
+		// Signed domain (useful for accesses to slices in loops).
+		// Process: x+delta > w (with delta constant)
 		if x, delta := isConstDelta(v); x != nil && d == signed {
 			if parent.Func.pass.debug > 1 {
 				parent.Func.Warnl(parent.Pos, "x+d %s w; x:%v %v delta:%v w:%v d:%v", r, x, parent.String(), delta, w.AuxInt, d)
@@ -1113,6 +1114,41 @@ func (ft *factsTable) update(parent *Block, v, w *Value, d domain, r relation) {
 						}
 						ft.signedMin(x, min)
 					}
+				}
+			}
+		} else if d == unsigned && isEnableAggressiveProve() {
+			// Unsigned domain: handle x+u >= w (with both u and w constants)
+			if x, delta := isConstDelta(v); x != nil && w.isGenericIntConst() && delta >= 0 {
+				u := uint64(delta)
+				wval := w.AuxUnsigned()
+				xlim := ft.limits[x.ID]
+				_, ok := safeAddU(xlim.umax, u, uint(x.Type.Size()*8))
+				if parent.Func.pass.debug > 1 {
+					parent.Func.Warnl(parent.Pos, "x+u %s w; x:%v %v u:%v w:%v d:%v xumax:%v ok:%v", r, x, parent.String(), u, wval, d, xlim.umax, ok)
+				}
+				// x+u >= w: if x+u never wraps, learn x >= w-u
+				if ok && wval >= u {
+					min := wval - u
+					if r == gt {
+						min++ // actually we have x+u > w, learn x >= w-u+1
+					}
+					ft.unsignedMin(x, min)
+				}
+			} else if x, delta := isConstDelta(w); x != nil && v.isGenericIntConst() && delta >= 0 {
+				u := uint64(delta)
+				vval := v.AuxUnsigned()
+				xlim := ft.limits[x.ID]
+				_, ok := safeAddU(xlim.umax, u, uint(x.Type.Size()*8))
+				if parent.Func.pass.debug > 1 {
+					parent.Func.Warnl(parent.Pos, "v %s x+u; x:%v %v u:%v v:%v d:%v xumax:%v ok:%v", r, x, parent.String(), u, vval, d, xlim.umax, ok)
+				}
+				// x+u <= v: if x+u never wraps, learn x <= v-u
+				if ok && vval >= u {
+					max := vval - u
+					if r == gt && max > 0 {
+						max-- // actually we have x+u < v, learn x <= v-u-1
+					}
+					ft.unsignedMax(x, max)
 				}
 			}
 		}
@@ -1763,14 +1799,26 @@ func (ft *factsTable) flowLimit(v *Value) bool {
 		// OR can only make the value bigger and can't flip bits proved to be zero in both inputs.
 		a := ft.limits[v.Args[0].ID]
 		b := ft.limits[v.Args[1].ID]
-		return ft.unsignedMinMax(v,
-			max(a.umin, b.umin),
-			1<<bits.Len64(a.umax|b.umax)-1)
+		bits := uint(bits.Len64(a.umax | b.umax))
+		upper := uint64(1)<<bits - 1
+		if isEnableAggressiveProve() {
+			if sum, ok := safeAddU(a.umax, b.umax, bits); ok && sum < upper {
+				upper = sum
+			}
+		}
+		return ft.unsignedMinMax(v, max(a.umin, b.umin), upper)
 	case OpXor64, OpXor32, OpXor16, OpXor8:
 		// XOR can't flip bits that are proved to be zero in both inputs.
 		a := ft.limits[v.Args[0].ID]
 		b := ft.limits[v.Args[1].ID]
-		return ft.unsignedMax(v, 1<<bits.Len64(a.umax|b.umax)-1)
+		bits := uint(bits.Len64(a.umax | b.umax))
+		upper := uint64(1)<<bits - 1
+		if isEnableAggressiveProve() {
+			if sum, ok := safeAddU(a.umax, b.umax, bits); ok && sum < upper {
+				upper = sum
+			}
+		}
+		return ft.unsignedMax(v, upper)
 	case OpCom64, OpCom32, OpCom16, OpCom8:
 		a := ft.limits[v.Args[0].ID]
 		return ft.newLimit(v, a.com(uint(v.Type.Size())*8))
@@ -1844,6 +1892,16 @@ func (ft *factsTable) flowLimit(v *Value) bool {
 		a := ft.limits[v.Args[0].ID]
 		b := ft.limits[v.Args[1].ID]
 		return ft.newLimit(v, a.mul(b.exp2(8), 8))
+	case OpRsh8Ux8, OpRsh8Ux16, OpRsh8Ux32, OpRsh8Ux64,
+		OpRsh16Ux8, OpRsh16Ux16, OpRsh16Ux32, OpRsh16Ux64,
+		OpRsh32Ux8, OpRsh32Ux16, OpRsh32Ux32, OpRsh32Ux64,
+		OpRsh64Ux8, OpRsh64Ux16, OpRsh64Ux32, OpRsh64Ux64:
+		if isEnableAggressiveProve() && v.Args[1].isGenericIntConst() {
+			by := v.Args[1].AuxUnsigned()
+			src := ft.limits[v.Args[0].ID]
+			upper := src.umax >> by
+			return ft.unsignedMax(v, upper)
+		}
 	case OpMod64, OpMod32, OpMod16, OpMod8:
 		a := ft.limits[v.Args[0].ID]
 		b := ft.limits[v.Args[1].ID]
@@ -1887,17 +1945,31 @@ func (ft *factsTable) flowLimit(v *Value) bool {
 		// where c3 = OpConst [3] and c5 = OpConst [5] are
 		// defined in the entry block, we can derive [3,5]
 		// as the limit for v.
-		l := ft.limits[v.Args[0].ID]
+		l := maybeImproveUpperBound(ft.limits[v.Args[0].ID], v.Args[0])
 		for _, a := range v.Args[1:] {
-			l2 := ft.limits[a.ID]
+			l2 := maybeImproveUpperBound(ft.limits[a.ID], a)
 			l.min = min(l.min, l2.min)
 			l.max = max(l.max, l2.max)
 			l.umin = min(l.umin, l2.umin)
 			l.umax = max(l.umax, l2.umax)
 		}
 		return ft.newLimit(v, l)
+	case OpLoad:
+		if upper, ok := getGlobalConstArrayUpperLimit(v); ok {
+			return ft.unsignedMax(v, upper)
+		}
 	}
 	return false
+}
+
+func maybeImproveUpperBound(lim limit, v *Value) limit {
+	if v.Op != OpLoad {
+		return lim
+	}
+	if upper, ok := getGlobalConstArrayUpperLimit(v); ok {
+		lim.umax = min(lim.umax, upper)
+	}
+	return lim
 }
 
 // getBranch returns the range restrictions added by p
@@ -2142,6 +2214,25 @@ var mostNegativeDividend = map[Op]int64{
 func simplifyBlock(sdom SparseTree, ft *factsTable, b *Block) {
 	for _, v := range b.Values {
 		switch v.Op {
+		case OpLess64U, OpLess32U, OpLess16U, OpLess8U, OpLeq64U, OpLeq32U, OpLeq16U, OpLeq8U:
+			if !isEnableAggressiveProve() {
+				break
+			}
+			// Substitute (OpLeqU (Add x [delta]) [cval]) => (OpLeqU x [cval-delta]) here:
+			// opt would need knowledge where unsigned wrap is possible to handle such cases.
+			x, delta := isConstDelta(v.Args[0])
+			if x == nil || !v.Args[1].isGenericIntConst() || delta < 0 {
+				break
+			}
+			cval := v.Args[1].AuxUnsigned()
+			xlim := ft.limits[x.ID]
+			u := uint64(delta)
+			if _, ok := safeAddU(xlim.umax, u, uint(x.Type.Size()*8)); !ok || u > cval {
+				break
+			}
+			v.SetArg(0, x)
+			uval := b.NewValue0I(b.Pos, v.Args[1].Op, v.Type, int64(cval-u))
+			v.SetArg(1, uval)
 		case OpSlicemask:
 			// Replace OpSlicemask operations in b with constants where possible.
 			x, delta := isConstDelta(v.Args[0])
@@ -2403,4 +2494,39 @@ func isCleanExt(v *Value) bool {
 		return !v.Args[0].Type.IsSigned()
 	}
 	return false
+}
+
+func getGlobalConstArrayUpperLimit(ld *Value) (uint64, bool) {
+	if !isEnableAggressiveProve() || ld.Op != OpLoad {
+		return 0, false
+	}
+	ptr := ld.Args[0]
+	if ptr.Op != OpAddPtr {
+		return 0, false
+	}
+	addr := ptr.Args[0]
+	if addr.Op != OpAddr || addr.Args[0].Op != OpSB {
+		return 0, false
+	}
+	sym := auxToSym(addr.Aux)
+	if sym == nil {
+		return 0, false
+	}
+	lsym, ok := sym.(*obj.LSym)
+	if !ok {
+		return 0, false
+	}
+	// TODO: The upper bound should be based on some global constant IP analysis instead of hard coding here.
+	// For now these values must be in sync with runtime/sizeclasses.go and runtime/sizeclasses_expanded_by_eight.go
+	// Also see TestSizeClassArrayMaxValueWithTags
+	switch lsym.Name {
+	case "runtime.size_to_class8":
+		return 32, true
+	case "runtime.size_to_class128":
+		return 67, true
+	case "runtime.class_to_size":
+		return 32768, true
+	default:
+	}
+	return 0, false
 }

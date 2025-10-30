@@ -41,12 +41,30 @@ go build -a -gcflags='all=-d forceinline=0 -d forceinlinelog=2' .
 ! stderr -q 'force-inline check allows'
 
 # ----------------------------------------------------------------------------------------------------------------------
-# Use -gcflags="-d forceinline=2", it is illegal setting value, expect build failed.
+# Use -gcflags="-d forceinline=2", inline only mallocgc sub-functions into mallocgc.
 #
 
-! go build -a -gcflags='all=-d forceinline=2 -d forceinlinelog=2' .
+go build -a -gcflags='all=-d forceinline=2 -d forceinlinelog=2' .
 
-stderr -q '-forceinline does not support setting to 2'
+stderr -q 'force-inline enabled .* func=runtime.mallocgcTiny'
+stderr -q 'force-inline enabled .* func=runtime.mallocgcSmallNoscan'
+stderr -q 'force-inline enabled .* func=runtime.mallocgcSmallScanNoHeader'
+stderr -q 'force-inline enabled .* func=runtime.mallocgcSmallScanHeader'
+stderr -q 'force-inline enabled .* func=runtime.mallocgcLarge'
+
+# Check that mallocgc itself is NOT force-inlined (not in case 2 list).
+! stderr -q 'force-inline enabled .* func=runtime.mallocgc$'
+
+# Check that non-mallocgc functions are NOT force-inlined.
+! stderr -q 'force-inline enabled .* func=runtime.scanobject'
+
+# ----------------------------------------------------------------------------------------------------------------------
+# Use -gcflags="-d forceinline=3", it is an illegal setting value, expect build failed.
+#
+
+! go build -a -gcflags='all=-d forceinline=3 -d forceinlinelog=2' .
+
+stderr -q '-forceinline does not support setting to 3'
 
 # ----------------------------------------------------------------------------------------------------------------------
 # Use -gcflags='all=-l -d forceinline=1", all functions cannot be inlined.
