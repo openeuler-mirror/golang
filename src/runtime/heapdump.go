@@ -14,6 +14,7 @@ package runtime
 import (
 	"internal/abi"
 	"internal/goarch"
+	"internal/goexperiment"
 	"unsafe"
 )
 
@@ -471,7 +472,7 @@ func dumproots() {
 
 // Bit vector of free marks.
 // Needs to be as big as the largest number of objects per span.
-var freemark [_PageSize / 8]bool
+var freemark [_PageSize / 8 * (1 + goexperiment.PageNumInt * _PageNumberMulti)]bool
 
 func dumpobjs() {
 	// To protect mheap_.allspans.
