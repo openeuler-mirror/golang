@@ -1,37 +1,42 @@
-# golang
+# The Go Programming Language
 
-#### 介绍
-golang package
+Go is an open source programming language that makes it easy to build simple,
+reliable, and efficient software.
 
-#### 软件架构
-软件架构说明
+![Gopher image](https://golang.org/doc/gopher/fiveyears.jpg)
+*Gopher image by [Renee French][rf], licensed under [Creative Commons 4.0 Attribution license][cc4-by].*
 
+Our canonical Git repository is located at https://go.googlesource.com/go.
+There is a mirror of the repository at https://github.com/golang/go.
 
-#### 安装教程
+Unless otherwise noted, the Go source files are distributed under the
+BSD-style license found in the LICENSE file.
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+### Download and Install
 
-#### 使用说明
+#### Binary Distributions
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+Official binary distributions are available at https://go.dev/dl/.
 
-#### 参与贡献
+After downloading a binary release, visit https://go.dev/doc/install
+for installation instructions.
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+#### Install From Source
 
+If a binary distribution is not available for your combination of
+operating system and architecture, visit
+https://go.dev/doc/install/source
+for source installation instructions.
 
-#### 特技
+### Contributing
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+Go is the work of thousands of contributors. We appreciate your help!
+
+To contribute, please read the contribution guidelines at https://go.dev/doc/contribute.
+
+Note that the Go project uses the issue tracker for bug reports and
+proposals only. See https://go.dev/wiki/Questions for a list of
+places to ask questions about the Go language.
+
+[rf]: https://reneefrench.blogspot.com/
+[cc4-by]: https://creativecommons.org/licenses/by/4.0/
