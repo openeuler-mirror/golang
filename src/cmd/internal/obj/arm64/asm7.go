@@ -287,6 +287,7 @@ const (
 	NOTUSETMP                // p expands to multiple instructions, but does NOT use REGTMP
 	BRANCH14BITS             // branch instruction encodes 14 bits
 	BRANCH19BITS             // branch instruction encodes 19 bits
+	SVE
 )
 
 var optab = []Optab{
@@ -1179,7 +1180,13 @@ func span7(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 			continue
 		default:
 			var out [6]uint32
-			count := c.asmout(p, out[:])
+			o := c.oplook(p)
+			var count int
+			if o.flag&SVE == SVE {
+				count = c.asmoutsve(p, out[:])
+			} else {
+				count = c.asmout(p, out[:])
+			}
 			buf.emit(out[:count]...)
 		}
 	}
@@ -1547,7 +1554,8 @@ func isMOVop(op obj.As) bool {
 }
 
 func isRegShiftOrExt(a *obj.Addr) bool {
-	return (a.Index-obj.RBaseARM64)&REG_EXT != 0 || (a.Index-obj.RBaseARM64)&REG_LSL != 0
+	return (a.Index-obj.RBaseARM64)&REG_EXT != 0 || (a.Index-obj.RBaseARM64)&REG_LSL != 0 ||
+		(REG_SVE_VECTOR_EXT <= a.Index && a.Index < REG_SVE_VECTOR_EXT_END)
 }
 
 // Maximum PC-relative displacement.
@@ -1885,15 +1893,31 @@ func rclass(r int16) int {
 		return C_FREG
 	case REG_V0 <= r && r <= REG_V31:
 		return C_VREG
+	case REG_Z0 <= r && r <= REG_Z31:
+		return C_ZREG
+	case REG_P0 <= r && r <= REG_P15:
+		return C_PREG
 	case r == REGSP:
 		return C_RSP
 	case r >= REG_ARNG && r < REG_ELEM:
 		return C_ARNG
 	case r >= REG_ELEM && r < REG_ELEM_END:
 		return C_ELEM
-	case r >= REG_UXTB && r < REG_SPECIAL,
-		r >= REG_LSL && r < REG_ARNG:
+	case r >= REG_LSL && r < REG_ARNG,
+		r >= REG_EXT && r < REG_SVE_VECTOR_EXT:
 		return C_EXTREG
+	case r >= REG_SVE_VECTOR_EXT && r < REG_SVE_VECTOR_EXT_END:
+		return C_EXTZARNG
+	case r >= REG_SVE_VECTOR && r < REG_SVE_VECTOR_INDEX:
+		return C_ZARNG
+	case r >= REG_SVE_VECTOR_INDEX && r < REG_SVE_VECTOR_END:
+		return C_ZELEM
+	case r >= REG_SVE_PREDICATE && r < REG_SVE_PREDICATE_Z:
+		return C_PARNG
+	case r >= REG_SVE_PREDICATE_Z && r < REG_SVE_PREDICATE_M:
+		return C_PREG_Z
+	case r >= REG_SVE_PREDICATE_M && r < REG_SPECIAL:
+		return C_PREG_M
 	case r >= REG_SPECIAL:
 		return C_SPR
 	}
@@ -2366,7 +2390,7 @@ func (c *ctxt7) oplook(p *obj.Prog) *Optab {
 		}
 	}
 
-	c.ctxt.Diag("illegal combination: %v %v %v %v %v %v, %d %d", p, DRconv(a1), DRconv(a2), DRconv(a3), DRconv(a4), DRconv(a5), p.From.Type, p.To.Type)
+	c.ctxt.Diag("illegal combination: %v %v %v %v %v %v, %s %s", p, DRconv(a1), DRconv(a2), DRconv(a3), DRconv(a4), DRconv(a5), p.From.Type.String(), p.To.Type.String())
 	// Turn illegal instruction into an UNDEF, avoid crashing in asmout
 	return &Optab{obj.AUNDEF, C_NONE, C_NONE, C_NONE, C_NONE, C_NONE, 90, 4, 0, 0, 0}
 }
@@ -3499,6 +3523,54 @@ func (c *ctxt7) checkShiftAmount(p *obj.Prog, a *obj.Addr) {
 	default:
 		panic("invalid operation")
 	}
+}
+
+// checkGPreg checks whether the governing scalable predicate register Pg is valid when
+// the destination operand is the scalable vector register.
+// According to ARM64 SVE reference manual, if destination operand is the scalable vector
+// register(Zn), Pg is encoded in 3 bits (P0-P7); if destination operand is the scalable
+// predicate register(Pn), Pg is encoded in 4 bits (P0-P15).
+func (c *ctxt7) checkGPreg(p *obj.Prog, preg int16) {
+	if preg&15 > 7 {
+		c.ctxt.Diag("invalid governing scalable predicate register P0-P7: %v", p)
+	}
+}
+
+func (c *ctxt7) parseArng(reg int16) uint32 {
+	return uint32(reg >> 5 & 15)
+}
+
+func (c *ctxt7) sveDataSize(arng uint32) uint32 {
+	size := 0
+	switch arng {
+	case ARNG_B:
+		size = 0
+	case ARNG_H:
+		size = 1
+	case ARNG_S:
+		size = 2
+	case ARNG_D:
+		size = 3
+	default:
+		c.ctxt.Diag("invalid data type")
+	}
+	return uint32(size)
+}
+
+func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
+	o := c.oplook(p)
+
+	o1 := uint32(0)
+	switch o.type_ {
+	default:
+		c.ctxt.Diag("%v: unknown asm %d", p, o.type_)
+
+	case 0:
+		break
+	}
+
+	out[0] = o1
+	return int(o.size(c.ctxt, p) / 4)
 }
 
 func (c *ctxt7) asmout(p *obj.Prog, out []uint32) (count int) {
@@ -7902,7 +7974,7 @@ func (c *ctxt7) encRegShiftOrExt(p *obj.Prog, a *obj.Addr, r int16) uint32 {
 		} else {
 			return roff(rm, 6, num)
 		}
-	case REG_SXTX <= r && r < REG_SPECIAL:
+	case REG_SXTX <= r && r < REG_SVE_VECTOR_EXT:
 		if a.Type == obj.TYPE_MEM {
 			if num == 0 {
 				return roff(rm, 7, 2)

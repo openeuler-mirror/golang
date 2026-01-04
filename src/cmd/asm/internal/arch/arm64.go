@@ -84,6 +84,14 @@ func GetARM64SpecialOperand(name string) arm64.SpecialOperand {
 	return arm64.SPOP_END
 }
 
+func IsARM64ZRegister(reg int) bool {
+	return reg >= arm64.REG_Z0 && reg <= arm64.REG_Z31
+}
+
+func IsARM64PRegister(reg int) bool {
+	return reg >= arm64.REG_P0 && reg <= arm64.REG_P15
+}
+
 // IsARM64ADR reports whether the op (as defined by an arm64.A* constant) is
 // one of the comparison instructions that require special handling.
 func IsARM64ADR(op obj.As) bool {
@@ -174,6 +182,10 @@ func arm64RegisterNumber(name string, n int16) (int16, bool) {
 		if 0 <= n && n <= 31 {
 			return arm64.REG_F0 + n, true
 		}
+	case "P":
+		if 0 <= n && n <= 15 {
+			return arm64.REG_P0 + n, true
+		}
 	case "R":
 		if 0 <= n && n <= 30 { // not 31
 			return arm64.REG_R0 + n, true
@@ -181,6 +193,10 @@ func arm64RegisterNumber(name string, n int16) (int16, bool) {
 	case "V":
 		if 0 <= n && n <= 31 {
 			return arm64.REG_V0 + n, true
+		}
+	case "Z":
+		if 0 <= n && n <= 31 {
+			return arm64.REG_Z0 + n, true
 		}
 	}
 	return 0, false
@@ -197,16 +213,14 @@ func ARM64RegisterShift(reg, op, count int16) (int64, error) {
 
 // ARM64RegisterExtension constructs an ARM64 register with extension or arrangement.
 func ARM64RegisterExtension(a *obj.Addr, ext string, reg, num int16, isAmount, isIndex bool) error {
-	Rnum := (reg & 31) + int16(num<<5)
-	if isAmount {
-		if num < 0 || num > 7 {
-			return errors.New("index shift amount is out of range")
-		}
-	}
 	if reg <= arm64.REG_R31 && reg >= arm64.REG_R0 {
 		if !isAmount {
 			return errors.New("invalid register extension")
 		}
+		if num < 0 || num > 7 {
+			return errors.New("index shift amount is out of range")
+		}
+		Rnum := int16(num)<<5 + int16(reg&31)
 		switch ext {
 		case "UXTB":
 			if a.Type == obj.TYPE_MEM {
@@ -332,6 +346,99 @@ func ARM64RegisterExtension(a *obj.Addr, ext string, reg, num int16, isAmount, i
 		default:
 			return errors.New("unsupported simd register extension type: " + ext)
 		}
+	} else if arm64.REG_SVE_VECTOR <= reg && reg < arm64.REG_SVE_VECTOR_INDEX {
+		switch ext {
+		case "LSL":
+			if a.Type == obj.TYPE_MEM {
+				a.Index = arm64.REG_SVE_VECTOR_LSL + (reg & 0x1ff) + num<<9
+			} else {
+				a.Reg = arm64.REG_SVE_VECTOR_LSL + (reg & 0x1ff) + num<<9
+			}
+		case "UXTW":
+			if a.Type == obj.TYPE_MEM {
+				a.Index = arm64.REG_SVE_VECTOR_UXTW + (reg & 0x1ff) + num<<9
+			} else {
+				a.Reg = arm64.REG_SVE_VECTOR_UXTW + (reg & 0x1ff) + num<<9
+			}
+		case "SXTW":
+			if a.Type == obj.TYPE_MEM {
+				a.Index = arm64.REG_SVE_VECTOR_SXTW + (reg & 0x1ff) + num<<9
+			} else {
+				a.Reg = arm64.REG_SVE_VECTOR_SXTW + (reg & 0x1ff) + num<<9
+			}
+		default:
+			return errors.New("unsupported SVE register extension type: " + ext)
+		}
+	} else if arm64.REG_Z0 <= reg && reg <= arm64.REG_Z31 {
+		switch ext {
+		case "B":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_VECTOR_INDEX + (reg & 31) + (arm64.ARNG_B << 5)
+			a.Index = num
+		case "H":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_VECTOR_INDEX + (reg & 31) + (arm64.ARNG_H << 5)
+			a.Index = num
+		case "S":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_VECTOR_INDEX + (reg & 31) + (arm64.ARNG_S << 5)
+			a.Index = num
+		case "D":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_VECTOR_INDEX + (reg & 31) + (arm64.ARNG_D << 5)
+			a.Index = num
+		case "Q":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_VECTOR_INDEX + (reg & 31) + (arm64.ARNG_Q << 5)
+			a.Index = num
+		default:
+			return errors.New("unsupported SVE register extension type: " + ext)
+		}
+	} else if arm64.REG_P0 <= reg && reg <= arm64.REG_P15 {
+		switch ext {
+		case "B":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_PREDICATE + (reg & 15) + (arm64.ARNG_B << 5)
+			a.Index = num
+		case "H":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_PREDICATE + (reg & 15) + (arm64.ARNG_H << 5)
+			a.Index = num
+		case "S":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_PREDICATE + (reg & 15) + (arm64.ARNG_S << 5)
+			a.Index = num
+		case "D":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_PREDICATE + (reg & 15) + (arm64.ARNG_D << 5)
+			a.Index = num
+		case "Q":
+			if !isIndex {
+				return errors.New("invalid SVE register extension")
+			}
+			a.Reg = arm64.REG_SVE_PREDICATE + (reg & 15) + (arm64.ARNG_Q << 5)
+			a.Index = num
+		default:
+			return errors.New("unsupported SVE register extension type: " + ext)
+		}
 	} else {
 		return errors.New("invalid register and extension combination")
 	}
@@ -379,23 +486,102 @@ func ARM64RegisterArrangement(reg int16, name, arng string) (int64, error) {
 }
 
 // ARM64RegisterListOffset generates offset encoding according to AArch64 specification.
-func ARM64RegisterListOffset(firstReg, regCnt int, arrangement int64) (int64, error) {
+func ARM64RegisterListOffset(a *obj.Addr, name string, firstReg, regCnt int, specifier int64) error {
 	offset := int64(firstReg)
-	switch regCnt {
-	case 1:
-		offset |= 0x7 << 12
-	case 2:
-		offset |= 0xa << 12
-	case 3:
-		offset |= 0x6 << 12
-	case 4:
-		offset |= 0x2 << 12
+	switch name[0] {
+	case 'Z': // [Zt1.B, Zt2.B]
+		if regCnt < 1 || regCnt > 4 {
+			return errors.New("invalid register number in ARM64 register list")
+		}
+		// |11 - 9|  8  -  5  |  4 - 0 |
+		// regCnt | specifier | firstReg
+		offset |= int64(regCnt)<<9 | (specifier&15)<<5
+		// For assembler printing, the information of scalable vector register with datasize is recorded in a.Reg.
+		a.Offset = offset
+		a.Reg = arm64.REG_SVE_VECTOR + int16(firstReg&31) + int16(specifier&15)<<5
+		return nil
+	case 'P': // [Pt1.B, Pt2.B]
+		if regCnt < 1 || regCnt > 4 {
+			return errors.New("invalid register number in ARM64 register list")
+		}
+		// |11 - 9|  8  -  5  |  4 - 0 |
+		// regCnt | specifier | firstReg
+		offset |= int64(regCnt)<<9 | (specifier&15)<<5
+		// For assembler printing, the information of scalable vector register with datasize is recorded in a.Reg.
+		a.Offset = offset
+		a.Reg = arm64.REG_SVE_PREDICATE + int16(firstReg&15) + int16(specifier&15)<<5
+		return nil
+	case 'V': // [Vt1.B8, Vt2.B8]
+		switch regCnt {
+		case 1:
+			offset |= 0x7 << 12
+		case 2:
+			offset |= 0xa << 12
+		case 3:
+			offset |= 0x6 << 12
+		case 4:
+			offset |= 0x2 << 12
+		default:
+			return errors.New("invalid register numbers in ARM64 register list")
+		}
+		offset |= specifier
+		// arm64 uses the 60th bit to differentiate from other archs
+		// For more details, refer to: obj/arm64/list7.go
+		offset |= 1 << 60
+		a.Offset = offset
+		return nil
 	default:
-		return 0, errors.New("invalid register numbers in ARM64 register list")
+		return errors.New("invalid ARM64 register list")
 	}
-	offset |= arrangement
-	// arm64 uses the 60th bit to differentiate from other archs
-	// For more details, refer to: obj/arm64/list7.go
-	offset |= 1 << 60
-	return offset, nil
+}
+
+// ARM64RegisterDatasize parses an ARM64 scalable vector register data size.
+func ARM64RegisterDatasize(datasize string) (int64, error) {
+	var size int64
+	switch datasize {
+	case "B":
+		size = arm64.ARNG_B
+	case "H":
+		size = arm64.ARNG_H
+	case "S":
+		size = arm64.ARNG_S
+	case "D":
+		size = arm64.ARNG_D
+	case "Q":
+		size = arm64.ARNG_Q
+	default:
+		return 0, errors.New("unsupported data size: " + datasize)
+	}
+	return size, nil
+}
+
+// ARM64RegisterScalable parses an ARM64 scalable vector/predicate registers with data size (e.g. Zn.B or Pn.B).
+func ARM64RegisterScalable(ext, name string, reg int16) (int16, error) {
+	var res int16
+	size, err := ARM64RegisterDatasize(ext)
+	if err != nil {
+		return res, err
+	}
+	switch name[0] {
+	case 'Z':
+		res = arm64.REG_SVE_VECTOR + reg&31 + int16(size&15)<<5
+	case 'P':
+		res = arm64.REG_SVE_PREDICATE + reg&31 + int16(size&15)<<5
+	default:
+		return res, errors.New("invalid scalable vector/predicate registers")
+	}
+	return res, nil
+}
+
+// ARM64GoverningPredicateRegister parses an ARM64 governing scalable predicate register (e.g. Pg/M or Pg/Z).
+func ARM64GoverningPredicateRegister(a *obj.Addr, reg int16, predication string) error {
+	switch predication {
+	case "M":
+		a.Reg = arm64.REG_SVE_PREDICATE_M + (reg & 15)
+	case "Z":
+		a.Reg = arm64.REG_SVE_PREDICATE_Z + (reg & 15)
+	default:
+		return errors.New("invalid predication")
+	}
+	return nil
 }

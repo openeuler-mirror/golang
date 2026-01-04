@@ -180,20 +180,26 @@ import (
 //			offset = ((reg&31) << 16) | (exttype << 13) | (amount<<10)
 //
 //	reg.<T>
-//		Register arrangement for ARM64 and Loong64 SIMD register
+//		Register arrangement for ARM64 SIMD/SVE and Loong64 SIMD register
 //		e.g.:
-//			On ARM64: V1.S4, V2.S2, V7.D2, V2.H4, V6.B16
+//			On ARM64: V1.S4, V2.S2, V7.D2, V2.H4, V6.B16, Z2.B, P3.B
 //			On Loong64: X1.B32, X1.H16, X1.W8, X2.V4, X1.Q1, V1.B16, V1.H8, V1.W4, V1.V2
 //		Encoding:
 //			type = TYPE_REG
-//			reg = REG_ARNG + register + arrangement
+//			reg = REG_(ARNG|SVE_VECTOR|SVE_PREDICATE) + register + arrangement
 //
 //	reg.<T>[index]
 //		Register element for ARM64 and Loong64
 //		Encoding:
 //			type = TYPE_REG
-//			reg = REG_ELEM + register + arrangement
+//			reg = REG_(ELEM|SVE_VECTOR_INDEX) + register + arrangement
 //			index = element index
+//
+//  reg.<T>.[US]XTW, reg.<T><<amount, reg.<T>.[US]XTW<<amount
+//      Register extension for ARM64 scalable vector register
+//      e.g.: Z2.B.UXTW, Z2.B<<3, Z2.B.SXTW<<2
+//      Encoding:
+//          reg = REG_SVE_VECTOR_(LSL|UXTW|SXTW) + register + arrangement + amount
 
 type Addr struct {
 	Reg    int16

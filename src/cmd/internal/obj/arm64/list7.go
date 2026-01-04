@@ -55,7 +55,7 @@ var strcond = [16]string{
 }
 
 func init() {
-	obj.RegisterRegister(obj.RBaseARM64, REG_SPECIAL+1024, rconv)
+	obj.RegisterRegister(obj.RBaseARM64, REG_SPECIAL+448, rconv)
 	obj.RegisterOpcode(obj.ABaseARM64, Anames)
 	obj.RegisterRegisterList(obj.RegListARM64Lo, obj.RegListARM64Hi, rlconv)
 	obj.RegisterOpSuffix("arm64", obj.CConvARM)
@@ -88,6 +88,8 @@ func arrange(a int) string {
 		return "S"
 	case ARNG_D:
 		return "D"
+	case ARNG_Q:
+		return "Q"
 	case ARNG_1Q:
 		return "Q1"
 	default:
@@ -97,6 +99,7 @@ func arrange(a int) string {
 
 func rconv(r int) string {
 	ext := (r >> 5) & 7
+	arng := (r >> 5) & 15
 	if r == REGG {
 		return "g"
 	}
@@ -109,6 +112,10 @@ func rconv(r int) string {
 		return fmt.Sprintf("F%d", r-REG_F0)
 	case REG_V0 <= r && r <= REG_V31:
 		return fmt.Sprintf("V%d", r-REG_V0)
+	case REG_Z0 <= r && r <= REG_Z31:
+		return fmt.Sprintf("Z%d", r-REG_Z0)
+	case REG_P0 <= r && r <= REG_P15:
+		return fmt.Sprintf("P%d", r-REG_P0)
 	case r == REGSP:
 		return "RSP"
 	case REG_UXTB <= r && r < REG_UXTH:
@@ -153,19 +160,42 @@ func rconv(r int) string {
 		} else {
 			return fmt.Sprintf("%s.SXTW", regname(r))
 		}
-	case REG_SXTX <= r && r < REG_SPECIAL:
+	case REG_SXTX <= r && r < REG_SVE_VECTOR_EXT:
 		if ext != 0 {
 			return fmt.Sprintf("%s.SXTX<<%d", regname(r), ext)
 		} else {
 			return fmt.Sprintf("%s.SXTX", regname(r))
 		}
-	// bits 0-4 indicate register, bits 5-7 indicate shift amount, bit 8 equals to 0.
 	case REG_LSL <= r && r < (REG_LSL+1<<8):
-		return fmt.Sprintf("R%d<<%d", r&31, (r>>5)&7)
+		return fmt.Sprintf("R%d<<%d", r&31, ext)
 	case REG_ARNG <= r && r < REG_ELEM:
-		return fmt.Sprintf("V%d.%s", r&31, arrange((r>>5)&15))
+		return fmt.Sprintf("V%d.%s", r&31, arrange(arng))
 	case REG_ELEM <= r && r < REG_ELEM_END:
-		return fmt.Sprintf("V%d.%s", r&31, arrange((r>>5)&15))
+		return fmt.Sprintf("V%d.%s", r&31, arrange(arng))
+	case REG_SVE_VECTOR_LSL <= r && r < REG_SVE_VECTOR_UXTW:
+		return fmt.Sprintf("Z%d.%s<<%d", r&31, arrange(arng), (r>>9)&3)
+	case REG_SVE_VECTOR_UXTW <= r && r < REG_SVE_VECTOR_SXTW:
+		num := (r >> 9) & 3
+		if num != 0 {
+			return fmt.Sprintf("Z%d.%s.UXTW<<%d", r&31, arrange(arng), num)
+		} else {
+			return fmt.Sprintf("Z%d.%s.UXTW", r&31, arrange(arng))
+		}
+	case REG_SVE_VECTOR_SXTW <= r && r < REG_SVE_VECTOR_EXT_END:
+		num := (r >> 9) & 3
+		if num != 0 {
+			return fmt.Sprintf("Z%d.%s.SXTW<<%d", r&31, arrange(arng), num)
+		} else {
+			return fmt.Sprintf("Z%d.%s.SXTW", r&31, arrange(arng))
+		}
+	case REG_SVE_VECTOR <= r && r < REG_SVE_VECTOR_END:
+		return fmt.Sprintf("Z%d.%s", r&31, arrange(arng))
+	case REG_SVE_PREDICATE <= r && r < REG_SVE_PREDICATE_Z:
+		return fmt.Sprintf("P%d.%s", r&15, arrange(arng))
+	case REG_SVE_PREDICATE_Z <= r && r < REG_SVE_PREDICATE_M:
+		return fmt.Sprintf("P%d/Z", r&15)
+	case REG_SVE_PREDICATE_M <= r && r < REG_SPECIAL:
+		return fmt.Sprintf("P%d/M", r&15)
 	}
 	// Return system register name.
 	name, _, _ := SysRegEnc(int16(r))

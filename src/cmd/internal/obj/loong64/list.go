@@ -78,10 +78,15 @@ func rconv(r int) string {
 
 	// bits 0-4 indicates register: Vn or Xn
 	// bits 5-9 indicates arrangement: <T>
-	// bits 10 indicates SMID type: 0: LSX, 1: LASX
-	simd_type := (int16(r) >> EXT_SIMDTYPE_SHIFT) & EXT_SIMDTYPE_MASK
-	reg_num := (int16(r) >> EXT_REG_SHIFT) & EXT_REG_MASK
-	arng_type := (int16(r) >> EXT_TYPE_SHIFT) & EXT_TYPE_MASK
+	// bits 10 indicates SIMD type: 0: LASX, 1: LSX
+	// TODO: In previous versions, the variable `simd_type` was computed without
+	// subtracting the base value, causing a mismatch between its actual value and
+	// intended meaning after base value adjustments. To fix this bug, the
+	// numerical value of this bit no longer corresponds to its defined meaning
+	// and must be corrected.
+	simd_type := ((int16(r-obj.RBaseLOONG64) >> EXT_SIMDTYPE_SHIFT) & EXT_SIMDTYPE_MASK) ^ 1
+	reg_num := (int16(r-obj.RBaseLOONG64) >> EXT_REG_SHIFT) & EXT_REG_MASK
+	arng_type := (int16(r-obj.RBaseLOONG64) >> EXT_TYPE_SHIFT) & EXT_TYPE_MASK
 	reg_prefix := "#"
 	switch simd_type {
 	case LSX:

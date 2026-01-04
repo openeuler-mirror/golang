@@ -143,10 +143,62 @@ const (
 	REG_V30
 	REG_V31
 
-	REG_RSP = REG_V31 + 32 // to differentiate ZR/SP, REG_RSP&0x1f = 31
+	// SVE scalable vector registers
+	REG_Z0
+	REG_Z1
+	REG_Z2
+	REG_Z3
+	REG_Z4
+	REG_Z5
+	REG_Z6
+	REG_Z7
+	REG_Z8
+	REG_Z9
+	REG_Z10
+	REG_Z11
+	REG_Z12
+	REG_Z13
+	REG_Z14
+	REG_Z15
+	REG_Z16
+	REG_Z17
+	REG_Z18
+	REG_Z19
+	REG_Z20
+	REG_Z21
+	REG_Z22
+	REG_Z23
+	REG_Z24
+	REG_Z25
+	REG_Z26
+	REG_Z27
+	REG_Z28
+	REG_Z29
+	REG_Z30
+	REG_Z31
+
+	// SVE scalable predicate registers
+	REG_P0
+	REG_P1
+	REG_P2
+	REG_P3
+	REG_P4
+	REG_P5
+	REG_P6
+	REG_P7
+	REG_P8
+	REG_P9
+	REG_P10
+	REG_P11
+	REG_P12
+	REG_P13
+	REG_P14
+	REG_P15
+
+	REG_RSP = REG_P15 + 16 // to differentiate ZR/SP, REG_RSP&0x1f = 31
 )
 
-// bits 0-4 indicates register: Vn
+// bits 0-4 indicates register: Rn/Vn/Zn/Pn
 // bits 5-8 indicates arrangement: <T>
 const (
 	REG_ARNG = obj.RBaseARM64 + 1<<10 + iota<<9 // Vn.<T>
@@ -173,6 +225,33 @@ const (
 	REG_SXTX
 )
 
+// SVE scalable vector register (extend form)
+const REG_SVE_VECTOR_EXT = obj.RBaseARM64 + 1<<12
+const (
+	REG_SVE_VECTOR_LSL  = REG_SVE_VECTOR_EXT + iota<<11 // Zn.<T><<amount
+	REG_SVE_VECTOR_UXTW                                 // Zn.<T>.UXTW
+	REG_SVE_VECTOR_SXTW                                 // Zn.<T>.SXTW
+	REG_SVE_VECTOR_EXT_END
+)
+
+// SVE scalable vector register(Zn) with arrangement
+const (
+	REG_SVE_VECTOR = obj.RBaseARM64 + 1<<13 + 1<<11 + iota<<9
+	REG_SVE_VECTOR_INDEX
+	REG_SVE_VECTOR_END
+)
+
+// SVE scalable predicate register(Pn) with arrangement
+const (
+	REG_SVE_PREDICATE = obj.RBaseARM64 + 1<<13 + 1<<11 + 1<<10
+)
+
+// SVE governing predicate register
+const (
+	REG_SVE_PREDICATE_Z = obj.RBaseARM64 + 1<<13 + 1<<11 + 1<<10 + 1<<9 + iota<<5
+	REG_SVE_PREDICATE_M
+)
+
 // Special registers, after subtracting obj.RBaseARM64, bit 12 indicates
 // a special register and the low bits select the register.
 // SYSREG_END is the last item in the automatically generated system register
@@ -180,7 +259,7 @@ const (
 // Define the special register after REG_SPECIAL, the first value of it should be
 // REG_{name} = SYSREG_END + iota.
 const (
-	REG_SPECIAL = obj.RBaseARM64 + 1<<12
+	REG_SPECIAL = obj.RBaseARM64 + 1<<13 + 1<<11 + 1<<10 + 1<<9 + 1<<6
 )
 
 // Register assignments:
@@ -317,6 +396,58 @@ var ARM64DWARFRegisters = map[int16]int16{
 	REG_V29: 93,
 	REG_V30: 94,
 	REG_V31: 95,
+
+	// SVE vector
+	REG_Z0:  96,
+	REG_Z1:  97,
+	REG_Z2:  98,
+	REG_Z3:  99,
+	REG_Z4:  100,
+	REG_Z5:  101,
+	REG_Z6:  102,
+	REG_Z7:  103,
+	REG_Z8:  104,
+	REG_Z9:  105,
+	REG_Z10: 106,
+	REG_Z11: 107,
+	REG_Z12: 108,
+	REG_Z13: 109,
+	REG_Z14: 110,
+	REG_Z15: 111,
+	REG_Z16: 112,
+	REG_Z17: 113,
+	REG_Z18: 114,
+	REG_Z19: 115,
+	REG_Z20: 116,
+	REG_Z21: 117,
+	REG_Z22: 118,
+	REG_Z23: 119,
+	REG_Z24: 120,
+	REG_Z25: 121,
+	REG_Z26: 122,
+	REG_Z27: 123,
+	REG_Z28: 124,
+	REG_Z29: 125,
+	REG_Z30: 126,
+	REG_Z31: 127,
+
+	// SVE predicate
+	REG_P0:  48,
+	REG_P1:  49,
+	REG_P2:  50,
+	REG_P3:  51,
+	REG_P4:  52,
+	REG_P5:  53,
+	REG_P6:  54,
+	REG_P7:  55,
+	REG_P8:  56,
+	REG_P9:  57,
+	REG_P10: 58,
+	REG_P11: 59,
+	REG_P12: 60,
+	REG_P13: 61,
+	REG_P14: 62,
+	REG_P15: 63,
 }
 
 const (
@@ -342,21 +473,29 @@ const (
 	// optab is sorted based on the order of these constants
 	// and the first match is chosen.
 	// The more specific class needs to come earlier.
-	C_NONE   = iota + 1 // starting from 1, leave unclassified Addr's class as 0
-	C_REG               // R0..R30
-	C_REGZR             // R0..R30, ZR
-	C_RSP               // R0..R30, RSP
-	C_FREG              // F0..F31
-	C_VREG              // V0..V31
-	C_PAIR              // (Rn, Rm)
-	C_SHIFT             // Rn<<2
-	C_EXTREG            // Rn.UXTB[<<3]
-	C_SPR               // REG_NZCV
-	C_COND              // condition code, EQ, NE, etc.
-	C_SPOP              // special operand, PLDL1KEEP, VMALLE1IS, etc.
-	C_ARNG              // Vn.<T>
-	C_ELEM              // Vn.<T>[index]
-	C_LIST              // [V1, V2, V3]
+	C_NONE     = iota + 1 // starting from 1, leave unclassified Addr's class as 0
+	C_REG                 // R0..R30
+	C_REGZR               // R0..R30, ZR
+	C_RSP                 // R0..R30, RSP
+	C_FREG                // F0..F31
+	C_VREG                // V0..V31
+	C_PAIR                // (Rn, Rm)
+	C_SHIFT               // Rn<<2
+	C_EXTREG              // Rn.UXTB[<<3]
+	C_SPR                 // REG_NZCV
+	C_COND                // condition code, EQ, NE, etc.
+	C_SPOP                // special operand, PLDL1KEEP, VMALLE1IS, etc.
+	C_ARNG                // Vn.<T>
+	C_ELEM                // Vn.<T>[index]
+	C_LIST                // [V1, V2, V3]
+	C_ZREG                // Zn
+	C_ZARNG               // Zn.<T>
+	C_EXTZARNG            // Zn.<T>.EXT
+	C_ZELEM               // Zn.<T>[index]
+	C_PREG                // Pg
+	C_PARNG               // Pn.<T>
+	C_PREG_M              // Pg/M
+	C_PREG_Z              // Pg/Z
 
 	C_ZCON     // $0
 	C_ABCON0   // could be C_ADDCON0 or C_BITCON
@@ -1032,15 +1171,15 @@ const (
 	SHIFT_ROR = 3 << 22
 )
 
-// Arrangement for ARM64 SIMD instructions
+// Arrangement for ARM64 SIMD/SVE instructions
 const (
 	// arrangement types
 	ARNG_8B = iota
-	ARNG_16B
-	ARNG_1D
 	ARNG_4H
-	ARNG_8H
 	ARNG_2S
+	ARNG_1D
+	ARNG_16B
+	ARNG_8H
 	ARNG_4S
 	ARNG_2D
 	ARNG_1Q
@@ -1048,6 +1187,7 @@ const (
 	ARNG_H
 	ARNG_S
 	ARNG_D
+	ARNG_Q
 )
 
 //go:generate stringer -type SpecialOperand -trimprefix SPOP_
@@ -1209,4 +1349,26 @@ const (
 	// Condition code end.
 
 	SPOP_END
+)
+
+type Pattern int64
+
+const (
+	PAT_POW2  = Pattern(0)
+	PAT_VL1   = Pattern(1)
+	PAT_VL2   = Pattern(2)
+	PAT_VL3   = Pattern(3)
+	PAT_VL4   = Pattern(4)
+	PAT_VL5   = Pattern(5)
+	PAT_VL6   = Pattern(6)
+	PAT_VL7   = Pattern(7)
+	PAT_VL8   = Pattern(8)
+	PAT_VL16  = Pattern(9)
+	PAT_VL32  = Pattern(10)
+	PAT_VL64  = Pattern(11)
+	PAT_VL128 = Pattern(12)
+	PAT_VL256 = Pattern(13)
+	PAT_MUL4  = Pattern(29)
+	PAT_MUL3  = Pattern(30)
+	PAT_ALL   = Pattern(31)
 )
