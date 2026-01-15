@@ -900,7 +900,7 @@ var optab = []Optab{
 	{AZORN, C_BITCON, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 5, 4, 0, SVE, 0},
 	{AZDUP, C_RSP, C_NONE, C_NONE, C_ZARNG, C_NONE, 7, 4, 0, SVE, 0},
 	{AZDUP, C_ZELEM, C_NONE, C_NONE, C_ZARNG, C_NONE, 8, 4, 0, SVE, 0},
-	{AZDUP, C_VCON, C_NONE, C_NONE, C_ZARNG, C_NONE, 9, 4, 0, SVE, 0},
+	{AZDUP, C_VCON, C_NONE, C_NONE, C_ZARNG, C_NONE, 3, 4, 0, SVE, 0},
 	{AWHILELT, C_REGZR, C_REGZR, C_NONE, C_PARNG, C_NONE, 10, 4, 0, SVE, 0},
 	{AWHILELT, C_REGZR, C_REGZR, C_NONE, C_LIST, C_NONE, 11, 4, 0, SVE, 0},
 	{AWHILELTW, C_REGZR, C_REGZR, C_NONE, C_PARNG, C_NONE, 10, 4, 0, SVE, 0},
@@ -908,8 +908,37 @@ var optab = []Optab{
 	{AZCMPEQ, C_VCON, C_ZARNG, C_PREG_Z, C_PARNG, C_NONE, 13, 4, 0, SVE, 0},
 	{AZSUQADD, C_ZARNG, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 2, 4, 0, SVE, 0},
 	{AZASR, C_VCON, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 15, 4, 0, SVE, 0},
+	{AZASR, C_ZARNG, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 16, 4, 0, SVE, 0},
+	{AZASR, C_VCON, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 18, 4, 0, SVE, 0},
+	{AZASR, C_ZARNG, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 19, 4, 0, SVE, 0},
 	{AZSQSHL, C_VCON, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 15, 4, 0, SVE, 0},
 	{AZASRD, C_VCON, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 15, 4, 0, SVE, 0},
+	{AZASRR, C_ZARNG, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 16, 4, 0, SVE, 0},
+	{AZSXTB, C_ZARNG, C_PREG_M, C_NONE, C_ZARNG, C_NONE, 17, 4, 0, SVE, 0},
+	{APTEST, C_PARNG, C_PREG, C_NONE, C_NONE, C_NONE, 20, 4, 0, SVE, 0},
+	{APFIRST, C_PARNG, C_PREG, C_NONE, C_PARNG, C_NONE, 21, 4, 0, SVE, 0},
+	{APFALSE, C_NONE, C_NONE, C_NONE, C_PARNG, C_NONE, 22, 4, 0, SVE, 0},
+	{APRDFFR, C_PREG_Z, C_NONE, C_NONE, C_PARNG, C_NONE, 23, 4, 0, SVE, 0},
+	{APRDFFR, C_NONE, C_NONE, C_NONE, C_PARNG, C_NONE, 23, 4, 0, SVE, 0},
+	{APRDFFRS, C_PREG_Z, C_NONE, C_NONE, C_PARNG, C_NONE, 23, 4, 0, SVE, 0},
+	{APNEXT, C_PARNG, C_PREG, C_NONE, C_PARNG, C_NONE, 24, 4, 0, SVE, 0},
+	{APTRUE, C_VCON, C_NONE, C_NONE, C_PARNG, C_NONE, 25, 4, 0, SVE, 0},
+	{APTRUES, C_VCON, C_NONE, C_NONE, C_PARNG, C_NONE, 25, 4, 0, SVE, 0},
+	{APTRUE, C_NONE, C_NONE, C_NONE, C_PARNG, C_NONE, 25, 4, 0, SVE, 0},
+	{APTRUES, C_NONE, C_NONE, C_NONE, C_PARNG, C_NONE, 25, 4, 0, SVE, 0},
+	{AZINDEX, C_VCON, C_NONE, C_VCON, C_ZARNG, C_NONE, 26, 4, 0, SVE, 0},
+	{AZINDEX, C_VCON, C_NONE, C_REGZR, C_ZARNG, C_NONE, 26, 4, 0, SVE, 0},
+	{AZINDEX, C_REGZR, C_NONE, C_VCON, C_ZARNG, C_NONE, 26, 4, 0, SVE, 0},
+	{AZINDEX, C_REGZR, C_NONE, C_REGZR, C_ZARNG, C_NONE, 26, 4, 0, SVE, 0},
+	{AZMUL, C_ZARNG, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 1, 4, 0, SVE, 0},
+	{AZMUL, C_ZARNG, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 2, 4, 0, SVE, 0},
+	{AZMUL, C_VCON, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 3, 4, 0, SVE, 0},
+	{AZMUL, C_ZELEM, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 9, 4, 0, SVE, 0},
+	{AZPMUL, C_ZARNG, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 1, 4, 0, SVE, 0},
+	{AZSQDMULH, C_ZARNG, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 1, 4, 0, SVE, 0},
+	{AZSMULH, C_ZARNG, C_ZARNG, C_NONE, C_ZARNG, C_NONE, 1, 4, 0, SVE, 0},
+	{AZSMULH, C_ZARNG, C_ZARNG, C_PREG_M, C_ZARNG, C_NONE, 2, 4, 0, SVE, 0},
+	{APUNPKHI, C_PARNG, C_NONE, C_NONE, C_PARNG, C_NONE, 27, 4, 0, SVE, 0},
 
 	{obj.AUNDEF, C_NONE, C_NONE, C_NONE, C_NONE, C_NONE, 90, 4, 0, 0, 0},
 	{obj.APCDATA, C_VCON, C_NONE, C_NONE, C_VCON, C_NONE, 0, 0, 0, 0, 0},
@@ -3398,7 +3427,10 @@ func buildop(ctxt *obj.Link) {
 			oprangeset(AZUQSUB, t)
 
 		case AZSUBR:
-			break
+			oprangeset(AZSMAX, t)
+			oprangeset(AZUMAX, t)
+			oprangeset(AZSMIN, t)
+			oprangeset(AZUMIN, t)
 
 		case AZAND:
 			oprangeset(AZBIC, t)
@@ -3462,6 +3494,12 @@ func buildop(ctxt *obj.Link) {
 			oprangeset(AZUSQADD, t)
 			oprangeset(AZSQSUBR, t)
 			oprangeset(AZUQSUBR, t)
+			oprangeset(AZSABD, t)
+			oprangeset(AZUABD, t)
+			oprangeset(AZSDIV, t)
+			oprangeset(AZUDIV, t)
+			oprangeset(AZSDIVR, t)
+			oprangeset(AZUDIVR, t)
 
 		case AZASR:
 			oprangeset(AZLSR, t)
@@ -3475,8 +3513,56 @@ func buildop(ctxt *obj.Link) {
 			oprangeset(AZURSHR, t)
 			oprangeset(AZSQSHLU, t)
 
+		case AZASRR:
+			oprangeset(AZLSLR, t)
+			oprangeset(AZLSRR, t)
+
 		case AZSEL:
 			break
+
+		case AZSXTB:
+			oprangeset(AZUXTB, t)
+			oprangeset(AZSXTH, t)
+			oprangeset(AZUXTH, t)
+			oprangeset(AZSXTW, t)
+			oprangeset(AZUXTW, t)
+			oprangeset(AZABS, t)
+			oprangeset(AZNEG, t)
+			oprangeset(AZCLS, t)
+			oprangeset(AZCLZ, t)
+			oprangeset(AZCNT, t)
+			oprangeset(AZCNOT, t)
+			oprangeset(AZFABS, t)
+			oprangeset(AZFNEG, t)
+			oprangeset(AZNOT, t)
+
+		case APTEST,
+			APFIRST,
+			APFALSE,
+			APRDFFR,
+			APRDFFRS,
+			APNEXT,
+			APTRUE,
+			APTRUES:
+			break
+
+		case AZINDEX:
+			break
+
+		case AZMUL:
+			break
+
+		case AZPMUL:
+			break
+
+		case AZSQDMULH:
+			oprangeset(AZSQRDMULH, t)
+
+		case AZSMULH:
+			oprangeset(AZUMULH, t)
+
+		case APUNPKHI:
+			oprangeset(APUNPKLO, t)
 
 		case obj.ANOP,
 			obj.AUNDEF,
@@ -3745,20 +3831,34 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 	case 0:
 		break
 
-	case 1: /* zadd/zsub/zsqadd/zsqsub/zuqadd/zuqsub Zm.<T>, Zn.<T>, Zd.<T> */
+	case 1:
+		/* zadd/zsub/zsqadd/zsqsub/zuqadd/zuqsub/zmul/zsmulh/zumulh/zpmul/zsqdmulh/zsqrdmulh
+		 *     Zm.<T>, Zn.<T>, Zd.<T> */
 		switch p.As {
 		case AZADD:
-			o1 |= 1<<26 | 1<<21 | 0<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 0<<10
 		case AZSUB:
-			o1 |= 1<<26 | 1<<21 | 1<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 1<<10
 		case AZSQADD:
-			o1 |= 1<<26 | 1<<21 | 4<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 4<<10
 		case AZUQADD:
-			o1 |= 1<<26 | 1<<21 | 5<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 5<<10
 		case AZSQSUB:
-			o1 |= 1<<26 | 1<<21 | 6<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 6<<10
 		case AZUQSUB:
-			o1 |= 1<<26 | 1<<21 | 7<<10
+			o1 |= 1<<26 | 1<<21 | 0<<13 | 7<<10
+		case AZMUL:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 0<<10
+		case AZPMUL:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 1<<10
+		case AZSMULH:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 2<<10
+		case AZUMULH:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 3<<10
+		case AZSQDMULH:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 4<<10
+		case AZSQRDMULH:
+			o1 |= 1<<26 | 1<<21 | 3<<13 | 5<<10
 		default:
 			c.ctxt.Diag("unexpected asm: %v", p)
 		}
@@ -3773,20 +3873,51 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		if am != an || am != ad {
 			c.ctxt.Diag("data size mismatch: %v", p)
 		}
+		if p.As == AZPMUL && am != ARNG_B {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
 
 		sz := c.sveDataSize(am)
 
 		o1 |= uint32(sz&3)<<22 | uint32(zm&31)<<16 | uint32(zn&31)<<5 | uint32(zd&31)
+
 	case 2:
-		/* zadd/zsub/zsubr/zand/zorr/zbic/zeor/zsqadd/zuqadd/zsqsub/zuqsub/zsuqadd/zusqadd/zsqsubr/zuqsubr
+		/* zadd/zsub/zsubr/zsmax/zumax/zsmin/zumin/zsabd/zuabd/zmul/zsmulh/zumulh/zsdiv/zudiv/zsdivr/zudivr/
+		 * zand/zorr/zbic/zeor/zsqadd/zuqadd/zsqsub/zuqsub/zsuqadd/zusqadd/zsqsubr/zuqsubr
 		 *     Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T> */
 		switch p.As {
 		case AZADD:
-			o1 |= 1<<26 | 0<<16
+			o1 |= 1<<26 | 0<<19 | 0<<16
 		case AZSUB:
-			o1 |= 1<<26 | 1<<16
+			o1 |= 1<<26 | 0<<19 | 1<<16
 		case AZSUBR:
-			o1 |= 1<<26 | 3<<16
+			o1 |= 1<<26 | 0<<19 | 3<<16
+		case AZSMAX:
+			o1 |= 1<<26 | 1<<19 | 0<<16
+		case AZUMAX:
+			o1 |= 1<<26 | 1<<19 | 1<<16
+		case AZSMIN:
+			o1 |= 1<<26 | 1<<19 | 2<<16
+		case AZUMIN:
+			o1 |= 1<<26 | 1<<19 | 3<<16
+		case AZSABD:
+			o1 |= 1<<26 | 1<<19 | 4<<16
+		case AZUABD:
+			o1 |= 1<<26 | 1<<19 | 5<<16
+		case AZMUL:
+			o1 |= 1<<26 | 2<<19 | 0<<16
+		case AZSMULH:
+			o1 |= 1<<26 | 2<<19 | 2<<16
+		case AZUMULH:
+			o1 |= 1<<26 | 2<<19 | 3<<16
+		case AZSDIV:
+			o1 |= 1<<26 | 2<<19 | 4<<16
+		case AZUDIV:
+			o1 |= 1<<26 | 2<<19 | 5<<16
+		case AZSDIVR:
+			o1 |= 1<<26 | 2<<19 | 6<<16
+		case AZUDIVR:
+			o1 |= 1<<26 | 2<<19 | 7<<16
 		case AZORR:
 			o1 |= 1<<26 | 3<<19 | 0<<16
 		case AZEOR:
@@ -3833,23 +3964,43 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 
 		sz := c.sveDataSize(am)
 
+		if o1>>30&1 == 0 && o1>>18&7 == 5 /* divide */ && sz < 2 {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
 		o1 |= uint32(sz&3)<<22 | uint32(pg&7)<<10 | uint32(zm&31)<<5 | uint32(zdn&31)
-	case 3: /* zadd/zsub/zsubr/zsqadd/zuqadd/zsqsub/zuqsub $(imm8|imm16), Zdn.<T>, Zdn<T> */
+
+	case 3:
+		/* zadd/zsub/zsubr/zsqadd/zuqadd/zsqsub/zuqsub $(imm8|imm16), Zdn.<T>, Zdn<T>
+		 * zsmax/zumax/zsmin/zumin/zmul $imm8, Zdn.<T>, Zdn.<T>
+		 * zdup $(imm8|imm16), Zd.<T> */
 		switch p.As {
 		case AZADD:
-			o1 |= 0x25<<24 | 1<<21 | 0<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 0<<16 | 3<<14
 		case AZSUB:
-			o1 |= 0x25<<24 | 1<<21 | 1<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 1<<16 | 3<<14
 		case AZSUBR:
-			o1 |= 0x25<<24 | 1<<21 | 3<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 3<<16 | 3<<14
 		case AZSQADD:
-			o1 |= 0x25<<24 | 1<<21 | 4<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 4<<16 | 3<<14
 		case AZUQADD:
-			o1 |= 0x25<<24 | 1<<21 | 5<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 5<<16 | 3<<14
 		case AZSQSUB:
-			o1 |= 0x25<<24 | 1<<21 | 6<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 6<<16 | 3<<14
 		case AZUQSUB:
-			o1 |= 0x25<<24 | 1<<21 | 7<<16 | 3<<14
+			o1 |= 0x25<<24 | 1<<21 | 0<<19 | 7<<16 | 3<<14
+		case AZSMAX:
+			o1 |= 0x25<<24 | 1<<21 | 1<<19 | 0<<16 | 3<<14
+		case AZUMAX:
+			o1 |= 0x25<<24 | 1<<21 | 1<<19 | 1<<16 | 3<<14
+		case AZSMIN:
+			o1 |= 0x25<<24 | 1<<21 | 1<<19 | 2<<16 | 3<<14
+		case AZUMIN:
+			o1 |= 0x25<<24 | 1<<21 | 1<<19 | 3<<16 | 3<<14
+		case AZMUL:
+			o1 |= 0x25<<24 | 1<<21 | 2<<19 | 0<<16 | 3<<14
+		case AZDUP:
+			o1 |= 0x25<<24 | 1<<21 | 3<<19 | 0<<16 | 3<<14
 		default:
 			c.ctxt.Diag("unexpected asm: %v", p)
 		}
@@ -3857,30 +4008,61 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		imm8 := p.From.Offset
 		zn := p.Reg
 		zd := p.To.Reg
+
+		ad := c.parseArng(zd)
+		sz := c.sveDataSize(ad)
+
+		sh := 0
+		opg := o1 >> 19 & 3
+		switch opg {
+		case 0: /* add/substract */
+			if imm8&0xff == 0 {
+				imm8 >>= 8
+				sh = 1
+			}
+			if imm8&^0xff != 0 {
+				c.ctxt.Diag("immediate out of range [0, 255]{ << 8 }: %v", p)
+			}
+			if sz == 0 && sh == 1 {
+				c.ctxt.Diag("undefined instruction cause [size:sh == '001']: %v", p)
+			}
+		case 1: /* min/max */
+			u := o1 >> 16 & 1
+			if u == 0 { /* signed */
+				if imm8 < -128 || imm8 > 127 {
+					c.ctxt.Diag("immediate out of range [-128, 127]: %v", p)
+				}
+			} else { /* unsigned */
+				if imm8&^0xff != 0 {
+					c.ctxt.Diag("immediate out of range [0, 255]: %v", p)
+				}
+			}
+		case 2: /* multiply */
+			if imm8 < -128 || imm8 > 127 {
+				c.ctxt.Diag("immediate out of range [-128, 127]: %v", p)
+			}
+		case 3: /* duplicate */
+			if imm8&0xff == 0 {
+				imm8 >>= 8
+				sh = 1
+			}
+			if imm8&^0xff != 0 {
+				c.ctxt.Diag("immediate out of range [0, 255]{ << 8 }: %v", p)
+			}
+			if sz == 0 && sh == 1 {
+				c.ctxt.Diag("undefined instruction cause [size:sh == '001']: %v", p)
+			}
+			zn = zd
+		default:
+			break
+		}
 		if zn != zd {
 			c.ctxt.Diag("register mismatch: %v", p)
 		}
 		zdn := zd
 
-		an := c.parseArng(zn)
-		sz := c.sveDataSize(an)
-
-		if imm8&^0xffff != 0 {
-			c.ctxt.Diag("invalid immediate: %v", p)
-		}
-		sh := 0
-		if imm8 >= 1<<8 {
-			if imm8&0xff != 0 {
-				c.ctxt.Diag("invalid immediate: %v", p)
-			}
-			if sz == 0 {
-				c.ctxt.Diag("undefined instruction cause [size:sh == '001']: %v", p)
-			}
-			imm8 >>= 8
-			sh = 1
-		}
-
 		o1 |= uint32(sz&3)<<22 | uint32(sh&1)<<13 | uint32(imm8&0xff)<<5 | uint32(zdn&31)
+
 	case 4: /* zand/zorr/zbic/zeor Zm.D, Zn.D, Zd.D */
 		switch p.As {
 		case AZAND:
@@ -3907,6 +4089,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		}
 
 		o1 |= uint32(zm&31)<<16 | uint32(zn&31)<<5 | uint32(zd&31)
+
 	case 5: /* zand/zorr/zbic/zorn/zeor/zeon $bitcon, Zdn.<T>, Zdn.<T> */
 		switch p.As {
 		case AZORR, AZORN:
@@ -3955,6 +4138,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		}
 
 		o1 |= uint32(imm13&0x1fff)<<5 | uint32(zdn&31)
+
 	case 6:
 		/* pand/pbic/peor/pands/pbics/peors/porr/porn/pnor/pnand/porrs/porns/pnors/pnands Pm.B, Pn.B, Pg/Z, Pd.B
 		 * psel Pm.B, Pn.B, Pg, Pd.B */
@@ -4006,6 +4190,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		}
 
 		o1 |= uint32(pm&15)<<16 | uint32(pg&15)<<10 | uint32(pn&15)<<5 | uint32(pd&15)
+
 	case 7: /* zdup R(n|SP), Zd.<T> */
 		o1 |= 5<<24 | 1<<21 | 7<<11
 
@@ -4016,6 +4201,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		sz := c.sveDataSize(ad)
 
 		o1 |= uint32(sz&3)<<22 | uint32(rn&31)<<5 | uint32(zd&31)
+
 	case 8: /* zdup Zn.<T>[idx], Zd.<T> */
 		o1 |= 5<<24 | 1<<21 | 1<<13
 
@@ -4063,31 +4249,58 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		tsz := imm7 & 31
 
 		o1 |= uint32(imm2&3)<<22 | uint32(tsz&31)<<16 | uint32(zn&31)<<5 | uint32(zd&31)
-	case 9: /* zdup $(imm8|imm16), Zd.<T> */
-		o1 |= 0x25<<24 | 7<<19 | 3<<14
 
-		imm8 := p.From.Offset
+	case 9: /* zmul Zm.<T>[idx], Zn.<T>, Zd.<T> */
+		o1 |= 0x11<<26 | 1<<21 | 0x1f<<11
+
+		zm := p.From.Reg
+		idx := p.From.Index
+		zn := p.Reg
 		zd := p.To.Reg
 
+		am := c.parseArng(zm)
+		an := c.parseArng(zn)
 		ad := c.parseArng(zd)
-		sz := c.sveDataSize(ad)
-
-		if imm8&^0xffff != 0 {
-			c.ctxt.Diag("invalid immediate: %v", p)
+		if am != an || am != ad {
+			c.ctxt.Diag("data size mismatch: %v", p)
 		}
-		sh := 0
-		if imm8 >= 1<<8 {
-			if imm8&0xff != 0 {
-				c.ctxt.Diag("invalid immediate: %v", p)
+		switch am {
+		case ARNG_B:
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		case ARNG_H:
+			if idx&^7 != 0 {
+				c.ctxt.Diag("index out of range [0, 7]: %v", p)
 			}
-			if sz == 0 {
-				c.ctxt.Diag("undefined instruction cause [size:sh == '001']: %v", p)
+			if zm&31&^7 != 0 {
+				c.ctxt.Diag("register Zm out of range [0, 7]: %v", p)
 			}
-			imm8 >>= 8
-			sh = 1
+			i3h := idx >> 2 & 1
+			i3l := idx & 3
+			o1 |= uint32(i3h&1)<<22 | uint32(i3l&3)<<19 | uint32(zm&7)<<16
+		case ARNG_S:
+			if idx&^3 != 0 {
+				c.ctxt.Diag("index out of range [0, 3]: %v", p)
+			}
+			if zm&31&^7 != 0 {
+				c.ctxt.Diag("register Zm out of range [0, 7]: %v", p)
+			}
+			i2 := idx & 3
+			o1 |= 2<<22 | uint32(i2&3)<<19 | uint32(zm&7)<<16
+		case ARNG_D:
+			if idx&^1 != 0 {
+				c.ctxt.Diag("index out of range [0, 1]: %v", p)
+			}
+			if zm&31&^15 != 0 {
+				c.ctxt.Diag("register Zm out of range [0, 15]: %v", p)
+			}
+			i1 := idx & 1
+			o1 |= 3<<22 | uint32(i1&1)<<20 | uint32(zm&15)<<16
+		default:
+			c.ctxt.Diag("invalid arrangement: %v", p)
 		}
 
-		o1 |= uint32(sz&3)<<22 | uint32(sh&1)<<13 | uint32(imm8&0xff)<<5 | uint32(zd&31)
+		o1 |= uint32(zn&31)<<5 | uint32(zd&31)
+
 	case 10: /* while<cc> Rm, Rn, Pd.<T> => whilexxw is the 32-bit version of whilexx */
 		u, lt, eq, sf := c.whileccFlags(p)
 		o1 |= 0x25<<24 | 1<<21 | sf<<12 | u<<11 | lt<<10 | eq<<4
@@ -4100,6 +4313,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		sz := c.sveDataSize(ad)
 
 		o1 |= uint32(sz&3)<<22 | uint32(rm&31)<<16 | uint32(rn&31)<<5 | uint32(pd&15)
+
 	case 11: /* while<cc> Rm, Rn, {Pd1.<T>, Pd2.<T>} => whilexxw is unavailable */
 		u, lt, eq, sf := c.whileccFlags(p)
 		if sf == 0 {
@@ -4123,6 +4337,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		sz := c.sveDataSize(ad)
 
 		o1 |= uint32(sz&3)<<22 | uint32(rm&31)<<16 | uint32(rn&31)<<5 | uint32(pd>>1&7)<<1
+
 	case 12:
 		/* zcmp<cc> Zm.<T>, Zn.<T>, Pg/Z, Pd.<T> (vectors)
 		 * zcmp<cc> Zm.D, Zn.<T>, Pg/Z, Pd.<T> (wide elements) */
@@ -4156,6 +4371,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		sz := c.sveDataSize(an)
 
 		o1 |= uint32(sz&3)<<22 | uint32(zm&31)<<16 | uint32(pg&7)<<10 | uint32(zn&31)<<5 | uint32(pd&15)
+
 	case 13: /* zcmp<cc> $imm, Zn.<T>, Pg/Z, Pd.<T> */
 		u, eq, lt, ne := c.cmpccFlags(p)
 		o1 |= 0x24<<24 | (u^1)<<24 | u<<21 | eq<<15 | lt<<13 | ne<<4
@@ -4185,6 +4401,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 			}
 			o1 |= uint32(sz&3)<<22 | uint32(imm&0x1f)<<16 | uint32(pg&7)<<10 | uint32(zn&31)<<5 | uint32(pd&15)
 		}
+
 	case 14: /* zsel Zm.<T>, Zn.<T>, Pv, Zd.<T> */
 		o1 |= 5<<24 | 1<<21 | 3<<14
 
@@ -4203,6 +4420,7 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		sz := c.sveDataSize(am)
 
 		o1 |= uint32(sz&3)<<22 | uint32(zm&31)<<16 | uint32(pv&15)<<10 | uint32(zn&31)<<5 | uint32(zd&31)
+
 	case 15: /* zasr/zlsr/zlsl/zsqshl/zuqshl/zasrd/zsrshr/zurshr/zsqshlu $const, Zdn.<T>, Pg/M, Zdn.<T> */
 		switch p.As {
 		case AZASR:
@@ -4304,6 +4522,399 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		imm3 := imm7 & 7
 
 		o1 |= uint32(tszh&3)<<22 | uint32(pg&7)<<10 | uint32(tszl&3)<<8 | uint32(imm3&7)<<5 | uint32(zdn&31)
+
+	case 16:
+		/* zasr/zlsr/zlsl/zasrr/zlsrr/zlslr Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T> (vectors)
+		 * zasr/zlsr/zlsl Zm.D, Zdn.<T>, Pg/M, Zdn.<T> (wide elements) */
+		switch p.As {
+		case AZASR:
+			o1 |= 1<<26 | 1<<20 | 0<<16 | 1<<15
+		case AZLSR:
+			o1 |= 1<<26 | 1<<20 | 1<<16 | 1<<15
+		case AZLSL:
+			o1 |= 1<<26 | 1<<20 | 3<<16 | 1<<15
+		case AZASRR:
+			o1 |= 1<<26 | 1<<20 | 4<<16 | 1<<15
+		case AZLSRR:
+			o1 |= 1<<26 | 1<<20 | 5<<16 | 1<<15
+		case AZLSLR:
+			o1 |= 1<<26 | 1<<20 | 7<<16 | 1<<15
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		zm := p.From.Reg
+		zn := p.Reg
+		pg := p.GetFrom3().Reg
+		zd := p.To.Reg
+		if zn != zd {
+			c.ctxt.Diag("register mismatch: %v", p)
+		}
+		zdn := zd
+		c.checkGPreg(p, pg)
+
+		am := c.parseArng(zm)
+		an := c.parseArng(zn)
+		if am != an {
+			switch p.As {
+			case AZASR, AZLSR, AZLSL:
+				if am != ARNG_D || an == ARNG_D {
+					c.ctxt.Diag("data size mismatch: %v", p)
+				}
+				/* wide elements */
+				o1 |= 1 << 19
+			default:
+				c.ctxt.Diag("data size mismatch: %v", p)
+			}
+		}
+
+		sz := c.sveDataSize(an)
+
+		o1 |= uint32(sz&3)<<22 | uint32(pg&7)<<10 | uint32(zm&31)<<5 | uint32(zdn&31)
+
+	case 17:
+		/* zsxtb/zuxtb/zsxth/zuxth/zsxtw/zustw/zabs/zneg/zcls/zclz/zcnt/zcnot/zfabs/zfneg/znot
+		 *     Zn.<T>, Pg/M, Zd.<T> */
+		switch p.As {
+		case AZSXTB:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 0<<16 | 5<<13
+		case AZUXTB:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 1<<16 | 5<<13
+		case AZSXTH:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 2<<16 | 5<<13
+		case AZUXTH:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 3<<16 | 5<<13
+		case AZSXTW:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 4<<16 | 5<<13
+		case AZUXTW:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 5<<16 | 5<<13
+		case AZABS:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 6<<16 | 5<<13
+		case AZNEG:
+			o1 |= 1<<26 | 1<<20 | 0<<19 | 7<<16 | 5<<13
+		case AZCLS:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 0<<16 | 5<<13
+		case AZCLZ:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 1<<16 | 5<<13
+		case AZCNT:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 2<<16 | 5<<13
+		case AZCNOT:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 3<<16 | 5<<13
+		case AZFABS:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 4<<16 | 5<<13
+		case AZFNEG:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 5<<16 | 5<<13
+		case AZNOT:
+			o1 |= 1<<26 | 1<<20 | 1<<19 | 6<<16 | 5<<13
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		zn := p.From.Reg
+		pg := p.Reg
+		zd := p.To.Reg
+
+		an := c.parseArng(zn)
+		ad := c.parseArng(zd)
+		if an != ad {
+			c.ctxt.Diag("data size mismatch: %v", p)
+		}
+		c.checkGPreg(p, pg)
+
+		sz := c.sveDataSize(an)
+
+		switch p.As {
+		case AZSXTB, AZUXTB, AZFABS, AZFNEG:
+			if sz < 1 {
+				c.ctxt.Diag("invalid arrangement: %v", p)
+			}
+		case AZSXTH, AZUXTH:
+			if sz < 2 {
+				c.ctxt.Diag("invalid arrangement: %v", p)
+			}
+		case AZSXTW, AZUXTW:
+			if sz < 3 {
+				c.ctxt.Diag("invalid arrangement: %v", p)
+			}
+		default:
+			break
+		}
+
+		o1 |= uint32(sz&3)<<22 | uint32(pg&7)<<10 | uint32(zn&31)<<5 | uint32(zd&31)
+
+	case 18: /* zasr/zlsr/zlsl $const, Zn,<T>, Zd.<T> */
+		var r bool
+		switch p.As {
+		case AZASR:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 1<<12 | 0<<10
+			r = true
+		case AZLSR:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 1<<12 | 1<<10
+			r = true
+		case AZLSL:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 1<<12 | 3<<10
+			r = false
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		con := p.From.Offset
+		zn := p.Reg
+		zd := p.To.Reg
+
+		an := c.parseArng(zn)
+		ad := c.parseArng(zd)
+		if an != ad {
+			c.ctxt.Diag("data size mismatch: %v", p)
+		}
+		var imm7 uint32
+		switch an {
+		case ARNG_B:
+			if r {
+				if con <= 0 || con > 8 {
+					c.ctxt.Diag("immediate shift amount out of range [1, 8]: %v", p)
+				}
+				imm7 = uint32(16 - con)
+			} else {
+				if con&^7 != 0 {
+					c.ctxt.Diag("immediate shift amount out of range [0, 7]: %v", p)
+				}
+				imm7 = uint32(con) | 1<<3
+			}
+		case ARNG_H:
+			if r {
+				if con <= 0 || con > 16 {
+					c.ctxt.Diag("immediate shift amount out of range [1, 16]: %v", p)
+				}
+				imm7 = uint32(32 - con)
+			} else {
+				if con&^15 != 0 {
+					c.ctxt.Diag("immediate shift amount out of range [0, 15]: %v", p)
+				}
+				imm7 = uint32(con) | 1<<4
+			}
+		case ARNG_S:
+			if r {
+				if con <= 0 || con > 32 {
+					c.ctxt.Diag("immediate shift amount out of range [1, 32]: %v", p)
+				}
+				imm7 = uint32(64 - con)
+			} else {
+				if con&^31 != 0 {
+					c.ctxt.Diag("immediate shift amount out of range [0, 31]: %v", p)
+				}
+				imm7 = uint32(con) | 1<<5
+			}
+		case ARNG_D:
+			if r {
+				if con <= 0 || con > 64 {
+					c.ctxt.Diag("immediate shift amount out of range [1, 64]: %v", p)
+				}
+				imm7 = uint32(128 - con)
+			} else {
+				if con&^63 != 0 {
+					c.ctxt.Diag("immediate shift amount out of range [0, 63]: %v", p)
+				}
+				imm7 = uint32(con) | 1<<6
+			}
+		default:
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+		tszh := imm7 >> 5 & 3
+		tszl := imm7 >> 3 & 3
+		imm3 := imm7 & 7
+
+		o1 |= uint32(tszh&3)<<22 | uint32(tszl&3)<<19 | uint32(imm3&7)<<16 | uint32(zn&31)<<5 | uint32(zd&31)
+
+	case 19: /* zasr/zlsr/zlsl Zm.D, Zn,<T>, Zd.<T> */
+		switch p.As {
+		case AZASR:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 0<<10
+		case AZLSR:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 1<<10
+		case AZLSL:
+			o1 |= 1<<26 | 1<<21 | 1<<15 | 3<<10
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		zm := p.From.Reg
+		zn := p.Reg
+		zd := p.To.Reg
+
+		am := c.parseArng(zm)
+		an := c.parseArng(zn)
+		ad := c.parseArng(zd)
+		if an != ad {
+			c.ctxt.Diag("data size mismatch: %v", p)
+		}
+		if am != ARNG_D || an == ARNG_D {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		sz := c.sveDataSize(an)
+
+		o1 |= uint32(sz&3)<<22 | uint32(zm&31)<<16 | uint32(zn&31)<<5 | uint32(zd&31)
+
+	case 20: /* ptest Pn.B, Pg */
+		o1 |= 0x25<<24 | 1<<22 | 1<<20 | 3<<14
+
+		pn := p.From.Reg
+		pg := p.Reg
+
+		an := c.parseArng(pn)
+		if an != ARNG_B {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		o1 |= uint32(pg&15)<<10 | uint32(pn&15)<<5
+
+	case 21: /* pfirst Pdn.B, Pg, Pdn.B */
+		o1 |= 0x25<<24 | 1<<22 | 3<<19 | 3<<14
+
+		pn := p.From.Reg
+		pg := p.Reg
+		pd := p.To.Reg
+		if pn != pd {
+			c.ctxt.Diag("register mismatch: %v", p)
+		}
+		pdn := pd
+
+		an := c.parseArng(pn)
+		if an != ARNG_B {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		o1 |= uint32(pg&15)<<5 | uint32(pdn&15)
+
+	case 22: /* pfalse Pd.B */
+		o1 |= 0x25<<24 | 3<<19 | 7<<13 | 1<<10
+
+		pd := p.To.Reg
+
+		ad := c.parseArng(pd)
+		if ad != ARNG_B {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		o1 |= uint32(pd & 15)
+
+	case 23:
+		/* prdffr/prdffrs Pg/Z, Pd.B (predicated)
+		 * prdffr Pd.B (unpredicated) */
+		switch p.As {
+		case APRDFFR:
+			o1 |= 0x25<<24 | 0<<22 | 3<<19 | 15<<12
+		case APRDFFRS:
+			o1 |= 0x25<<24 | 1<<22 | 3<<19 | 15<<12
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		pd := p.To.Reg
+
+		ad := c.parseArng(pd)
+		if ad != ARNG_B {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		if p.From.Type == obj.TYPE_NONE { /* unpredicated */
+			o1 |= 1 << 16
+			o1 |= uint32(pd & 15)
+		} else { /* predicated */
+			pg := p.From.Reg
+			o1 |= uint32(pg&15)<<5 | uint32(pd&15)
+		}
+
+	case 24: /* pnext Pdn.B, Pv, Pdn.B */
+		o1 |= 0x25<<24 | 1<<22 | 3<<19 | 7<<14 | 1<<10
+
+		pn := p.From.Reg
+		pv := p.Reg
+		pd := p.To.Reg
+		if pn != pd {
+			c.ctxt.Diag("register mismatch: %v", p)
+		}
+		pdn := pd
+
+		an := c.parseArng(pn)
+		sz := c.sveDataSize(an)
+
+		o1 |= uint32(sz&3)<<22 | uint32(pv&15)<<5 | uint32(pdn&15)
+
+	case 25: /* ptrue/ptrues {pattern, }Pd.<T> */
+		switch p.As {
+		case APTRUE:
+			o1 |= 0x25<<24 | 3<<19 | 0<<16 | 7<<13
+		case APTRUES:
+			o1 |= 0x25<<24 | 3<<19 | 1<<16 | 7<<13
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		pat := Pattern(p.From.Offset)
+		if p.From.Type == obj.TYPE_NONE {
+			pat = PAT_ALL
+		}
+		pd := p.To.Reg
+		if pat&^31 != 0 {
+			c.ctxt.Diag("illegal pattern code: %v", p)
+		}
+
+		ad := c.parseArng(pd)
+		sz := c.sveDataSize(ad)
+
+		o1 |= uint32(sz&3)<<22 | uint32(pat&31)<<5 | uint32(pd&31)
+
+	case 26: /* zindex (Rn|$imm5), (Rn|$imm5), Zd.<T> */
+		o1 |= 1<<26 | 1<<21 | 1<<14
+
+		var op1, op2 int64
+		if p.From.Type == obj.TYPE_CONST {
+			op1 = int64(p.From.Offset)
+			if op1 < -16 || op1 > 15 {
+				c.ctxt.Diag("immediate out of range [-16, 15]: %v", p)
+			}
+		} else {
+			o1 |= 1 << 11
+			op1 = int64(p.From.Reg)
+		}
+		if p.GetFrom3().Type == obj.TYPE_CONST {
+			op2 = int64(p.GetFrom3().Offset)
+			if op2 < -16 || op2 > 15 {
+				c.ctxt.Diag("immediate out of range [-16, 15]: %v", p)
+			}
+		} else {
+			o1 |= 1 << 10
+			op2 = int64(p.GetFrom3().Reg)
+		}
+		zd := p.To.Reg
+
+		ad := c.parseArng(zd)
+		sz := c.sveDataSize(ad)
+
+		o1 |= uint32(sz&3)<<22 | uint32(op1&31)<<16 | uint32(op2&31)<<5 | uint32(zd&31)
+
+	case 27: /* punpkhi/punpklo Pn.B, Pd.H */
+		switch p.As {
+		case APUNPKLO:
+			o1 |= 5<<24 | 3<<20 | 0<<16 | 1<<14
+		case APUNPKHI:
+			o1 |= 5<<24 | 3<<20 | 1<<16 | 1<<14
+		default:
+			c.ctxt.Diag("unexpected asm: %v", p)
+		}
+
+		pn := p.From.Reg
+		pd := p.To.Reg
+
+		an := c.parseArng(pn)
+		ad := c.parseArng(pd)
+		if an != ARNG_B || ad != ARNG_H {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
+
+		o1 |= uint32(pn&15)<<5 | uint32(pd&15)
 	}
 
 	out[0] = o1
