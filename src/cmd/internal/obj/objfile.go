@@ -773,6 +773,19 @@ func genFuncInfoSyms(ctxt *Link) {
 			FuncFlag:  fn.FuncFlag,
 			StartLine: fn.StartLine,
 		}
+
+		if goobj.EnableMappingSymbols {
+			poolsInfo := make([]goobj.PoolInfo, len(fn.Pool))
+			for i, p := range fn.Pool {
+				poolsInfo[i].PoolOff = uint32(p.Pc)
+				target := p.To.Target()
+				if target != nil {
+					poolsInfo[i].CodeOff = uint32(target.Pc)
+				}
+			}
+			o.PoolsInfo = poolsInfo
+		}
+
 		pc := &fn.Pcln
 		i := 0
 		o.File = make([]goobj.CUFileIndex, len(pc.UsedFiles))

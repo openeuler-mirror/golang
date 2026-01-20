@@ -2127,6 +2127,26 @@ func (fi *FuncInfo) InlTree(k int) InlTreeNode {
 	}
 }
 
+func (fi *FuncInfo) NumPoolInfo() uint32 {
+	if !goobj.EnableMappingSymbols {
+		panic("disabled mapping symbols, but (*FuncInfo).NumPoolInfo is called, is there a bug?")
+	}
+	if !fi.lengths.Initialized {
+		panic("need to call Preload first")
+	}
+	return fi.lengths.NumPoolInfo
+}
+
+func (fi *FuncInfo) PoolInfo(k uint32) goobj.PoolInfo {
+	if !goobj.EnableMappingSymbols {
+		panic("disabled mapping symbols, but (*FuncInfo).PoolInfo is called, is there a bug?")
+	}
+	if !fi.lengths.Initialized {
+		panic("need to call Preload first")
+	}
+	return (*goobj.FuncInfo)(nil).ReadPoolInfo(fi.data, fi.lengths.PoolInfoOff, k)
+}
+
 func (l *Loader) FuncInfo(i Sym) FuncInfo {
 	r, auxs := l.auxs(i)
 	for j := range auxs {

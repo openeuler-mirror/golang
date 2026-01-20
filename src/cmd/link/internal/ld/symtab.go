@@ -31,8 +31,10 @@
 package ld
 
 import (
+	"cmd/internal/goobj"
 	"cmd/internal/obj"
 	"cmd/internal/objabi"
+	"cmd/internal/sys"
 	"cmd/link/internal/loader"
 	"cmd/link/internal/sym"
 	"debug/elf"
@@ -78,30 +80,9 @@ func putelfsyment(out *OutBuf, off int, addr int64, size int64, info uint8, shnd
 
 func putelfsym(ctxt *Link, x loader.Sym, typ elf.SymType, curbind elf.SymBind) {
 	ldr := ctxt.loader
-	addr := ldr.SymValue(x)
-	size := ldr.SymSize(x)
-
-	xo := x
-	if ldr.OuterSym(x) != 0 {
-		xo = ldr.OuterSym(x)
-	}
-	xot := ldr.SymType(xo)
-	xosect := ldr.SymSect(xo)
-
-	var elfshnum elf.SectionIndex
-	if xot == sym.SDYNIMPORT || xot == sym.SHOSTOBJ || xot == sym.SUNDEFEXT {
-		elfshnum = elf.SHN_UNDEF
-		size = 0
-	} else {
-		if xosect == nil {
-			ldr.Errorf(x, "missing section in putelfsym")
-			return
-		}
-		if xosect.Elfsect == nil {
-			ldr.Errorf(x, "missing ELF section in putelfsym")
-			return
-		}
-		elfshnum = xosect.Elfsect.(*ElfShdr).shnum
+	addr, size, sect, elfshnum, ok := getSymInfo(ctxt, x)
+	if !ok {
+		return
 	}
 
 	sname := ldr.SymExtname(x)
@@ -126,7 +107,7 @@ func putelfsym(ctxt *Link, x loader.Sym, typ elf.SymType, curbind elf.SymBind) {
 	}
 
 	if ctxt.LinkMode == LinkExternal && elfshnum != elf.SHN_UNDEF {
-		addr -= int64(xosect.Vaddr)
+		addr -= int64(sect.Vaddr)
 	}
 	other := int(elf.STV_DEFAULT)
 	if ldr.AttrVisibilityHidden(x) {
@@ -178,6 +159,117 @@ func putelfsym(ctxt *Link, x loader.Sym, typ elf.SymType, curbind elf.SymBind) {
 	putelfsyment(ctxt.Out, putelfstr(sname), addr, size, elf.ST_INFO(bind, typ), elfshnum, other)
 	ldr.SetSymElfSym(x, int32(ctxt.numelfsym))
 	ctxt.numelfsym++
+}
+
+// Generates special mapping symbols that are required by ARM64 ELF standtard.
+// https://github.com/ARM-software/abi-aa/blob/2020q4/aaelf64/aaelf64.rst#mapping-symbols
+func genElfMappingSymbols(ctxt *Link) {
+	if !goobj.EnableMappingSymbols || ctxt.Arch.Family != sys.ARM64 || !ctxt.IsELF {
+		return
+	}
+
+	ldr := ctxt.loader
+
+	// There are 2 symbols designed to mark inline transitions between code adn data:
+	// $d in the beginning of a sequence of data.
+	// $x in the beginning of a sequence of ARM64 instructions.
+	// Mapping symbols have type STT_NOTYPE and binding STB_LOCAL, the st_size field is unused and must be zero.
+	datasymb := putelfstr("$d")
+	codesymb := putelfstr("$x")
+
+	needcodesymb := true
+	// The section index of the section the previously emitted mapping symbol
+	// belongs to. ^elf.SectionIndex(0) (-1) is never a valid section index,
+	// so the first section is always treated as a new section.
+	prevshnum := ^elf.SectionIndex(0)
+	for _, s := range ctxt.Textp {
+		var numpoolinfo uint32 = 0
+		funcinfo := ldr.FuncInfo(s)
+		if funcinfo.Valid() {
+			funcinfo.Preload()
+			numpoolinfo = funcinfo.NumPoolInfo()
+		}
+
+		// sz is ignored, because accroding to the documentation the st_size field must be zero.
+		addr, _, sect, elfshnum, ok := getSymInfo(ctxt, s)
+		if !ok || elfshnum == elf.SHN_UNDEF {
+			continue
+		}
+
+		// AAELF64 requires every section containing instructions to define a
+		// mapping symbol at the beginning of the section, so reset the code
+		// state whenever the section changes.
+		if elfshnum != prevshnum {
+			prevshnum = elfshnum
+			needcodesymb = true
+		}
+
+		if !needcodesymb && numpoolinfo == 0 {
+			continue
+		}
+
+		if needcodesymb {
+			if ctxt.LinkMode == LinkExternal && elfshnum != elf.SHN_UNDEF {
+				addr -= int64(sect.Vaddr)
+			}
+			putelfsyment(ctxt.Out, codesymb, addr, 0, elf.ST_INFO(elf.STB_LOCAL, elf.STT_NOTYPE), elfshnum, 0)
+			ctxt.numelfsym++
+			needcodesymb = false
+		}
+
+		for at := uint32(0); at < numpoolinfo; at++ {
+			poolInfo := funcinfo.PoolInfo(at)
+			poollocation := ldr.SymValue(s) + int64(poolInfo.PoolOff)
+			codelocation := ldr.SymValue(s) + int64(poolInfo.CodeOff)
+
+			if ctxt.LinkMode == LinkExternal && elfshnum != elf.SHN_UNDEF {
+				poollocation -= int64(sect.Vaddr)
+				codelocation -= int64(sect.Vaddr)
+			}
+
+			putelfsyment(ctxt.Out, datasymb, poollocation+4, 0, elf.ST_INFO(elf.STB_LOCAL, elf.STT_NOTYPE), elfshnum, 0)
+			ctxt.numelfsym++
+			needcodesymb = true
+
+			if poolInfo.CodeOff != 0 {
+				putelfsyment(ctxt.Out, codesymb, codelocation, 0, elf.ST_INFO(elf.STB_LOCAL, elf.STT_NOTYPE), elfshnum, 0)
+				ctxt.numelfsym++
+				needcodesymb = false
+			}
+		}
+	}
+}
+
+// getSymInfo returns generic information about symbol size and position that's needed inside putelfsym and genElfMappingSymbols.
+func getSymInfo(ctxt *Link, x loader.Sym) (addr int64, sz int64, sect *sym.Section, elfshnum elf.SectionIndex, ok bool) {
+	ldr := ctxt.loader
+	addr = ldr.SymValue(x)
+	sz = ldr.SymSize(x)
+
+	xo := x
+	if ldr.OuterSym(x) != 0 {
+		xo = ldr.OuterSym(x)
+	}
+	xot := ldr.SymType(xo)
+	sect = ldr.SymSect(xo)
+
+	if xot == sym.SDYNIMPORT || xot == sym.SHOSTOBJ || xot == sym.SUNDEFEXT {
+		elfshnum = elf.SHN_UNDEF
+		sz = 0
+	} else {
+		if sect == nil {
+			ldr.Errorf(x, "missing section in getSymInfo")
+			return
+		}
+		if sect.Elfsect == nil {
+			ldr.Errorf(x, "missing ELF section in getSymInfo")
+			return
+		}
+		elfshnum = sect.Elfsect.(*ElfShdr).shnum
+	}
+
+	ok = true
+	return
 }
 
 func putelfsectionsym(ctxt *Link, out *OutBuf, s loader.Sym, shndx elf.SectionIndex) {
@@ -277,6 +369,8 @@ func asmElfSym(ctxt *Link) {
 	// encountered on some versions of Solaris. See issue #14957.
 	putelfsyment(ctxt.Out, putelfstr("go.go"), 0, 0, elf.ST_INFO(elf.STB_LOCAL, elf.STT_FILE), elf.SHN_ABS, 0)
 	ctxt.numelfsym++
+
+	genElfMappingSymbols(ctxt)
 
 	bindings := []elf.SymBind{elf.STB_LOCAL, elf.STB_GLOBAL}
 	for _, elfbind := range bindings {

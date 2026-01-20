@@ -110,6 +110,8 @@ var (
 	GoPathError   string
 	GOPATHChanged bool
 	CGOChanged    bool
+
+	MappingSymbol bool // -mappingsymbol flag
 )
 
 func defaultContext() build.Context {

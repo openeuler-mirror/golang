@@ -199,6 +199,7 @@ func Main(arch *sys.Arch, theArch Arch) {
 	flag.Var(&ctxt.LinkMode, "linkmode", "set link `mode`")
 	flag.Var(&ctxt.BuildMode, "buildmode", "set build `mode`")
 	flag.BoolVar(&ctxt.compressDWARF, "compressdwarf", true, "compress DWARF if possible")
+	flag.BoolVar(&goobj.EnableMappingSymbols, "mappingsymbol", false, "generate mapping symbols for arm64")
 	objabi.Flagfn1("L", "add specified `directory` to library path", func(a string) { Lflag(ctxt, a) })
 	objabi.AddVersionFlag() // -V
 	objabi.Flagfn1("X", "add string value `definition` of the form importpath.name=value", func(s string) { addstrdata1(ctxt, s) })
@@ -323,6 +324,13 @@ func Main(arch *sys.Arch, theArch Arch) {
 	ctxt.computeTLSOffset()
 	bench.Start("Archinit")
 	thearch.Archinit(ctxt)
+
+	if goobj.EnableMappingSymbols && (!ctxt.IsARM64() || !ctxt.IsELF) {
+		// mapping symbols are only generated for arm64 ELF; on any other
+		// target the flag is a no-op and must not alter linking behavior
+		// (text splitting, trampolines)
+		goobj.EnableMappingSymbols = false
+	}
 
 	if ctxt.linkShared && !ctxt.IsELF {
 		Exitf("-linkshared can only be used on elf systems")

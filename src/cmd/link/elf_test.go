@@ -14,10 +14,12 @@ import (
 	"fmt"
 	"internal/platform"
 	"internal/testenv"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -521,6 +523,153 @@ func TestPIESize(t *testing.T) {
 				t.Errorf("PIE unexpectedly large: got difference of %d (%d - %d), expected difference %d", diffReal, sizepie, sizeexe, diffExpected)
 			}
 		})
+	}
+}
+
+var goMappingSymbolsSrc = `
+package main
+import "unsafe"
+type A struct {
+	c [16384]uint8
+}
+//go:noinline
+func foo(i int) A {
+	var a [2]A
+	b := uint16(0)
+	*(*uint16)(unsafe.Pointer(&a[0].c[1])) = b
+	b++
+	*(*uint16)(unsafe.Pointer(&a[1].c[1])) = b
+	return a[i]
+}
+func main() {
+	_ = foo(0)
+	return
+}
+`
+
+func TestMappingSymbols(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("skipping arm64 only test")
+	}
+
+	testenv.MustHaveGoBuild(t)
+	t.Parallel()
+
+	buildmodes := []string{"exe", "pie"}
+	enableMappingSymbols := []bool{true, false}
+
+	var wg sync.WaitGroup
+	wg.Add(len(enableMappingSymbols) * len(buildmodes))
+	for _, enable := range enableMappingSymbols {
+		for _, buildmode := range buildmodes {
+			go func(mode string, enable bool) {
+				defer wg.Done()
+				symbols := buildSymbols(t, mode, enable)
+				checkMappingSymbols(t, symbols, enable)
+			}(buildmode, enable)
+		}
+	}
+	wg.Wait()
+}
+
+// Builds a simple program, then returns a corresponding symbol table for that binary
+func buildSymbols(t *testing.T, mode string, enableMappingSymbols bool) []elf.Symbol {
+	goTool := testenv.GoToolPath(t)
+
+	dir := t.TempDir()
+
+	goFile := filepath.Join(dir, "main.go")
+	if err := ioutil.WriteFile(goFile, []byte(goMappingSymbolsSrc), 0444); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module elf_test\n"), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	var cmd *exec.Cmd
+	args := []string{"build", "-o", mode, "-buildmode=" + mode}
+	if enableMappingSymbols {
+		args = append(args, "-mappingsymbol")
+	}
+
+	cmd = exec.Command(goTool, args...)
+
+	cmd.Dir = dir
+
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Logf("%s", out)
+		t.Fatal(err)
+	}
+
+	bin := filepath.Join(dir, mode)
+
+	elfexe, err := elf.Open(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	symbols, err := elfexe.Symbols()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return symbols
+}
+
+// Checks that mapping symbols are inserted correctly inside a symbol table.
+func checkMappingSymbols(t *testing.T, symbols []elf.Symbol, enableMappingSymbols bool) {
+	// mappingSymbols variable keeps only "$x" and "$d" symbols sorted by their position.
+	var mappingSymbols []elf.Symbol
+	var fooSym *elf.Symbol = nil
+	var fooDSymFound bool = false
+	for _, symbol := range symbols {
+		if symbol.Name == "$x" || symbol.Name == "$d" {
+			if elf.ST_TYPE(symbol.Info) != elf.STT_NOTYPE || elf.ST_BIND(symbol.Info) != elf.STB_LOCAL {
+				t.Fatalf("met \"%v\" symbol at %v position with incorrect info %v", symbol.Name, symbol.Value, symbol.Info)
+			}
+			mappingSymbols = append(mappingSymbols, symbol)
+		}
+		if symbol.Name == "main.foo" {
+			if elf.ST_TYPE(symbol.Info) != elf.STT_FUNC || elf.ST_BIND(symbol.Info) != elf.STB_GLOBAL {
+				t.Fatalf("met \"%v\" symbol at %v position with incorrect info %v", symbol.Name, symbol.Value, symbol.Info)
+			}
+			fooSym = &symbol
+		}
+	}
+
+	if fooSym == nil {
+		t.Fatal("Not found symbol for 'main.foo' function")
+	}
+
+	if !enableMappingSymbols {
+		if len(mappingSymbols) != 0 {
+			t.Fatal("disable mapping symbols, but binary has mapping symbols")
+		}
+		return
+	}
+
+	sort.Slice(mappingSymbols, func(i, j int) bool {
+		return mappingSymbols[i].Value < mappingSymbols[j].Value
+	})
+
+	if len(mappingSymbols) == 0 {
+		t.Fatal("binary does not have mapping symbols")
+	}
+
+	for i := 0; i < len(mappingSymbols)-1; i += 2 {
+		if mappingSymbols[i].Name == "$d" {
+			t.Fatalf("met unexpected \"$d\" symbol at %v position", mappingSymbols[i].Value)
+		}
+		if i+1 < len(mappingSymbols) && mappingSymbols[i+1].Name == "$x" {
+			t.Fatalf("met unexpected \"$x\" symbol at %v position", mappingSymbols[i+1].Value)
+		}
+		if mappingSymbols[i+1].Value > fooSym.Value && mappingSymbols[i+1].Value < fooSym.Value+fooSym.Size {
+			fooDSymFound = true
+		}
+	}
+
+	if enableMappingSymbols && !fooDSymFound {
+		t.Fatal("Failed to find $d symbol inside 'main.foo' function")
 	}
 }
 

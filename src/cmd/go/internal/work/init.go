@@ -336,6 +336,11 @@ func buildModeInit() {
 			base.Fatalf("build flag -modfile only valid when using modules")
 		}
 	}
+	if cfg.MappingSymbol {
+		forcedGcflags = append(forcedGcflags, "-mappingsymbol")
+		forcedAsmflags = append(forcedAsmflags, "-mappingsymbol")
+		forcedLdflags = append(forcedLdflags, "-mappingsymbol")
+	}
 }
 
 type version struct {

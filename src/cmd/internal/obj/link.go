@@ -511,6 +511,8 @@ type FuncInfo struct {
 	WasmExport *WasmExport
 
 	sehUnwindInfoSym *LSym
+
+	Pool []*Prog
 }
 
 // JumpTable represents a table used for implementing multi-way

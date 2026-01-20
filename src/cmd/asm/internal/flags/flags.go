@@ -6,6 +6,7 @@
 package flags
 
 import (
+	"cmd/internal/goobj"
 	"cmd/internal/obj"
 	"cmd/internal/objabi"
 	"flag"
@@ -46,6 +47,8 @@ func init() {
 	flag.Var(&I, "I", "include directory; can be set multiple times")
 	flag.BoolVar(&DebugV, "v", false, "print debug output")
 	flag.Var(objabi.NewDebugFlag(&DebugFlags, nil), "d", "enable debugging settings; try -d help")
+	flag.BoolVar(&goobj.EnableMappingSymbols, "mappingsymbol", false, "generate mapping symbols for arm64")
+
 	objabi.AddVersionFlag() // -V
 	objabi.Flagcount("S", "print assembly and machine code", &PrintOut)
 }
