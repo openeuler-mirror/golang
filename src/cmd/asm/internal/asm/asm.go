@@ -15,7 +15,6 @@ import (
 	"cmd/asm/internal/flags"
 	"cmd/asm/internal/lex"
 	"cmd/internal/obj"
-	"cmd/internal/obj/arm64"
 	"cmd/internal/obj/ppc64"
 	"cmd/internal/obj/riscv"
 	"cmd/internal/obj/x86"
@@ -607,8 +606,8 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 	case 0:
 		// Nothing to do.
 	case 1:
-		if p.arch.UnaryDst[op] || op == obj.ARET || op == obj.AGETCALLERPC || op == arm64.APTEST ||
-			op == arm64.APTRUE || op == arm64.APTRUES || op == arm64.APRDFFR || op == arm64.APFALSE {
+		if p.arch.UnaryDst[op] || op == obj.ARET || op == obj.AGETCALLERPC ||
+			arch.IsARM64SveDstOnly(op) || arch.IsARM64SveINC(op) {
 			// prog.From is no address.
 			prog.To = a[0]
 		} else {
@@ -634,10 +633,17 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 				prog.Reg = p.getRegister(prog, op, &a[1])
 				break
 			}
-		} else if p.arch.Family == sys.ARM64 && (arch.IsARM64CMP(op) || op == arm64.APTEST) {
-			prog.From = a[0]
-			prog.Reg = p.getRegister(prog, op, &a[1])
-			break
+		} else if p.arch.Family == sys.ARM64 {
+			if arch.IsARM64CMP(op) || arch.IsARM64SvePTEST(op) {
+				prog.From = a[0]
+				prog.Reg = p.getRegister(prog, op, &a[1])
+				break
+			}
+			if arch.IsARM64SveINC(op) {
+				prog.AddRestSource(a[0])
+				prog.To = a[1]
+				break
+			}
 		} else if p.arch.Family == sys.MIPS || p.arch.Family == sys.MIPS64 {
 			if arch.IsMIPSCMP(op) || arch.IsMIPSMUL(op) {
 				prog.From = a[0]
@@ -715,7 +721,7 @@ func (p *Parser) asmInstruction(op obj.As, cond string, a []obj.Addr) {
 					return
 				}
 				prog.RegTo2 = a[2].Reg
-			case arch.IsARM64TBL(op) || op == arm64.AZINDEX:
+			case arch.IsARM64TBL(op) || arch.IsARM64SveINDEX(op) || arch.IsARM64SveINC(op):
 				// one of its inputs does not fit into prog.Reg.
 				prog.From = a[0]
 				prog.AddRestSource(a[1])

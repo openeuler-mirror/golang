@@ -151,6 +151,42 @@ func IsARM64CASP(op obj.As) bool {
 	return false
 }
 
+// IsARM64SveDstOnly reports whether the op (as defined by an arm64.A*
+// constant) is one of the PFALSE-like instructions, and can have
+// no source registers that require special handling.
+func IsARM64SveDstOnly(op obj.As) bool {
+	switch op {
+	case arm64.APTRUE, arm64.APTRUES, arm64.APRDFFR, arm64.APFALSE:
+		return true
+	}
+	return false
+}
+
+// IsARM64SvePTEST reports whether the op (as defined by an arm64.A*
+// constant) is PTEST instruction that require special handling.
+func IsARM64SvePTEST(op obj.As) bool {
+	return op == arm64.APTEST
+}
+
+// IsARM64SveINDEX reports whether the op (as defined by an arm64.A*
+// constant) is INDEX instruction that require special handling.
+func IsARM64SveINDEX(op obj.As) bool {
+	return op == arm64.AZINDEX
+}
+
+// IsARM64SveINC reports whether the op (as defined by an arm64.A*
+// constant) is one of the INCB-like instructions that require special
+// handling.
+func IsARM64SveINC(op obj.As) bool {
+	switch op {
+	case arm64.AZINCB, arm64.AZINCH, arm64.AZINCW, arm64.AZINCD,
+		arm64.AZDECB, arm64.AZDECH, arm64.AZDECW, arm64.AZDECD,
+		arm64.AZCNTB, arm64.AZCNTH, arm64.AZCNTW, arm64.AZCNTD:
+		return true
+	}
+	return false
+}
+
 // ARM64Suffix handles the special suffix for the ARM64.
 // It returns a boolean to indicate success; failure means
 // cond was unrecognized.

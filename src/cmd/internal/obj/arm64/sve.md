@@ -73,6 +73,18 @@ The following instructions are supported:
 | CMPNE (wide elements)                         | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPNE            | 12   |
 | CNOT                                          | `CNOT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZCNOT             | 17   |
 | CNT                                           | `CNT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZCNT              | 17   |
+| CNTB                                          | `CNTB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTB             | 42   |
+| CNTD                                          | `CNTD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTD             | 42   |
+| CNTH                                          | `CNTH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTH             | 42   |
+| CNTP (predicate)                              | `CNTP <Xd>, <Pg>, <Pn>.<T>`                                                         | ZCNTP             | 46   |
+| CNTW                                          | `CNTW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTW             | 42   |
+| DECB (scalar)                                 | `DECB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECB             | 42   |
+| DECD (scalar)                                 | `DECD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECD             | 42   |
+| DECD (vector)                                 | `DECD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | ZDECD             | 43   |
+| DECH (scalar)                                 | `DECH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECH             | 42   |
+| DECH (vector)                                 | `DECH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | ZDECH             | 43   |
+| DECW (scalar)                                 | `DECW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECW             | 42   |
+| DECW (vector)                                 | `DECW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | ZDECW             | 43   |
 | DUP (immediate)                               | `DUP <Zd>.<T>, #<imm>{, <shift>}`                                                   | ZDUP              | 3    |
 | DUP (indexed)                                 | `DUP <Zd>.<T>, <Zn>.<T>[<imm>]`                                                     | ZDUP              | 8    |
 | DUP (scalar)                                  | `DUP <Zd>.<T>, <R><n\|SP>`                                                          | ZDUP              | 7    |
@@ -84,10 +96,21 @@ The following instructions are supported:
 | EORS                                          | `EORS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PEORS             | 6    |
 | FABS                                          | `FABS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZFABS             | 17   |
 | FNEG                                          | `FNEG <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZFNEG             | 17   |
+| INCB (scalar)                                 | `INCB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCB             | 42   |
+| INCD (scalar)                                 | `INCD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCD             | 42   |
+| INCD (vector)                                 | `INCD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | ZINCD             | 43   |
+| INCH (scalar)                                 | `INCH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCH             | 42   |
+| INCH (vector)                                 | `INCH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | ZINCH             | 43   |
+| INCW (scalar)                                 | `INCW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCW             | 42   |
+| INCW (vector)                                 | `INCW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | ZINCW             | 43   |
 | INDEX (immediate, scalar)                     | `INDEX <Zd>.<T>, #<imm>, <R><m>`                                                    | ZINDEX            | 26   |
 | INDEX (immediates)                            | `INDEX <Zd>.<T>, #<imm1>, #<imm2>`                                                  | ZINDEX            | 26   |
 | INDEX (scalar, immediate)                     | `INDEX <Zd>.<T>, <R><n>, #<imm>`                                                    | ZINDEX            | 26   |
 | INDEX (scalars)                               | `INDEX <Zd>.<T>, <R><n>, <R><m>`                                                    | ZINDEX            | 26   |
+| LASTA (scalar)                                | `LASTA <R><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTA           | 44   |
+| LASTA (SIMD&FP scalar)                        | `LASTA <V><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTA           | 45   |
+| LASTB (scalar)                                | `LASTB <R><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTB           | 44   |
+| LASTB (SIMD&FP scalar)                        | `LASTB <V><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTB           | 45   |
 | LD1B (scalar plus immediate, single register) | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1B             | 32   |
 | LD1B (scalar plus scalar, single register)    | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                                       | ZLD1B             | 33   |
 | LD1D (scalar plus immediate, single register) | `LD1D { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1D             | 32   |
@@ -189,6 +212,7 @@ The following instructions are supported:
 | RDFFR (unpredicated)                          | `RDFFR <Pd>.B`                                                                      | PRDFFR            | 23   |
 | RDFFRS                                        | `RDFFRS <Pd>.B, <Pg>/Z`                                                             | PRDFFRS           | 23   |
 | SABD                                          | `SABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSABD             | 2    |
+| SADDV                                         | `SADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | ZSADDV            | 47   |
 | SDIV                                          | `SDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSDIV             | 2    |
 | SDIVR                                         | `SDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZSDIVR            | 2    |
 | SEL (predicates)                              | `SEL <Pd>.B, <Pg>, <Pn>.B, <Pm>.B`                                                  | PSEL              | 6    |
@@ -211,6 +235,44 @@ The following instructions are supported:
 | SQSUB (vectors, unpredicated)                 | `SQSUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZSQSUB            | 1    |
 | SQSUBR                                        | `SQSUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | ZSQSUBR           | 2    |
 | SRSHR                                         | `SRSHR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | ZSRSHR            | 15   |
+| ST1B (scalar plus immediate, single register) | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1B             | 38   |
+| ST1B (scalar plus scalar, single register)    | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>]`                                         | ZST1B             | 39   |
+| ST1D (scalar plus immediate, single register) | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1D             | 38   |
+| ST1D (scalar plus scalar, single register)    | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                                 | ZST1D             | 39   |
+| ST1H (scalar plus immediate, single register) | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1H             | 38   |
+| ST1H (scalar plus scalar, single register)    | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                                 | ZST1H             | 39   |
+| ST1W (scalar plus immediate, single register) | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1W             | 38   |
+| ST1W (scalar plus scalar, single register)    | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                                 | ZST1W             | 39   |
+| ST2B (scalar plus immediate)                  | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2B             | 40   |
+| ST2B (scalar plus scalar)                     | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                                 | ZST2B             | 41   |
+| ST2D (scalar plus immediate)                  | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2D             | 40   |
+| ST2D (scalar plus scalar)                     | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                         | ZST2D             | 41   |
+| ST2H (scalar plus immediate)                  | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2H             | 40   |
+| ST2H (scalar plus scalar)                     | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                         | ZST2H             | 41   |
+| ST2Q (scalar plus immediate)                  | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2Q             | 40   |
+| ST2Q (scalar plus scalar)                     | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                         | ZST2Q             | 41   |
+| ST2W (scalar plus immediate)                  | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2W             | 40   |
+| ST2W (scalar plus scalar)                     | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                         | ZST2W             | 41   |
+| ST3B (scalar plus immediate)                  | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3B             | 40   |
+| ST3B (scalar plus scalar)                     | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                        | ZST3B             | 41   |
+| ST3D (scalar plus immediate)                  | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3D             | 40   |
+| ST3D (scalar plus scalar)                     | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                | ZST3D             | 41   |
+| ST3H (scalar plus immediate)                  | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3H             | 40   |
+| ST3H (scalar plus scalar)                     | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                | ZST3H             | 41   |
+| ST3Q (scalar plus immediate)                  | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3Q             | 40   |
+| ST3Q (scalar plus scalar)                     | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                | ZST3Q             | 41   |
+| ST3W (scalar plus immediate)                  | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3W             | 40   |
+| ST3W (scalar plus scalar)                     | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                | ZST3W             | 41   |
+| ST4B (scalar plus immediate)                  | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4B             | 40   |
+| ST4B (scalar plus scalar)                     | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>, <Xm>]`               | ZST4B             | 41   |
+| ST4D (scalar plus immediate)                  | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4D             | 40   |
+| ST4D (scalar plus scalar)                     | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`       | ZST4D             | 41   |
+| ST4H (scalar plus immediate)                  | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4H             | 40   |
+| ST4H (scalar plus scalar)                     | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`       | ZST4H             | 41   |
+| ST4Q (scalar plus immediate)                  | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4Q             | 40   |
+| ST4Q (scalar plus scalar)                     | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`       | ZST4Q             | 41   |
+| ST4W (scalar plus immediate)                  | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4W             | 40   |
+| ST4W (scalar plus scalar)                     | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`       | ZST4W             | 41   |
 | SUB (immediate)                               | `SUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                       | ZSUB              | 3    |
 | SUB (vectors, predicated)                     | `SUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZSUB              | 2    |
 | SUB (vectors, unpredicated)                   | `SUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | ZSUB              | 1    |
@@ -225,6 +287,7 @@ The following instructions are supported:
 | TRN2 (predicates)                             | `TRN2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | UTRN2             | 28   |
 | TRN2 (vectors)                                | `TRN2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZTRN2             | 29   |
 | UABD                                          | `UABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUABD             | 2    |
+| UADDV                                         | `UADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | ZUADDV            | 47   |
 | UDIV                                          | `UDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUDIV             | 2    |
 | UDIVR                                         | `UDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZUDIVR            | 2    |
 | UMAX (immediate)                              | `UMAX <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | ZUMAX             | 3    |
