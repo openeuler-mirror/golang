@@ -1551,6 +1551,29 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			return s.newValue1(ssa.OpZeroExt8to64, types.Types[types.TUINT64], out)
 		},
 		sys.AMD64)
+
+	if cfg.goarm64.IntrinsicMatchH2 {
+		addF("internal/runtime/maps", "ctrlGroupMatchH2",
+			func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+				g := args[0]
+				h := args[1]
+
+				const bitsetLSB int64 = 0x0101010101010101
+				const bitsetMSB int64 = -0x7f7f7f7f7f7f7f80 // 0x8080808080808080
+				const bitsetL7B int64 = 0x7f7f7f7f7f7f7f7f
+
+				lsb := s.constInt64(types.Types[types.TUINT64], bitsetLSB)
+				hs := s.newValue2(ssa.OpARM64MUL, types.Types[types.TUINT64], h, lsb)
+				v := s.newValue2(ssa.OpARM64EON, types.Types[types.TUINT64], g, hs)
+
+				clr := s.newValue1I(ssa.OpARM64ANDconst, types.Types[types.TUINT64], bitsetL7B, v)
+				msk := s.newValue1I(ssa.OpARM64ANDconst, types.Types[types.TUINT64], bitsetMSB, v)
+
+				res := s.newValue1I(ssa.OpARM64ADDconst, types.Types[types.TUINT64], bitsetLSB, clr)
+				return s.newValue2(ssa.OpARM64AND, types.Types[types.TUINT64], res, msk)
+			},
+			sys.ARM64)
+	}
 }
 
 // findIntrinsic returns a function which builds the SSA equivalent of the
