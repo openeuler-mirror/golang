@@ -344,7 +344,7 @@ const (
 	// The more specific class needs to come earlier.
 	C_NONE   = iota + 1 // starting from 1, leave unclassified Addr's class as 0
 	C_REG               // R0..R30
-	C_ZREG              // R0..R30, ZR
+	C_REGZR             // R0..R30, ZR
 	C_RSP               // R0..R30, RSP
 	C_FREG              // F0..F31
 	C_VREG              // V0..V31
