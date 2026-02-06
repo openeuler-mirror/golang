@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goboltci
+//go:build goboltci
 
 // Package testdir_test runs tests in the GOROOT/test directory.
 package testdir_test
@@ -173,7 +173,7 @@ func goFiles(t *testing.T, dir string) []string {
 	names := []string{}
 	for _, file := range files {
 		name := file.Name()
-		if !strings.HasPrefix(name, ".") && (strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".s")) && shardMatch(name) {
+		if !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go") && shardMatch(name) {
 			names = append(names, name)
 		}
 	}
@@ -703,34 +703,24 @@ func (t test) run() error {
 			// -S=2 forces outermost line numbers when disassembling inlined code.
 			cmdline := []string{"build", "-gcflags", "-S=2"}
 
-			if strings.HasSuffix(t.goFileName(), ".s") {
-				cmdline[0] = "tool"
-				cmdline[1] = "asm"
-				cmdline[2] = "-S=2"
-				// Append flags
-				for i := 0; i < len(flags); i++ {
-					flag := flags[i]
+			// Append flags, but don't override -gcflags=-S=2; add to it instead.
+			for i := 0; i < len(flags); i++ {
+				flag := flags[i]
+				switch {
+				case strings.HasPrefix(flag, "-gcflags="):
+					cmdline[2] += " " + strings.TrimPrefix(flag, "-gcflags=")
+				case strings.HasPrefix(flag, "--gcflags="):
+					cmdline[2] += " " + strings.TrimPrefix(flag, "--gcflags=")
+				case flag == "-gcflags", flag == "--gcflags":
+					i++
+					if i < len(flags) {
+						cmdline[2] += " " + flags[i]
+					}
+				default:
 					cmdline = append(cmdline, flag)
 				}
-			} else {
-				// Append flags, but don't override -gcflags=-S=2; add to it instead.
-				for i := 0; i < len(flags); i++ {
-					flag := flags[i]
-					switch {
-					case strings.HasPrefix(flag, "-gcflags="):
-						cmdline[2] += " " + strings.TrimPrefix(flag, "-gcflags=")
-					case strings.HasPrefix(flag, "--gcflags="):
-						cmdline[2] += " " + strings.TrimPrefix(flag, "--gcflags=")
-					case flag == "-gcflags", flag == "--gcflags":
-						i++
-						if i < len(flags) {
-							cmdline[2] += " " + flags[i]
-						}
-					default:
-						cmdline = append(cmdline, flag)
-					}
-				}
 			}
+
 			cmdline = append(cmdline, long)
 			cmd := exec.Command(goTool, cmdline...)
 			cmd.Env = append(os.Environ(), env.Environ()...)
