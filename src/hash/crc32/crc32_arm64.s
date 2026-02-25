@@ -28,8 +28,6 @@ TEXT ·castagnoliUpdate(SB),NOSPLIT,$0-36
 	VMOV R4, V8.D[0]
 	VMOV R5, V9.D[0]
 
-	JMP large_loop
-
 large_loop:
 	MOVD $0, R1
 	MOVD $0, R2
@@ -190,12 +188,9 @@ loop_4x:
 	EOR R4, R2, R2
 	EOR R2, R9, R9
 
-	SUB  $1024, R11
-
+	SUB $1024, R11
 	CMP $1024, R11
-	BLT update
-
-	JMP large_loop
+	BGE large_loop
 
 update:
 	CMP	$16, R11
