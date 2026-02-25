@@ -12,6 +12,9 @@ TEXT ·castagnoliUpdate(SB),NOSPLIT,$0-36
 	MOVD	p+8(FP), R13  // data pointer
 	MOVD	p_len+16(FP), R11  // len(p)
 
+	CMP $1024, R11
+	BLT update
+
 	MOVD $0xa741c1bf, R1
 	MOVD $0xe417f38a, R2
 	MOVD $0xdd7e3b0c, R3
@@ -25,9 +28,9 @@ TEXT ·castagnoliUpdate(SB),NOSPLIT,$0-36
 	VMOV R4, V8.D[0]
 	VMOV R5, V9.D[0]
 
+	JMP large_loop
+
 large_loop:
-    CMP $1024, R11
-	BLT update
 	MOVD $0, R1
 	MOVD $0, R2
 	MOVD $0, R3
@@ -188,6 +191,9 @@ loop_4x:
 	EOR R2, R9, R9
 
 	SUB  $1024, R11
+
+	CMP $1024, R11
+	BLT update
 
 	JMP large_loop
 
