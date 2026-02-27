@@ -1,7 +1,7 @@
 // Copyright 2024 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
-//go:build !goexperiment.widetrie
+//go:build goexperiment.widetrie
 
 package sync
 
@@ -68,7 +68,7 @@ func (ht *HashTrieMap[K, V]) Load(key K) (value V, ok bool) {
 
 	i := ht.root.Load()
 	hashShift := 8 * goarch.PtrSize
-	for hashShift != 0 {
+	for hashShift >= nChildrenLog2 {
 		hashShift -= nChildrenLog2
 
 		n := i.children[(hash>>hashShift)&nChildrenMask].Load()
@@ -98,7 +98,7 @@ func (ht *HashTrieMap[K, V]) LoadOrStore(key K, value V) (result V, loaded bool)
 		i = ht.root.Load()
 		hashShift = 8 * goarch.PtrSize
 		haveInsertPoint := false
-		for hashShift != 0 {
+		for hashShift >= nChildrenLog2 {
 			hashShift -= nChildrenLog2
 
 			slot = &i.children[(hash>>hashShift)&nChildrenMask]
@@ -178,7 +178,7 @@ func (ht *HashTrieMap[K, V]) expand(oldEntry, newEntry *entry[K, V], newHash uin
 	newIndirect := newIndirectNode(parent)
 	top := newIndirect
 	for {
-		if hashShift == 0 {
+		if hashShift < nChildrenLog2 {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while inserting")
 		}
 		hashShift -= nChildrenLog2 // hashShift is for the level parent is at. We need to go deeper.
@@ -215,7 +215,7 @@ func (ht *HashTrieMap[K, V]) Swap(key K, new V) (previous V, loaded bool) {
 		i = ht.root.Load()
 		hashShift = 8 * goarch.PtrSize
 		haveInsertPoint := false
-		for hashShift != 0 {
+		for hashShift >= nChildrenLog2 {
 			hashShift -= nChildrenLog2
 
 			slot = &i.children[(hash>>hashShift)&nChildrenMask]
@@ -430,7 +430,7 @@ func (ht *HashTrieMap[K, V]) find(key K, hash uintptr, valEqual equalFunc, value
 		i = ht.root.Load()
 		hashShift = 8 * goarch.PtrSize
 		found := false
-		for hashShift != 0 {
+		for hashShift >= nChildrenLog2 {
 			hashShift -= nChildrenLog2
 
 			slot = &i.children[(hash>>hashShift)&nChildrenMask]
@@ -533,7 +533,7 @@ const (
 	// load performance: any smaller and we lose out on
 	// 50% or more in CPU performance. Any larger and the
 	// returns are minuscule (~1% improvement for 32 children).
-	nChildrenLog2 = 4
+	nChildrenLog2 = 7
 	nChildren     = 1 << nChildrenLog2
 	nChildrenMask = nChildren - 1
 )
