@@ -725,3 +725,131 @@ func TestFlagR(t *testing.T) {
 		t.Errorf("executable failed to run: %v\n%s", err, out)
 	}
 }
+
+func TestTextSplit(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("skipping arm64 only test")
+	}
+	testenv.MustHaveGoBuild(t)
+	t.Parallel()
+	var linkers = []string{"internal", "external"}
+	var enableMappingSymbols = []bool{true, false}
+	var wg sync.WaitGroup
+	wg.Add(len(enableMappingSymbols) * len(linkers))
+
+	for _, enableMappingSymbol := range enableMappingSymbols {
+		for _, buildlinker := range linkers {
+			go func(linkerMod string, enableMappingSymbol bool) {
+				defer wg.Done()
+				symb, objfile := buildSymbolsTextSplit(t, linkerMod, enableMappingSymbol)
+				checkTextSplit(t, symb, (linkerMod == "external") && enableMappingSymbol)
+				if linkerMod == "external" && enableMappingSymbol {
+					checkTextSplitMappingSymbols(t, objfile)
+				}
+			}(buildlinker, enableMappingSymbol)
+		}
+	}
+
+	wg.Wait()
+}
+
+func checkTextSplit(t *testing.T, symbols []elf.Symbol, expectSplit bool) {
+	isSplit := false
+	for _, symbol := range symbols {
+		if symbol.Name == "runtime.text.1" {
+			// If the symbol runtime.text.1 is contained, text has been split.
+			isSplit = true
+			break
+		}
+	}
+
+	if isSplit != expectSplit {
+		t.Errorf("expect: %v actual is: %v ", expectSplit, isSplit)
+	}
+}
+
+// checkTextSplitMappingSymbols checks that every executable section in the
+// object file emitted by the Go linker (go.o) begins with an $x mapping
+// symbol, as required by the ARM64 AAELF64 specification. The check runs on
+// the link-time object rather than the final executable because the external
+// linker merges the split .text sections into a single output section.
+func checkTextSplitMappingSymbols(t *testing.T, objfile string) {
+	f, err := elf.Open(objfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	symbols, err := f.Symbols()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nexec := 0
+	for i, sect := range f.Sections {
+		if sect.Flags&elf.SHF_EXECINSTR == 0 {
+			continue
+		}
+		nexec++
+		hasCodeSym := false
+		for _, sym := range symbols {
+			if sym.Name == "$x" && sym.Section == elf.SectionIndex(i) && sym.Value == 0 {
+				hasCodeSym = true
+				break
+			}
+		}
+		if !hasCodeSym {
+			t.Errorf("executable section %s has no $x mapping symbol at offset 0", sect.Name)
+		}
+	}
+	if nexec < 2 {
+		t.Errorf("expected text to be split into at least 2 executable sections, got %d", nexec)
+	}
+}
+
+// buildSymbolsTextSplit builds a simple program with a small text size limit,
+// which makes the linker split the text into multiple sections, and returns
+// the symbol table of the final executable as well as the path of the object
+// file emitted by the Go linker (go.o).
+func buildSymbolsTextSplit(t *testing.T, linkerMod string, enableMappingSymbols bool) ([]elf.Symbol, string) {
+	goTool := testenv.GoToolPath(t)
+	dir := t.TempDir()
+	objdir := t.TempDir()
+
+	goFile := filepath.Join(dir, "main.go")
+	if err := ioutil.WriteFile(goFile, []byte(goSource), 0444); err != nil {
+		t.Fatal(err)
+	}
+	if err := ioutil.WriteFile(filepath.Join(dir, "go.mod"), []byte("module elf_test\n"), 0666); err != nil {
+		t.Fatal(err)
+	}
+
+	var cmd *exec.Cmd
+	args := []string{"build", "-o", linkerMod, "-buildmode=exe",
+		"-ldflags=-debugtextsize=360000 -linkmode=" + linkerMod + " -tmpdir=" + objdir}
+	if enableMappingSymbols {
+		args = append(args, "-mappingsymbol")
+	}
+
+	cmd = exec.Command(goTool, args...)
+
+	cmd.Dir = dir
+
+	if _, err := cmd.CombinedOutput(); err != nil {
+		t.Fatal(err)
+	}
+
+	bin := filepath.Join(dir, linkerMod)
+
+	elfexe, err := elf.Open(bin)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	symbols, err := elfexe.Symbols()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return symbols, filepath.Join(objdir, "go.o")
+}

@@ -34,6 +34,7 @@ package ld
 import (
 	"bytes"
 	"cmd/internal/gcprog"
+	"cmd/internal/goobj"
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
 	"cmd/link/internal/loader"
@@ -2605,6 +2606,12 @@ func (ctxt *Link) textaddress() {
 
 			// Assign actual address for current symbol.
 			sect, n, va = assignAddress(ctxt, sect, n, s, va, false, big)
+			if goobj.EnableMappingSymbols && ctxt.IsARM64() && ctxt.IsELF && ctxt.IsExternal() {
+				// do not generate trampoline if goobj.EnableMappingSymbols == true
+				// and then the ntramps always zero, do not need to use EnableMappingSymbols
+				// to split calc newtextp
+				continue
+			}
 
 			// Resolve jumps, adding trampolines if they are needed.
 			trampoline(ctxt, s)
@@ -2781,7 +2788,16 @@ func resetAddress(ctxt *Link, s loader.Sym) {
 // machinery in the external linker; see #58425 for more on the
 // history here.
 func splitTextSections(ctxt *Link) bool {
-	return (ctxt.IsARM() || ctxt.IsPPC64() || (ctxt.IsARM64() && ctxt.IsDarwin())) && ctxt.IsExternal()
+	if !ctxt.IsExternal() {
+		return false
+	}
+	if ctxt.IsARM() || ctxt.IsPPC64() || (ctxt.IsARM64() && ctxt.IsDarwin()) {
+		// upstream behavior, independent of -mappingsymbol
+		return true
+	}
+	// split ARM64 ELF text sections as well, so mapping symbols
+	// stay within section boundaries for ARM64 mapping symbols builds
+	return goobj.EnableMappingSymbols && ctxt.IsARM64() && ctxt.IsELF
 }
 
 // On Wasm, we reserve 4096 bytes for zero page, then 8192 bytes for wasm_exec.js

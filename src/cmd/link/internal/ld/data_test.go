@@ -5,6 +5,7 @@
 package ld
 
 import (
+	"cmd/internal/goobj"
 	"cmd/internal/objabi"
 	"cmd/internal/sys"
 	"cmd/link/internal/loader"
@@ -88,5 +89,133 @@ func TestAddGotSym(t *testing.T) {
 		if s := ctxt.loader.SymSize(ctxt.loader.Lookup(".got", 0)); s != int64(test.gotsize) {
 			t.Fatalf(`[%d] expected ldr.Size(".got") == %v, got %v`, i, test.gotsize, s)
 		}
+	}
+}
+
+func TestSplitTextSections(t *testing.T) {
+	tests := []struct {
+		name           string
+		arch           *sys.Arch
+		ht             objabi.HeadType
+		iself          bool
+		bm, lm         string
+		mappingSymbols bool
+		expectSplit    bool
+	}{
+		{
+			name:           "arm64_linux_elf_external_ms",
+			arch:           sys.ArchARM64,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "pie",
+			lm:             "external",
+			mappingSymbols: true,
+			expectSplit:    true,
+		},
+		{
+			name:           "arm64_linux_elf_internal_ms",
+			arch:           sys.ArchARM64,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "pie",
+			lm:             "internal",
+			mappingSymbols: true,
+			expectSplit:    false,
+		},
+		{
+			name:           "arm64_darwin_external_ms",
+			arch:           sys.ArchARM64,
+			ht:             objabi.Hdarwin,
+			iself:          false,
+			bm:             "pie",
+			lm:             "external",
+			mappingSymbols: true,
+			expectSplit:    true,
+		},
+		{
+			// regression test: ARM32 splitting must not be lost when
+			// mapping symbols are enabled (issue #58425)
+			name:           "arm_linux_elf_external_ms",
+			arch:           sys.ArchARM,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "exe",
+			lm:             "external",
+			mappingSymbols: true,
+			expectSplit:    true,
+		},
+		{
+			// regression test: PPC64 splitting must not be lost when
+			// mapping symbols are enabled ('bl' offset limit)
+			name:           "ppc64_linux_elf_external_ms",
+			arch:           sys.ArchPPC64,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "exe",
+			lm:             "external",
+			mappingSymbols: true,
+			expectSplit:    true,
+		},
+		{
+			name:           "amd64_linux_elf_external_ms",
+			arch:           sys.ArchAMD64,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "exe",
+			lm:             "external",
+			mappingSymbols: true,
+			expectSplit:    false,
+		},
+		{
+			name:           "arm64_linux_elf_external",
+			arch:           sys.ArchARM64,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "exe",
+			lm:             "external",
+			mappingSymbols: false,
+			expectSplit:    false,
+		},
+		{
+			name:           "arm_linux_elf_external",
+			arch:           sys.ArchARM,
+			ht:             objabi.Hlinux,
+			iself:          true,
+			bm:             "exe",
+			lm:             "external",
+			mappingSymbols: false,
+			expectSplit:    true,
+		},
+		{
+			name:           "arm64_darwin_external",
+			arch:           sys.ArchARM64,
+			ht:             objabi.Hdarwin,
+			iself:          false,
+			bm:             "pie",
+			lm:             "external",
+			mappingSymbols: false,
+			expectSplit:    true,
+		},
+	}
+
+	// Save the architecture and the flag as we're going to set them on each test run.
+	origArch := buildcfg.GOARCH
+	origMappingSymbols := goobj.EnableMappingSymbols
+
+	defer func(goarch string, state bool) {
+		buildcfg.GOARCH = goarch
+		goobj.EnableMappingSymbols = state
+	}(origArch, origMappingSymbols)
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			buildcfg.GOARCH = test.arch.Name
+			goobj.EnableMappingSymbols = test.mappingSymbols
+			ctxt := setUpContext(test.arch, test.iself, test.ht, test.bm, test.lm)
+			isSplit := splitTextSections(ctxt)
+			if isSplit != test.expectSplit {
+				t.Errorf("expect: %v actual is: %v", test.expectSplit, isSplit)
+			}
+		})
 	}
 }
