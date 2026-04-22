@@ -34,6 +34,29 @@ func TestDescriptions(t *testing.T) {
 	}
 }
 
+func pmuProfileAvailableForTest(t *testing.T, brbe bool) bool {
+	t.Helper()
+
+	if !pprof.SamplePMU() || (brbe && !pprof.SampleBRBE()) {
+		return false
+	}
+
+	errCh, err := pprof.StartPMUProfile(io.Discard, &pprof.PMUAttr{
+		EvtList:    []string{"cycles"},
+		Freq:       1000,
+		Duration:   1,
+		EnableBRBE: brbe,
+	})
+	if err == nil {
+		err = <-errCh
+	}
+	if err != nil {
+		t.Logf("skip PMU profile test, brbe=%v: %v", brbe, err)
+		return false
+	}
+	return true
+}
+
 func TestHandlers(t *testing.T) {
 	testCases := []struct {
 		path               string
@@ -55,6 +78,21 @@ func TestHandlers(t *testing.T) {
 		{"/debug/pprof/goroutine?seconds=1", Index, http.StatusOK, "application/octet-stream", `attachment; filename="goroutine-delta"`, nil},
 		{"/debug/pprof/", Index, http.StatusOK, "text/html; charset=utf-8", "", []byte("Types of profiles available:")},
 	}
+
+	addPMUProfileCase := func(path string) {
+		tc := testCases[4] // Copy the existing "/debug/pprof/profile?seconds=1" case.
+		tc.path = path
+		testCases = append(testCases, tc)
+	}
+
+	if pmuProfileAvailableForTest(t, false) {
+		addPMUProfileCase("/debug/pprof/profile?event=cycles&freq=1000&seconds=1")
+
+		if pmuProfileAvailableForTest(t, true) {
+			addPMUProfileCase("/debug/pprof/profile?event=cycles&freq=1000&brbe=true&seconds=1")
+		}
+	}
+
 	for _, tc := range testCases {
 		t.Run(tc.path, func(t *testing.T) {
 			req := httptest.NewRequest("GET", "http://example.com"+tc.path, nil)
