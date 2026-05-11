@@ -134,4 +134,7 @@ type Flags struct {
 
 	// StepOpt enables optimization for func step in package runtime
 	StepOpt bool
+
+	// RevertCopyHashKeys enables the "revert" hash map implementation.
+	RevertCopyHashKeys bool
 }
