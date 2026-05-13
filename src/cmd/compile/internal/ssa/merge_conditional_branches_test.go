@@ -29,6 +29,11 @@ func ARM64Eq(cond, sub, alt string) ctrl {
 	return ctrl{BlockARM64EQ, cond, []string{sub, alt}}
 }
 
+// Ret specifies BlockRet
+func Ret(arg string) ctrl {
+	return ctrl{BlockRet, arg, []string{}}
+}
+
 // isNewConditionCorrect verifies that a block has been correctly transformed
 // to use conditional comparison (CCMP) with the expected parameters.
 // It checks:
