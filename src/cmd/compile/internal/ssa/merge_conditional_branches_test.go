@@ -5,6 +5,7 @@
 package ssa
 
 import (
+	"cmd/compile/internal/base"
 	"cmd/compile/internal/types"
 	"testing"
 )
@@ -91,6 +92,8 @@ func containsOpARM64CCMP(b *Block) bool {
 // This represents the ideal case where the optimization should apply successfully.
 func TestMergeConditionalBranchesWithoutPointers(t *testing.T) {
 	t.Run("arm64", func(t *testing.T) {
+		base.Flag.CcmpGen = true
+		defer func() { base.Flag.CcmpGen = false }()
 		c := testConfigArch(t, "arm64")
 		intType := c.config.Types.Int64
 		fun := c.Fun("entry",
@@ -181,6 +184,8 @@ func TestMergeConditionalBranchesWithoutPointers(t *testing.T) {
 // Test that pointer comparison with memory load doesn't generate CCMP
 func TestNoCCMPWithPointerAndMemoryLoad(t *testing.T) {
 	t.Run("arm64", func(t *testing.T) {
+		base.Flag.CcmpGen = true
+		defer func() { base.Flag.CcmpGen = false }()
 		c := testConfigArch(t, "arm64")
 		intType := c.config.Types.Int64
 		ptrType := c.config.Types.BytePtr

@@ -5,6 +5,7 @@
 package ssa
 
 import (
+	"cmd/compile/internal/base"
 	"cmd/compile/internal/types"
 )
 
@@ -56,7 +57,7 @@ const (
 // The resulting code uses conditional comparison instructions that test the second
 // condition only if the first condition evaluates to a specific value.
 func mergeConditionalBranches(f *Func) {
-	if f.Config.arch != "arm64" {
+	if !base.Flag.CcmpGen || f.Config.arch != "arm64" {
 		return
 	}
 
