@@ -154,4 +154,7 @@ type Flags struct {
 
 	// Enable atomic
 	AtomicVar bool
+
+	// Kunpeng malloc prefetch optimization.
+	PrefetchMalloc bool
 }
