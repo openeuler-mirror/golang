@@ -73,6 +73,14 @@ func ParseGOEXPERIMENT(goos, goarch, goexp string) (*ExperimentFlags, error) {
 		haveXchg8 = true
 	}
 
+	var pagenumSupported bool
+	switch goarch {
+	case "arm64":
+		if GOARM64.KpMemOpt {
+			pagenumSupported = true
+		}
+	}
+
 	baseline := goexperiment.Flags{
 		RegabiWrappers:   regabiSupported,
 		RegabiArgs:       regabiSupported,
@@ -148,6 +156,14 @@ func ParseGOEXPERIMENT(goos, goarch, goexp string) (*ExperimentFlags, error) {
 	if flags.RegabiArgs && !flags.RegabiWrappers {
 		return nil, fmt.Errorf("GOEXPERIMENT regabiargs requires regabiwrappers")
 	}
+	if !pagenumSupported {
+		flags.PageNum = false
+	}
+	// Force PageNum on when KpMemOpt is set, regardless of GOEXPERIMENT.
+	if pagenumSupported {
+		flags.PageNum = true
+	}
+
 	return flags, nil
 }
 

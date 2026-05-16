@@ -98,8 +98,9 @@ const (
 	// would not be invariant to size-class rounding. Eschewing this property means a
 	// more complex check or possibly storing additional state to determine whether a
 	// span has malloc headers.
-	minSizeForMallocHeader = goarch.PtrSize * ptrBits
 )
+
+var minSizeForMallocHeader uintptr
 
 // heapBitsInSpan returns true if the size of an object implies its ptr/scalar
 // data is stored at the end of the span, and is accessible via span.heapBits.
@@ -576,9 +577,9 @@ func (span *mspan) heapBits() []uintptr {
 	// Find the bitmap at the end of the span.
 	//
 	// Nearly every span with heap bits is exactly one page in size. Arenas are the only exception.
-	if span.npages == 1 {
+	if span.npages == pageNumberMultiplier {
 		// This will be inlined and constant-folded down.
-		return heapBitsSlice(span.base(), pageSize)
+		return heapBitsSlice(span.base(), pageNumberMultiplier*pageSize)
 	}
 	return heapBitsSlice(span.base(), span.npages*pageSize)
 }
@@ -669,7 +670,9 @@ func (span *mspan) writeHeapBitsSmall(x, dataSize uintptr, typ *_type) (scanSize
 
 	// Since we're never writing more than one uintptr's worth of bits, we're either going
 	// to do one or two writes.
-	dst := unsafe.Pointer(span.base() + pageSize - pageSize/goarch.PtrSize/8)
+	const spanSize = pageNumberMultiplier * pageSize
+	const bitmapSize = pageNumberMultiplier * pageSize / goarch.PtrSize / 8
+	dst := unsafe.Pointer(span.base() + spanSize - bitmapSize)
 	o := (x - span.base()) / goarch.PtrSize
 	i := o / ptrBits
 	j := o % ptrBits

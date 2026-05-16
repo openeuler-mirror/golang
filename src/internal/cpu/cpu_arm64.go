@@ -8,8 +8,15 @@ package cpu
 // We choose 128 because Apple Silicon, a.k.a. M1, has 128-byte cache line size.
 // It doesn't cost much and is much more future-proof.
 const CacheLinePadSize = 128
+var preCpuInit = false
 
 func doinit() {
+	if !preCpuInit {
+		osInit()
+		preCpuInit = true
+		return
+	}
+
 	options = []option{
 		{Name: "aes", Feature: &ARM64.HasAES},
 		{Name: "pmull", Feature: &ARM64.HasPMULL},
@@ -19,7 +26,10 @@ func doinit() {
 		{Name: "crc32", Feature: &ARM64.HasCRC32},
 		{Name: "atomics", Feature: &ARM64.HasATOMICS},
 		{Name: "cpuid", Feature: &ARM64.HasCPUID},
+		{Name: "sve", Feature: &ARM64.HasSVE},
+		{Name: "sve2", Feature: &ARM64.HasSVE2},
 		{Name: "isNeoverse", Feature: &ARM64.IsNeoverse},
+		{Name: "IsKunpeng", Feature: &ARM64.IsKunpeng},
 	}
 
 	// arm64 uses different ways to detect CPU features at runtime depending on the operating system.

@@ -157,4 +157,10 @@ type Flags struct {
 
 	// Kunpeng malloc prefetch optimization.
 	PrefetchMalloc bool
+
+	//PageNum enables 128k span size.
+	PageNum bool
+
+	// Enable malloc optimize print
+	MallocOptPrint bool
 }
