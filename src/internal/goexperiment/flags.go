@@ -137,10 +137,15 @@ type Flags struct {
 
 	// RevertCopyHashKeys enables the "revert" hash map implementation.
 	RevertCopyHashKeys bool
-	
+
 	// Clear the span if necessary
 	ClearSpan bool
 
 	// PageShift14 enables 16K page size.
 	PageShift14 bool
+
+	// ReflectRWLock enables a read-lock fast path in reflect.initFuncTypes
+	// for the function-type cache, reducing lock contention on concurrent
+	// reflect.FuncOf calls when the cache is hot.
+	ReflectRWLock bool
 }
