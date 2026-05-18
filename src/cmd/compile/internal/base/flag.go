@@ -128,6 +128,8 @@ type CmdFlags struct {
 	PgoProfile         string       "help:\"read profile or pre-process profile from `file`\""
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
 
+	AggressivePatterns bool "help:\"enable additional optimization patterns\""
+
 	// Configuration derived from flags; not a flag itself.
 	Cfg struct {
 		Embed struct { // set by -embedcfg

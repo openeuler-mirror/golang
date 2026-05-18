@@ -974,6 +974,9 @@ func (c *mcache) nextFree(spc spanClass) (v gclinkptr, s *mspan, checkGCTrigger 
 		throw("freeIndex is not valid")
 	}
 
+	// Clear the span if necessary
+	clearSpanFunc(s)
+
 	v = gclinkptr(uintptr(freeIndex)*s.elemsize + s.base())
 	s.allocCount++
 	if s.allocCount > s.nelems {
@@ -981,6 +984,13 @@ func (c *mcache) nextFree(spc spanClass) (v gclinkptr, s *mspan, checkGCTrigger 
 		throw("s.allocCount > s.nelems")
 	}
 	return
+}
+
+func clearSpanFunc(s *mspan) {
+	if goexperiment.ClearSpan && (s.allocCount == 0) && (s.needzero != 0) {
+		memclrNoHeapPointers(unsafe.Pointer(s.startAddr), (s.elemsize * uintptr(s.nelems)))
+		s.needzero = 0
+	}
 }
 
 // doubleCheckMalloc enables a bunch of extra checks to malloc to double-check
@@ -1177,14 +1187,17 @@ func mallocgcTiny(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uint
 		v, span, checkGCTrigger = c.nextFree(tinySpanClass)
 	}
 	x := unsafe.Pointer(v)
-	if goexperiment.TinySize {
-		(*[4]uint64)(x)[0] = 0
-		(*[4]uint64)(x)[1] = 0
-		(*[4]uint64)(x)[2] = 0
-		(*[4]uint64)(x)[3] = 0
-	} else {
-		(*[2]uint64)(x)[0] = 0
-		(*[2]uint64)(x)[1] = 0
+
+	if !goexperiment.ClearSpan || span.needzero != 0 {
+		if goexperiment.TinySize {
+			(*[4]uint64)(x)[0] = 0
+			(*[4]uint64)(x)[1] = 0
+			(*[4]uint64)(x)[2] = 0
+			(*[4]uint64)(x)[3] = 0
+		} else {
+			(*[2]uint64)(x)[0] = 0
+			(*[2]uint64)(x)[1] = 0
+		}
 	}
 
 	// See if we need to replace the existing tiny block with the new one

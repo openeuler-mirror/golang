@@ -7,6 +7,7 @@ package runtime
 import (
 	"internal/abi"
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
 	"unsafe"
@@ -1106,6 +1107,10 @@ func pcvalue(f funcInfo, off uint32, targetpc uintptr, strict bool) (int32, uint
 	return -1, 0
 }
 
+func GetFirstModuledataPcRange() (min, max uintptr) {
+	return firstmoduledata.minpc, firstmoduledata.maxpc
+}
+
 func funcname(f funcInfo) string {
 	if !f.valid() {
 		return ""
@@ -1246,6 +1251,9 @@ func funcdata(f funcInfo, i uint8) unsafe.Pointer {
 
 // step advances to the next pc, value pair in the encoded table.
 func step(p []byte, pc *uintptr, val *int32, first bool) (newp []byte, ok bool) {
+	if goexperiment.StepOpt {
+		return step_exp(p, pc, val, first)
+	}
 	// For both uvdelta and pcdelta, the common case (~70%)
 	// is that they are a single byte. If so, avoid calling readvarint.
 	uvdelta := uint32(p[0])
@@ -1266,6 +1274,49 @@ func step(p []byte, pc *uintptr, val *int32, first bool) (newp []byte, ok bool) 
 	}
 	p = p[n:]
 	*pc += uintptr(pcdelta * sys.PCQuantum)
+	return p, true
+}
+
+func step_exp(p []byte, pc *uintptr, val *int32, first bool) (newp []byte, ok bool) {
+	// For both uvdelta and pcdelta, the common case (~70%)
+	// is that they are a single byte. If so, avoid calling readvarint.
+	var n uint32
+	uvdelta := uint32(p[0])
+	if uvdelta == 0 && !first {
+		return nil, false
+	}
+	if uvdelta&0x80 == 0 {
+		n = 1
+		*val += int32(-(uvdelta & 1) ^ (uvdelta >> 1))
+		p = p[n:]
+	} else {
+		a := uint32(p[1])
+		if a&0x80 == 0 {
+			uvdelta = (uvdelta & 0x7f) | (a << 7)
+			n = 2
+		} else {
+			n, uvdelta = readvarint(p)
+		}
+		*val += int32(-(uvdelta & 1) ^ (uvdelta >> 1))
+		p = p[n:]
+	}
+
+	pcdelta := uint32(p[0]) // load 2-byte once
+	if pcdelta&0x80 == 0 {
+		n = 1
+		*pc += uintptr((pcdelta & 0xff) * sys.PCQuantum)
+		p = p[n:]
+	} else {
+		a := uint32(p[1])
+		if a&0x80 == 0 {
+			pcdelta = (pcdelta & 0x7f) | (a << 7)
+			n = 2
+		} else {
+			n, pcdelta = readvarint(p)
+		}
+		p = p[n:]
+		*pc += uintptr(pcdelta * sys.PCQuantum)
+	}
 	return p, true
 }
 

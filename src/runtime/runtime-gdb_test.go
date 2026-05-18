@@ -709,7 +709,13 @@ func TestGdbConst(t *testing.T) {
 
 	sgot := strings.ReplaceAll(string(got), "\r\n", "\n")
 
-	if !strings.Contains(sgot, "\n$1 = 42\n$2 = 18446744073709551615\n$3 = -1\n$4 = 1 '\\001'\n$5 = 8192") {
+	s := "\n$1 = 42\n$2 = 18446744073709551615\n$3 = -1\n$4 = 1 '\\001'\n$5 = "
+	if goexperiment.PageShift14 {
+		s = s + "16384"
+	} else {
+		s = s + "8192"
+	}
+	if !strings.Contains(sgot, s) {
 		t.Fatalf("output mismatch")
 	}
 }

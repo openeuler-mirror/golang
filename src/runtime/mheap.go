@@ -13,6 +13,7 @@ import (
 	"internal/goarch"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
+	"internal/goexperiment"
 	"unsafe"
 )
 
@@ -23,7 +24,7 @@ const (
 	minPhysPageSize = 4096
 
 	// maxPhysPageSize is the maximum page size the runtime supports.
-	maxPhysPageSize = 512 << 10
+	maxPhysPageSize = 512 << (10 + goexperiment.PageShift14Int*1)
 
 	// maxPhysHugePageSize sets an upper-bound on the maximum huge page size
 	// that the runtime supports.

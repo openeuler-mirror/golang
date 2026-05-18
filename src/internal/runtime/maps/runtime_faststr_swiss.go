@@ -9,6 +9,7 @@ package maps
 import (
 	"internal/abi"
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/race"
 	"internal/runtime/sys"
 	"unsafe"
@@ -56,7 +57,14 @@ func (m *Map) getWithoutKeySmallFastStr(typ *abi.SwissMapType, key string) unsaf
 
 dohash:
 	// This path will cost 1 hash and 1+ε comparisons.
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	var k string
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 	h2 := uint8(h2(hash))
 	ctrls = *g.ctrls()
 	slotKey = g.key(typ, 0)
@@ -124,8 +132,14 @@ func runtime_mapaccess1_faststr(typ *abi.SwissMapType, m *Map, key string) unsaf
 		return elem
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k string
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Select table.
 	idx := m.directoryIndex(hash)
@@ -183,8 +197,14 @@ func runtime_mapaccess2_faststr(typ *abi.SwissMapType, m *Map, key string) (unsa
 		return elem, true
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k string
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Select table.
 	idx := m.directoryIndex(hash)
@@ -273,8 +293,14 @@ func runtime_mapassign_faststr(typ *abi.SwissMapType, m *Map, key string) unsafe
 		fatal("concurrent map writes")
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k string
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Set writing after calling Hasher, since Hasher may panic, in which
 	// case we have not actually done a write.
