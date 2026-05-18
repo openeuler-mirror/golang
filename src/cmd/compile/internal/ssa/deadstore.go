@@ -9,11 +9,157 @@ import (
 	"cmd/compile/internal/types"
 )
 
+func aggressiveDse(f *Func) {
+	var stores []*Value
+	loadUse := f.newSparseSet(f.NumValues())
+	defer f.retSparseSet(loadUse)
+	storeUse := f.newSparseSet(f.NumValues())
+	defer f.retSparseSet(storeUse)
+	shadowed := f.newSparseMap(f.NumValues())
+	defer f.retSparseMap(shadowed)
+	// localAddrs maps from a local variable (the Aux field of a LocalAddr value) to an instance of a LocalAddr value for that variable in the current block.
+	localAddrs := map[any]*Value{}
+	for _, b := range f.Blocks {
+		// Find all the stores in this block. Categorize their uses:
+		//  loadUse contains stores which are used by a subsequent load.
+		//  storeUse contains stores which are used by a subsequent store.
+		loadUse.clear()
+		storeUse.clear()
+		clear(localAddrs)
+		stores = stores[:0]
+		for _, v := range b.Values {
+			if v.Op == OpPhi {
+				// Ignore phis - they will always be first and can't be eliminated
+				continue
+			}
+			if v.Type.IsMemory() {
+				stores = append(stores, v)
+				for _, a := range v.Args {
+					if a.Block == b && a.Type.IsMemory() {
+						storeUse.add(a.ID)
+						if v.Op != OpStore && v.Op != OpZero && v.Op != OpVarDef {
+							// CALL, DUFFCOPY, etc. are both
+							// reads and writes.
+							loadUse.add(a.ID)
+						}
+					}
+				}
+			} else {
+				if v.Op == OpLocalAddr {
+					if _, ok := localAddrs[v.Aux]; !ok {
+						localAddrs[v.Aux] = v
+					} else {
+						continue
+					}
+				}
+				if v.Op == OpInlMark || v.Op == OpConvert {
+					// Not really a use of the memory. See #67957.
+					continue
+				}
+				for _, a := range v.Args {
+					if a.Block == b && a.Type.IsMemory() {
+						loadUse.add(a.ID)
+					}
+				}
+			}
+		}
+		if len(stores) == 0 {
+			continue
+		}
+
+		// find last store in the block
+		var last *Value
+		for _, v := range stores {
+			if storeUse.contains(v.ID) {
+				continue
+			}
+			if last != nil {
+				b.Fatalf("two final stores - simultaneous live stores %s %s", last.LongString(), v.LongString())
+			}
+			last = v
+		}
+		if last == nil {
+			b.Fatalf("no last store found - cycle?")
+		}
+
+		// Walk backwards looking for dead stores. Keep track of shadowed addresses.
+		// A "shadowed address" is a pointer, offset, and size describing a memory region that
+		// is known to be written. We keep track of shadowed addresses in the shadowed map,
+		// mapping the ID of the address to a shadowRange where future writes will happen.
+		// Since we're walking backwards, writes to a shadowed region are useless,
+		// as they will be immediately overwritten.
+		shadowed.clear()
+		v := last
+
+	walkloop:
+		if loadUse.contains(v.ID) {
+			// Someone might be reading this memory state.
+			// Clear all shadowed addresses.
+			shadowed.clear()
+		}
+		if v.Op == OpStore || v.Op == OpZero {
+			ptr := v.Args[0]
+			var off int64
+			for ptr.Op == OpOffPtr { // Walk to base pointer
+				off += ptr.AuxInt
+				ptr = ptr.Args[0]
+			}
+			var sz int64
+			if v.Op == OpStore {
+				sz = v.Aux.(*types.Type).Size()
+			} else { // OpZero
+				sz = v.AuxInt
+			}
+			if ptr.Op == OpLocalAddr {
+				if la, ok := localAddrs[ptr.Aux]; ok {
+					ptr = la
+				}
+			}
+			sr := shadowRange(shadowed.get(ptr.ID))
+			if sr.contains(off, off+sz) {
+				// Modify the store/zero into a copy of the memory state,
+				// effectively eliding the store operation.
+				if v.Op == OpStore {
+					// store addr value mem
+					v.SetArgs1(v.Args[2])
+				} else {
+					// zero addr mem
+					v.SetArgs1(v.Args[1])
+				}
+				v.Aux = nil
+				v.AuxInt = 0
+				v.Op = OpCopy
+			} else {
+				// Extend shadowed region.
+				shadowed.set(ptr.ID, int32(sr.merge(off, off+sz)))
+			}
+		}
+		// walk to previous store
+		if v.Op == OpPhi {
+			// At start of block.  Move on to next block.
+			// The memory phi, if it exists, is always
+			// the first logical store in the block.
+			// (Even if it isn't the first in the current b.Values order.)
+			continue
+		}
+		for _, a := range v.Args {
+			if a.Block == b && a.Type.IsMemory() {
+				v = a
+				goto walkloop
+			}
+		}
+	}
+}
+
 // dse does dead-store elimination on the Function.
 // Dead stores are those which are unconditionally followed by
 // another store to the same location, with no intervening load.
 // This implementation only works within a basic block. TODO: use something more global.
 func dse(f *Func) {
+	if isEnableAggressiveDse() {
+		aggressiveDse(f)
+		return
+	}
 	var stores []*Value
 	loadUse := f.newSparseSet(f.NumValues())
 	defer f.retSparseSet(loadUse)

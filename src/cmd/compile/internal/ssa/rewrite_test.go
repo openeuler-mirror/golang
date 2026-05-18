@@ -4,7 +4,12 @@
 
 package ssa
 
-import "testing"
+import (
+	"cmd/compile/internal/types"
+	"cmd/internal/src"
+	"internal/buildcfg"
+	"testing"
+)
 
 // We generate memmove for copy(x[1:], x[:]), however we may change it to OpMove,
 // because size is known. Check that OpMove is alias-safe, or we did call memmove.
@@ -188,6 +193,86 @@ func TestMergePPC64SldiSrw(t *testing.T) {
 		} else if r, _, _, m := DecodePPC64RotateMask(result); v.rotate != r || v.mask != m {
 			t.Errorf("mergePPC64SldiSrw(Test %d) got (%d,0x%x) expected (%d,0x%x)", i, r, m, v.rotate, v.mask)
 		}
+	}
+}
+
+// TestCopyCompatibleType exercises copyCompatibleType, the predicate used by
+// the aggressive Load-of-Store forwarding rules to decide whether a Load of
+// type t1 can consume a value of type t2 stored at the same address.
+//
+// The contract is: size must match, and either (both integer) or (both
+// pointer-shaped) or (t1.Compare(t2) == types.CMPeq). Floats, complex, and
+// aggregate types fall into the strict-equality branch.
+func TestCopyCompatibleType(t *testing.T) {
+	if buildcfg.GOARCH != "arm64" {
+		t.Skip("aggressivedse tests only run on arm64")
+	}
+	c := testConfig(t)
+	tt := c.config.Types
+
+	// A concrete pointer type distinct from BytePtr.
+	int32Ptr := types.NewPtr(tt.Int32)
+
+	// Two same-shape-but-distinct struct types: fall through to Compare, which
+	// treats them as unequal because the field syms differ.
+	structA := types.NewStruct([]*types.Field{
+		types.NewField(src.NoXPos, &types.Sym{Name: "A"}, tt.Int32),
+	})
+	structB := types.NewStruct([]*types.Field{
+		types.NewField(src.NoXPos, &types.Sym{Name: "B"}, tt.Int32),
+	})
+
+	cases := []struct {
+		name     string
+		t1, t2   *types.Type
+		expected bool
+	}{
+		// Integer-integer, same size (both signednesses) — should forward.
+		{"int32↔uint32", tt.Int32, tt.UInt32, true},
+		{"uint32↔int32", tt.UInt32, tt.Int32, true},
+		{"int8↔uint8", tt.Int8, tt.UInt8, true},
+		{"int64↔uint64", tt.Int64, tt.UInt64, true},
+
+		// Integer-integer, different size — blocked by size gate.
+		{"int32↔int64", tt.Int32, tt.Int64, false},
+		{"int8↔int32", tt.Int8, tt.Int32, false},
+
+		// Pointer-shaped ↔ pointer-shaped, same size — should forward.
+		{"bytePtr↔int32Ptr", tt.BytePtr, int32Ptr, true},
+		{"int32Ptr↔bytePtr", int32Ptr, tt.BytePtr, true},
+
+		// uintptr is IsInteger() but not IsPtrShaped(); ptr↔uintptr must NOT
+		// forward in either direction because the integer branch requires t2
+		// to also be IsInteger and the pointer branch requires t2 to be
+		// IsPtrShaped.
+		{"uintptr↔bytePtr", tt.Uintptr, tt.BytePtr, false},
+		{"bytePtr↔uintptr", tt.BytePtr, tt.Uintptr, false},
+
+		// Float ↔ int of the same size — falls through to Compare and fails,
+		// which is the desired conservative behavior (bit patterns differ
+		// in meaning).
+		{"float32↔int32", tt.Float32, tt.Int32, false},
+		{"int32↔float32", tt.Int32, tt.Float32, false},
+		{"float64↔int64", tt.Float64, tt.Int64, false},
+
+		// Same float type — Compare returns CMPeq.
+		{"float32↔float32", tt.Float32, tt.Float32, true},
+		{"float64↔float64", tt.Float64, tt.Float64, true},
+
+		// Distinct struct types of equal size — Compare returns non-CMPeq.
+		{"structA↔structB", structA, structB, false},
+		// Same struct type — Compare returns CMPeq.
+		{"structA↔structA", structA, structA, true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := copyCompatibleType(tc.t1, tc.t2)
+			if got != tc.expected {
+				t.Errorf("copyCompatibleType(%v, %v) = %v, want %v",
+					tc.t1, tc.t2, got, tc.expected)
+			}
+		})
 	}
 }
 
