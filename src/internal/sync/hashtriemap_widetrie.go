@@ -80,6 +80,13 @@ func (ht *HashTrieMap[K, V]) Load(key K) (value V, ok bool) {
 		}
 		i = n.indirect()
 	}
+	n := i.children[hash&finalHashMask].Load()
+	if n == nil {
+		return *new(V), false
+	}
+	if n.isEntry {
+		return n.entry().lookup(key)
+	}
 	panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
 }
 
@@ -119,6 +126,22 @@ func (ht *HashTrieMap[K, V]) LoadOrStore(key K, value V) (result V, loaded bool)
 				break
 			}
 			i = n.indirect()
+		}
+		if !haveInsertPoint {
+			slot = &i.children[hash&finalHashMask]
+			n = slot.Load()
+			if n == nil {
+				// We found a nil slot which is a candidate for insertion.
+				haveInsertPoint = true
+			} else if n.isEntry {
+				// We found an existing entry, which is as far as we can go.
+				// If it stays this way, we'll have to replace it with an
+				// indirect node.
+				if v, ok := n.entry().lookup(key); ok {
+					return v, true
+				}
+				haveInsertPoint = true
+			}
 		}
 		if !haveInsertPoint {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
@@ -179,7 +202,17 @@ func (ht *HashTrieMap[K, V]) expand(oldEntry, newEntry *entry[K, V], newHash uin
 	top := newIndirect
 	for {
 		if hashShift < nChildrenLog2 {
-			panic("internal/sync.HashTrieMap: ran out of hash bits while inserting")
+			oi := oldHash & finalHashMask
+			ni := newHash & finalHashMask
+			if oi != ni {
+				newIndirect.children[oi].Store(&oldEntry.node)
+				newIndirect.children[ni].Store(&newEntry.node)
+				break
+			}
+			// Hash collision on all bits.
+			newEntry.overflow.Store(oldEntry)
+			newIndirect.children[oi].Store(&newEntry.node)
+			break
 		}
 		hashShift -= nChildrenLog2 // hashShift is for the level parent is at. We need to go deeper.
 		oi := (oldHash >> hashShift) & nChildrenMask
@@ -227,6 +260,13 @@ func (ht *HashTrieMap[K, V]) Swap(key K, new V) (previous V, loaded bool) {
 				break
 			}
 			i = n.indirect()
+		}
+		if !haveInsertPoint {
+			slot = &i.children[hash&finalHashMask]
+			n = slot.Load()
+			if n == nil || n.isEntry {
+				haveInsertPoint = true
+			}
 		}
 		if !haveInsertPoint {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
@@ -342,7 +382,11 @@ func (ht *HashTrieMap[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
 		if hashShift == 8*goarch.PtrSize {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
 		}
-		hashShift += nChildrenLog2
+		if hashShift == 0 {
+			hashShift = finalHashShift
+		} else {
+			hashShift += nChildrenLog2
+		}
 
 		// Delete the current node in the parent.
 		parent := i.parent
@@ -404,7 +448,11 @@ func (ht *HashTrieMap[K, V]) CompareAndDelete(key K, old V) (deleted bool) {
 		if hashShift == 8*goarch.PtrSize {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
 		}
-		hashShift += nChildrenLog2
+		if hashShift == 0 {
+			hashShift = finalHashShift
+		} else {
+			hashShift += nChildrenLog2
+		}
 
 		// Delete the current node in the parent.
 		parent := i.parent
@@ -453,6 +501,27 @@ func (ht *HashTrieMap[K, V]) find(key K, hash uintptr, valEqual equalFunc, value
 				break
 			}
 			i = n.indirect()
+		}
+		if !found {
+			hashShift = 0
+			slot = &i.children[hash&finalHashMask]
+			n = slot.Load()
+			if n == nil {
+				// Nothing to compare with. Give up.
+				i = nil
+				return
+			}
+			if n.isEntry {
+				// We found an entry. Check if it matches.
+				if _, ok := n.entry().lookupWithValue(key, value, valEqual); !ok {
+					// No match, comparison failed.
+					i = nil
+					n = nil
+					return
+				}
+				// We've got a match. Prepare to perform an operation on the key.
+				found = true
+			}
 		}
 		if !found {
 			panic("internal/sync.HashTrieMap: ran out of hash bits while iterating")
@@ -536,6 +605,9 @@ const (
 	nChildrenLog2 = 7
 	nChildren     = 1 << nChildrenLog2
 	nChildrenMask = nChildren - 1
+
+	finalHashShift = 8 * goarch.PtrSize % nChildrenLog2
+	finalHashMask  = (1 << finalHashShift) - 1
 )
 
 // indirect is an internal node in the hash-trie.

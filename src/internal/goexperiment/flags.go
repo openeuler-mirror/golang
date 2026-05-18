@@ -132,6 +132,12 @@ type Flags struct {
 	// WideTrie uses larger children group in sync.hashtriemap
 	WideTrie bool
 
+	// StepOpt enables optimization for func step in package runtime
+	StepOpt bool
+
+	// RevertCopyHashKeys enables the "revert" hash map implementation.
+	RevertCopyHashKeys bool
+	
 	// Clear the span if necessary
 	ClearSpan bool
 }
