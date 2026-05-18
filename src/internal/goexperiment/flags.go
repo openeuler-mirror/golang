@@ -140,4 +140,7 @@ type Flags struct {
 	
 	// Clear the span if necessary
 	ClearSpan bool
+
+	// PageShift14 enables 16K page size.
+	PageShift14 bool
 }
