@@ -1612,6 +1612,66 @@ func rewriteValueARM64_OpARM64ADD(v *Value) bool {
 		}
 		break
 	}
+	// match: (ADD x0 x1:(ANDshiftRA x2:(SLLconst [c] y) z [63]))
+	// cond: isEnableAggressivePatterns() && x1.Uses == 1 && x2.Uses == 1
+	// result: (ADDshiftLL x0 (ANDshiftRA <y.Type> y z [63]) [c])
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x0 := v_0
+			x1 := v_1
+			if x1.Op != OpARM64ANDshiftRA || auxIntToInt64(x1.AuxInt) != 63 {
+				continue
+			}
+			z := x1.Args[1]
+			x2 := x1.Args[0]
+			if x2.Op != OpARM64SLLconst {
+				continue
+			}
+			c := auxIntToInt64(x2.AuxInt)
+			y := x2.Args[0]
+			if !(isEnableAggressivePatterns() && x1.Uses == 1 && x2.Uses == 1) {
+				continue
+			}
+			v.reset(OpARM64ADDshiftLL)
+			v.AuxInt = int64ToAuxInt(c)
+			v0 := b.NewValue0(v.Pos, OpARM64ANDshiftRA, y.Type)
+			v0.AuxInt = int64ToAuxInt(63)
+			v0.AddArg2(y, z)
+			v.AddArg2(x0, v0)
+			return true
+		}
+		break
+	}
+	// match: (ADD x0 x1:(ANDshiftLL x2:(SRAconst [63] z) y [c]))
+	// cond: isEnableAggressivePatterns() && x1.Uses == 1 && x2.Uses == 1
+	// result: (ADDshiftLL x0 (ANDshiftRA <y.Type> y z [63]) [c])
+	for {
+		for _i0 := 0; _i0 <= 1; _i0, v_0, v_1 = _i0+1, v_1, v_0 {
+			x0 := v_0
+			x1 := v_1
+			if x1.Op != OpARM64ANDshiftLL {
+				continue
+			}
+			c := auxIntToInt64(x1.AuxInt)
+			y := x1.Args[1]
+			x2 := x1.Args[0]
+			if x2.Op != OpARM64SRAconst || auxIntToInt64(x2.AuxInt) != 63 {
+				continue
+			}
+			z := x2.Args[0]
+			if !(isEnableAggressivePatterns() && x1.Uses == 1 && x2.Uses == 1) {
+				continue
+			}
+			v.reset(OpARM64ADDshiftLL)
+			v.AuxInt = int64ToAuxInt(c)
+			v0 := b.NewValue0(v.Pos, OpARM64ANDshiftRA, y.Type)
+			v0.AuxInt = int64ToAuxInt(63)
+			v0.AddArg2(y, z)
+			v.AddArg2(x0, v0)
+			return true
+		}
+		break
+	}
 	return false
 }
 func rewriteValueARM64_OpARM64ADDSflags(v *Value) bool {
@@ -14277,6 +14337,23 @@ func rewriteValueARM64_OpARM64NEG(v *Value) bool {
 		v.copyOf(x)
 		return true
 	}
+	// match: (NEG x1:(SUB x y))
+	// cond: isEnableAggressivePatterns() && x1.Uses == 1
+	// result: (SUB y x)
+	for {
+		x1 := v_0
+		if x1.Op != OpARM64SUB {
+			break
+		}
+		y := x1.Args[1]
+		x := x1.Args[0]
+		if !(isEnableAggressivePatterns() && x1.Uses == 1) {
+			break
+		}
+		v.reset(OpARM64SUB)
+		v.AddArg2(y, x)
+		return true
+	}
 	// match: (NEG (MOVDconst [c]))
 	// result: (MOVDconst [-c])
 	for {
@@ -24030,6 +24107,96 @@ func rewriteBlockARM64(b *Block) bool {
 			b.resetWithControl(BlockARM64EQ, v0)
 			return true
 		}
+		// match: (EQ (CMPconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMP x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMP, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (EQ (CMPWconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPW x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPW, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (EQ (CMPconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPconst [c] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPconst, types.TypeFlags)
+			v0.AuxInt = int64ToAuxInt(c)
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (EQ (CMPWconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPWconst [int32(c)] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPWconst, types.TypeFlags)
+			v0.AuxInt = int32ToAuxInt(int32(c))
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
 		// match: (EQ (CMPconst [0] x) yes no)
 		// result: (Z x yes no)
 		for b.Controls[0].Op == OpARM64CMPconst {
@@ -26164,6 +26331,96 @@ func rewriteBlockARM64(b *Block) bool {
 			b.resetWithControl(BlockARM64NE, v0)
 			return true
 		}
+		// match: (NE (CMPconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMP x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMP, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (NE (CMPWconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPW x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPW, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (NE (CMPconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPconst [c] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPconst, types.TypeFlags)
+			v0.AuxInt = int64ToAuxInt(c)
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (NE (CMPWconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPWconst [int32(c)] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPWconst, types.TypeFlags)
+			v0.AuxInt = int32ToAuxInt(int32(c))
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
 		// match: (NE (CMPconst [0] x) yes no)
 		// result: (NZ x yes no)
 		for b.Controls[0].Op == OpARM64CMPconst {
@@ -26727,6 +26984,126 @@ func rewriteBlockARM64(b *Block) bool {
 			return true
 		}
 	case BlockARM64UGT:
+		// match: (UGT (CMPconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMP x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMP, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (UGT (CMPWconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPW x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPW, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (UGT (CMPconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPconst [c] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPconst, types.TypeFlags)
+			v0.AuxInt = int64ToAuxInt(c)
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (UGT (CMPWconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (NE (CMPWconst [int32(c)] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPWconst, types.TypeFlags)
+			v0.AuxInt = int32ToAuxInt(int32(c))
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64NE, v0)
+			return true
+		}
+		// match: (UGT (CMPconst [0] x) yes no)
+		// cond: isEnableAggressivePatterns()
+		// result: (NZ x yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			x := v_0.Args[0]
+			if !(isEnableAggressivePatterns()) {
+				break
+			}
+			b.resetWithControl(BlockARM64NZ, x)
+			return true
+		}
+		// match: (UGT (CMPWconst [0] x) yes no)
+		// cond: isEnableAggressivePatterns()
+		// result: (NZW x yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			x := v_0.Args[0]
+			if !(isEnableAggressivePatterns()) {
+				break
+			}
+			b.resetWithControl(BlockARM64NZW, x)
+			return true
+		}
 		// match: (UGT (FlagConstant [fc]) yes no)
 		// cond: fc.ugt()
 		// result: (First yes no)
@@ -26761,6 +27138,126 @@ func rewriteBlockARM64(b *Block) bool {
 			return true
 		}
 	case BlockARM64ULE:
+		// match: (ULE (CMPconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMP x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMP, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (ULE (CMPWconst [0] sub:(SUB x y)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPW x y) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUB {
+				break
+			}
+			y := sub.Args[1]
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPW, types.TypeFlags)
+			v0.AddArg2(x, y)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (ULE (CMPconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPconst [c] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPconst, types.TypeFlags)
+			v0.AuxInt = int64ToAuxInt(c)
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (ULE (CMPWconst [0] sub:(SUBconst [c] x)) yes no)
+		// cond: isEnableAggressivePatterns() && sub.Uses==1
+		// result: (EQ (CMPWconst [int32(c)] x) yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			sub := v_0.Args[0]
+			if sub.Op != OpARM64SUBconst {
+				break
+			}
+			c := auxIntToInt64(sub.AuxInt)
+			x := sub.Args[0]
+			if !(isEnableAggressivePatterns() && sub.Uses == 1) {
+				break
+			}
+			v0 := b.NewValue0(v_0.Pos, OpARM64CMPWconst, types.TypeFlags)
+			v0.AuxInt = int32ToAuxInt(int32(c))
+			v0.AddArg(x)
+			b.resetWithControl(BlockARM64EQ, v0)
+			return true
+		}
+		// match: (ULE (CMPconst [0] x) yes no)
+		// cond: isEnableAggressivePatterns()
+		// result: (Z x yes no)
+		for b.Controls[0].Op == OpARM64CMPconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt64(v_0.AuxInt) != 0 {
+				break
+			}
+			x := v_0.Args[0]
+			if !(isEnableAggressivePatterns()) {
+				break
+			}
+			b.resetWithControl(BlockARM64Z, x)
+			return true
+		}
+		// match: (ULE (CMPWconst [0] x) yes no)
+		// cond: isEnableAggressivePatterns()
+		// result: (ZW x yes no)
+		for b.Controls[0].Op == OpARM64CMPWconst {
+			v_0 := b.Controls[0]
+			if auxIntToInt32(v_0.AuxInt) != 0 {
+				break
+			}
+			x := v_0.Args[0]
+			if !(isEnableAggressivePatterns()) {
+				break
+			}
+			b.resetWithControl(BlockARM64ZW, x)
+			return true
+		}
 		// match: (ULE (FlagConstant [fc]) yes no)
 		// cond: fc.ule()
 		// result: (First yes no)
