@@ -8,6 +8,7 @@ package maps
 
 import (
 	"internal/abi"
+	"internal/goexperiment"
 	"internal/race"
 	"internal/runtime/sys"
 	"unsafe"
@@ -48,8 +49,14 @@ func runtime_mapaccess1_fast32(typ *abi.SwissMapType, m *Map, key uint32) unsafe
 		return unsafe.Pointer(&zeroVal[0])
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k uint32
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Select table.
 	idx := m.directoryIndex(hash)
@@ -117,8 +124,14 @@ func runtime_mapaccess2_fast32(typ *abi.SwissMapType, m *Map, key uint32) (unsaf
 		return unsafe.Pointer(&zeroVal[0]), false
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k uint32
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Select table.
 	idx := m.directoryIndex(hash)
@@ -205,8 +218,14 @@ func runtime_mapassign_fast32(typ *abi.SwissMapType, m *Map, key uint32) unsafe.
 		fatal("concurrent map writes")
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k uint32
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Set writing after calling Hasher, since Hasher may panic, in which
 	// case we have not actually done a write.
@@ -339,8 +358,14 @@ func runtime_mapassign_fast32ptr(typ *abi.SwissMapType, m *Map, key unsafe.Point
 		fatal("concurrent map writes")
 	}
 
-	k := key
-	hash := typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	var k unsafe.Pointer
+	var hash uintptr
+	if goexperiment.RevertCopyHashKeys {
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&key)), m.seed)
+	} else {
+		k = key
+		hash = typ.Hasher(abi.NoEscape(unsafe.Pointer(&k)), m.seed)
+	}
 
 	// Set writing after calling Hasher, since Hasher may panic, in which
 	// case we have not actually done a write.

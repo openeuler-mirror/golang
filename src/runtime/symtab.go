@@ -1107,6 +1107,10 @@ func pcvalue(f funcInfo, off uint32, targetpc uintptr, strict bool) (int32, uint
 	return -1, 0
 }
 
+func GetFirstModuledataPcRange() (min, max uintptr) {
+	return firstmoduledata.minpc, firstmoduledata.maxpc
+}
+
 func funcname(f funcInfo) string {
 	if !f.valid() {
 		return ""

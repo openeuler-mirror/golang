@@ -2439,3 +2439,7 @@ func rewriteStructStore(v *Value) *Value {
 
 	return mem
 }
+
+func isEnableAggressivePatterns() bool {
+	return base.Flag.AggressivePatterns
+}

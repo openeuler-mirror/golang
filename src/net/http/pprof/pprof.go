@@ -138,9 +138,45 @@ func serveError(w http.ResponseWriter, status int, txt string) {
 	fmt.Fprintln(w, txt)
 }
 
+func parsePMUParams(r *http.Request) (*pprof.PMUAttr, error) {
+	periodStr := r.FormValue("period")
+	freqStr := r.FormValue("freq")
+
+	if periodStr != "" && freqStr != "" {
+		return nil, fmt.Errorf("Invalid param: only one of 'period' or 'freq' can be set for PMU collection")
+	}
+	if periodStr == "" && freqStr == "" {
+		return nil, fmt.Errorf("Invalid param: a valid 'period' or 'freq' must be provided for PMU collection")
+	}
+
+	pmuAttr := new(pprof.PMUAttr)
+	if periodStr != "" {
+		period, err := strconv.ParseUint(periodStr, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("Invalid PMU sampling period: %s", err)
+		}
+		if period == 0 {
+			return nil, fmt.Errorf("Invalid PMU sampling period: must be greater than 0")
+		}
+		pmuAttr.Period = period
+		return pmuAttr, nil
+	}
+
+	freq, err := strconv.ParseUint(freqStr, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("Invalid PMU sampling frequency: %s", err)
+	}
+	if freq == 0 {
+		return nil, fmt.Errorf("Invalid PMU sampling frequency: must be greater than 0")
+	}
+	pmuAttr.Freq = freq
+	return pmuAttr, nil
+}
+
 // Profile responds with the pprof-formatted cpu profile.
 // Profiling lasts for duration specified in seconds GET parameter, or for 30 seconds if not specified.
 // The package initialization registers it as /debug/pprof/profile.
+// The PMU collection is implemented to support sampling and SPE mode.
 func Profile(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	sec, err := strconv.ParseInt(r.FormValue("seconds"), 10, 64)
@@ -150,18 +186,64 @@ func Profile(w http.ResponseWriter, r *http.Request) {
 
 	configureWriteDeadline(w, r, float64(sec))
 
-	// Set Content Type assuming StartCPUProfile will work,
-	// because if it does it starts writing.
-	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("Content-Disposition", `attachment; filename="profile"`)
-	if err := pprof.StartCPUProfile(w); err != nil {
-		// StartCPUProfile failed, so no writes yet.
-		serveError(w, http.StatusInternalServerError,
-			fmt.Sprintf("Could not enable CPU profiling: %s", err))
+	rawEvents := r.FormValue("event")
+	if rawEvents == "" {
+		// Set Content-Type assuming StartCPUProfile will work,
+		// because if it does it starts writing.
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", `attachment; filename="profile"`)
+
+		if err := pprof.StartCPUProfile(w); err != nil {
+			// StartCPUProfile failed, so no writes yet.
+			serveError(w, http.StatusInternalServerError,
+				fmt.Sprintf("Could not enable CPU profiling: %s", err))
+			return
+		}
+		sleep(r, time.Duration(sec)*time.Second)
+		pprof.StopCPUProfile()
 		return
 	}
-	sleep(r, time.Duration(sec)*time.Second)
-	pprof.StopCPUProfile()
+
+	eventNames := strings.Split(rawEvents, ",")
+	for _, eventName := range eventNames {
+		if eventName == "" {
+			serveError(w, http.StatusBadRequest,
+				"Invalid PMU parameter input: empty event name")
+			return
+		}
+	}
+
+	pmuAttr, err := parsePMUParams(r)
+	if err != nil {
+		serveError(w, http.StatusBadRequest,
+			fmt.Sprintf("Invalid PMU parameter input: %s", err))
+		return
+	}
+	pmuAttr.EvtList = eventNames
+	pmuAttr.EnableBRBE = r.FormValue("brbe") == "true"
+	pmuAttr.Duration = sec
+
+	var buf bytes.Buffer
+	// Start PMU collection and write profile into an intermediate buffer
+	errCh, err := pprof.StartPMUProfile(&buf, pmuAttr)
+	if err != nil {
+		serveError(w, http.StatusInternalServerError,
+			fmt.Sprintf("PMU collection failed: %s", err))
+		return
+	}
+	// Wait until PMU collection completes
+	if goroutineErr := <-errCh; goroutineErr != nil {
+		serveError(w, http.StatusInternalServerError,
+			fmt.Sprintf("PMU collection failed: %s", goroutineErr))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("Content-Disposition", `attachment; filename="profile"`)
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(buf.Bytes()); err != nil {
+		return
+	}
 }
 
 // Trace responds with the execution trace in binary form.

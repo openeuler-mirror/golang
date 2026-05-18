@@ -200,8 +200,18 @@ pkg os, type Root struct #67002
 pkg regexp, method (*Regexp) AppendText([]uint8) ([]uint8, error) #62384
 pkg runtime, func AddCleanup[$0 interface{}, $1 interface{}](*$0, func($1), $1) Cleanup #67535
 pkg runtime, func GOROOT //deprecated #51473
+pkg runtime, func GetFirstModuledataPcRange() (uintptr, uintptr) #55022
 pkg runtime, method (Cleanup) Stop() #67535
 pkg runtime, type Cleanup struct #67535
+pkg runtime/pprof, type PMUAttr struct #55022
+pkg runtime/pprof, type PMUAttr struct, Duration int64 #55022
+pkg runtime/pprof, type PMUAttr struct, EnableBRBE bool #55022
+pkg runtime/pprof, type PMUAttr struct, EvtList []string #55022
+pkg runtime/pprof, type PMUAttr struct, Freq uint64 #55022
+pkg runtime/pprof, type PMUAttr struct, Period uint64 #55022
+pkg runtime/pprof, func SampleBRBE() bool #55022
+pkg runtime/pprof, func SamplePMU() bool #55022
+pkg runtime/pprof, func StartPMUProfile(io.Writer, *PMUAttr) (<-chan error, error) #55022
 pkg strings, func FieldsFuncSeq(string, func(int32) bool) iter.Seq[string] #61901
 pkg strings, func FieldsSeq(string) iter.Seq[string] #61901
 pkg strings, func Lines(string) iter.Seq[string] #61901

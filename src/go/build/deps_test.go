@@ -628,11 +628,11 @@ var depsRules = `
 	< net/http/fcgi;
 
 	# Profiling
-	FMT, compress/gzip, encoding/binary, sort, text/tabwriter
-	< runtime/pprof;
-
 	OS, compress/gzip, internal/lazyregexp
 	< internal/profile;
+
+	FMT, compress/gzip, encoding/binary, sort, text/tabwriter, internal/profile
+	< runtime/pprof;
 
 	html, internal/profile, net/http, runtime/pprof, runtime/trace
 	< net/http/pprof;
