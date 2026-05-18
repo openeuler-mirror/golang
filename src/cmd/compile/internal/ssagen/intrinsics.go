@@ -274,6 +274,12 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			return nil
 		},
 		sys.AMD64, sys.ARM64, sys.MIPS, sys.MIPS64, sys.PPC64, sys.RISCV64, sys.S390X)
+	addF("internal/runtime/atomic", "Store16",
+		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+			s.vars[memVar] = s.newValue3(ssa.OpAtomicStore16, types.TypeMem, args[0], args[1], s.mem())
+			return nil
+		},
+		sys.ARM64)
 	addF("internal/runtime/atomic", "Store64",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			s.vars[memVar] = s.newValue3(ssa.OpAtomicStore64, types.TypeMem, args[0], args[1], s.mem())

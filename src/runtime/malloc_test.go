@@ -20,6 +20,7 @@ import (
 	"testing"
 	"time"
 	"unsafe"
+	"internal/goexperiment"
 )
 
 var testMemStatsCount int
@@ -321,6 +322,70 @@ func TestArenaCollision(t *testing.T) {
 					t.Fatalf("allocation %#x in reserved region [%#x, %#x)", p, d[0], d[1])
 				}
 			}
+		}
+	}
+}
+
+func TestPublicationBarrierGenerate(t *testing.T) {
+	testenv.MustHaveExec(t)
+	switch runtime.GOARCH {
+	case "arm64":
+	default:
+		t.Skipf("test not enabled for %s", runtime.GOARCH)
+	}
+
+	cmd := exec.Command(testenv.GoToolPath(t), "tool", "objdump", "-s", "runtime.mallocgc", os.Args[0])
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("can't objdump %v", err)
+	}
+	lines := strings.Split(string(out), "\n")[1:]
+
+	// Walk through assembly instructions, checking inst and operand.
+	dmbInstructionCount := 0
+	dmbOperandISHSTCount := 0
+	dmbOperandSTCount := 0
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		t.Logf("%s", line)
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			continue
+		}
+		if !strings.HasPrefix(parts[0], "malloc.go:") && !strings.HasPrefix(parts[0], "malloc_freeindex_arm64.go:") {
+			continue
+		}
+		// Detect whether we're in the write barrier.
+		switch runtime.GOARCH {
+		case "arm64":
+			if parts[3] == "DMB" {
+				dmbInstructionCount++
+				if parts[4] == "$14" {
+					dmbOperandSTCount++
+				} else if parts[4] == "$10" {
+					dmbOperandISHSTCount++
+				}
+			}
+		}
+	}
+
+	if dmbInstructionCount == 0 {
+		t.Errorf("no dmbInstructionCount")
+	}
+	if goexperiment.AtomicVar {
+		// With GOEXPERIMENT=atomicvar, the per-mallocgc* publicationBarrier calls
+		// are elided and the freeIndexForScan publication is done via STLRH
+		// (atomic.Store16). One DMB ST remains in mallocgc for the GC scan
+		// publication path on the slow path, so the expected counts are:
+		//   dmbInstructionCount = 1, dmbOperandSTCount = 1, dmbOperandISHSTCount = 0.
+		if dmbInstructionCount != 1 {
+			t.Errorf("dmbInstructionCount: got %d, want 1", dmbInstructionCount)
+		}
+		if dmbOperandSTCount != 1 {
+			t.Errorf("dmbOperandSTCount: got %d, want 1", dmbOperandSTCount)
+		}
+		if dmbOperandISHSTCount != 0 {
+			t.Errorf("dmbOperandISHSTCount: got %d, want 0", dmbOperandISHSTCount)
 		}
 	}
 }

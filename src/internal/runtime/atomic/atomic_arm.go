@@ -271,4 +271,7 @@ func Load64(addr *uint64) uint64
 func Store8(addr *uint8, v uint8)
 
 //go:noescape
+func Store16(addr *uint16, v uint16)
+
+//go:noescape
 func Store64(addr *uint64, v uint64)

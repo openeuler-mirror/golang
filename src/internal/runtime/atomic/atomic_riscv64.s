@@ -111,6 +111,15 @@ TEXT ·Store8(SB), NOSPLIT, $0-9
 	FENCE
 	RET
 
+// func Store16(ptr *uint16, val uint16)
+TEXT ·Store16(SB), NOSPLIT, $0-10
+	MOV	    ptr+0(FP), A0
+	MOVHU	val+8(FP), A1
+	FENCE
+	MOVH	A1, (A0)
+	FENCE
+	RET
+
 // func Store64(ptr *uint64, val uint64)
 TEXT ·Store64(SB), NOSPLIT, $0-16
 	MOV	ptr+0(FP), A0

@@ -77,3 +77,18 @@ TEXT	·Store8(SB),NOSPLIT,$0-5
 	DMB	MB_ISH
 	RET
 
+TEXT	·Store16(SB),NOSPLIT,$0-6
+	MOVW	addr+0(FP), R1
+	MOVH	v+4(FP), R2
+
+	MOVB	runtime·goarm(SB), R8
+	CMP	$7, R8
+	BLT	2(PC)
+	DMB	MB_ISH
+
+	MOVH	R2, (R1)
+
+	CMP	$7, R8
+	BLT	2(PC)
+	DMB	MB_ISH
+	RET

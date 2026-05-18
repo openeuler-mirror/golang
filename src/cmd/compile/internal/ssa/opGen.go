@@ -1736,6 +1736,7 @@ const (
 	OpARM64LDARB
 	OpARM64LDARW
 	OpARM64STLRB
+	OpARM64STLRH
 	OpARM64STLR
 	OpARM64STLRW
 	OpARM64LoweredAtomicExchange64
@@ -3329,6 +3330,7 @@ const (
 	OpAtomicLoadAcq32
 	OpAtomicLoadAcq64
 	OpAtomicStore8
+	OpAtomicStore16
 	OpAtomicStore32
 	OpAtomicStore64
 	OpAtomicStorePtrNoWB
@@ -23216,6 +23218,19 @@ var opcodeTable = [...]opInfo{
 		},
 	},
 	{
+		name:			"STLRH",
+		argLen:			3,
+		faultOnNilArg0:	true,
+		hasSideEffects:	true,
+		asm:			arm64.ASTLRH,
+		reg: regInfo{
+			inputs: []inputInfo{
+				{1, 805044223},
+				{0, 9223372038733561855},
+			},
+		},
+	},
+	{
 		name:           "STLR",
 		argLen:         3,
 		faultOnNilArg0: true,
@@ -42187,6 +42202,12 @@ var opcodeTable = [...]opInfo{
 		argLen:         3,
 		hasSideEffects: true,
 		generic:        true,
+	},
+	{
+		name:           "AtomicStore16",
+		argLen:         3,
+		hasSideEffects: true,
+		generic:        false,
 	},
 	{
 		name:           "AtomicStore32",
