@@ -134,4 +134,7 @@ type Flags struct {
 
 	// StepOpt enables optimization for func step in package runtime
 	StepOpt bool
+
+	// PageShift14 enables 16K page size.
+	PageShift14 bool
 }
