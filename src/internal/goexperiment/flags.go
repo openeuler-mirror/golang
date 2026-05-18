@@ -137,4 +137,7 @@ type Flags struct {
 
 	// RevertCopyHashKeys enables the "revert" hash map implementation.
 	RevertCopyHashKeys bool
+	
+	// Clear the span if necessary
+	ClearSpan bool
 }
