@@ -176,7 +176,7 @@ func TestMergeConditionalBranchesWithoutPointers(t *testing.T) {
 		}
 
 		if !isNewConditionCorrect(entryBlock) {
-			t.Errorf("Entry block doesn't contain CCMP opertation")
+			t.Errorf("Entry block doesn't contain CCMP operation")
 		}
 	})
 }

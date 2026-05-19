@@ -16,7 +16,9 @@ import (
 	"go/format"
 	"log"
 	"os"
-	"strings"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // IntegerConstraint defines a type constraint for all integer types
@@ -148,7 +150,8 @@ var typeConfigs = []TypeConfig{
 
 // writeTypeSpecificTest generates test for a specific integer type
 func writeTypeSpecificTest(w *bytes.Buffer, typeName, baseValue string) {
-	typeTitle := strings.Title(typeName)
+	caser := cases.Title(language.English)
+	typeTitle := caser.String(typeName)
 
 	fmt.Fprintf(w, "func Test%sConditionalCmpConst(t *testing.T) {\n", typeTitle)
 
