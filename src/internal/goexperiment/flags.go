@@ -148,4 +148,7 @@ type Flags struct {
 	// for the function-type cache, reducing lock contention on concurrent
 	// reflect.FuncOf calls when the cache is hot.
 	ReflectRWLock bool
+
+	// set tinysize to 32
+	TinySize bool
 }

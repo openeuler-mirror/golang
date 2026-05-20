@@ -125,8 +125,9 @@ const (
 	_64bit = 1 << (^uintptr(0) >> 63) / 2
 
 	// Tiny allocator parameters, see "Tiny allocator" comment in malloc.go.
-	_TinySize      = 16
-	_TinySizeClass = int8(2)
+	_TinySizeMultiple = 1 + goexperiment.TinySizeInt
+	_TinySize         = 16 * _TinySizeMultiple
+	_TinySizeClass    = int8(2 * _TinySizeMultiple)
 
 	_FixAllocChunk = 16 << 10 // Chunk size for FixAlloc
 
@@ -1186,10 +1187,19 @@ func mallocgcTiny(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uint
 		v, span, checkGCTrigger = c.nextFree(tinySpanClass)
 	}
 	x := unsafe.Pointer(v)
+
 	if !goexperiment.ClearSpan || span.needzero != 0 {
-		(*[2]uint64)(x)[0] = 0
-		(*[2]uint64)(x)[1] = 0
+		if goexperiment.TinySize {
+			(*[4]uint64)(x)[0] = 0
+			(*[4]uint64)(x)[1] = 0
+			(*[4]uint64)(x)[2] = 0
+			(*[4]uint64)(x)[3] = 0
+		} else {
+			(*[2]uint64)(x)[0] = 0
+			(*[2]uint64)(x)[1] = 0
+		}
 	}
+
 	// See if we need to replace the existing tiny block with the new one
 	// based on amount of remaining free space.
 	if !raceenabled && (size < c.tinyoffset || c.tiny == 0) {
