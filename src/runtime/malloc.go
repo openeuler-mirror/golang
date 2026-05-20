@@ -1104,6 +1104,11 @@ func mallocgc(size uintptr, typ *_type, needzero bool) unsafe.Pointer {
 	if debug.malloc {
 		postMallocgcDebug(x, elemsize, typ)
 	}
+
+	if goexperiment.PrefetchMalloc {
+		sys.Prefetch(uintptr(unsafe.Add(x, size)))
+	}
+
 	return x
 }
 
@@ -1154,6 +1159,9 @@ func mallocgcTiny(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uint
 	// reduces heap size by ~20%.
 	c := getMCache(mp)
 	off := c.tinyoffset
+	if goexperiment.PrefetchMalloc {
+		sys.Prefetch(uintptr(unsafe.Pointer(&c.alloc[tinySpanClass])))
+	}
 	// Align tiny pointer for required (conservative) alignment.
 	if size&7 == 0 {
 		off = alignUp(off, 8)
