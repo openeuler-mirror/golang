@@ -278,6 +278,11 @@ func writeDconv(w io.Writer, p *Prog, a *Addr, abiDetail bool) {
 			fmt.Fprintf(w, "[%d]", a.Index)
 		}
 
+		if (RBaseARM64+1<<13+1<<11+1<<9) /* arm64.REG_SVE_VECTOR_INDEX */ <= a.Reg &&
+			a.Reg < (RBaseARM64+1<<13+1<<11+1<<10) /* arm64.REG_SVE_VECTOR_END */ {
+			fmt.Fprintf(w, "[%d]", a.Index)
+		}
+
 		if (RBaseLOONG64+(1<<10)+(1<<11)) /* loong64.REG_ELEM */ <= a.Reg &&
 			a.Reg < (RBaseLOONG64+(1<<10)+(2<<11)) /* loong64.REG_ELEM_END */ {
 			fmt.Fprintf(w, "[%d]", a.Index)
@@ -365,7 +370,26 @@ func writeDconv(w io.Writer, p *Prog, a *Addr, abiDetail bool) {
 		fmt.Fprintf(w, "%v, %v", Rconv(int(a.Offset)), Rconv(int(a.Reg)))
 
 	case TYPE_REGLIST:
-		io.WriteString(w, RLconv(a.Offset))
+		switch buildcfg.GOARCH {
+		case "arm64":
+			// [<Zt1>.<T>, <Zt2>.<T>]
+			if (RBaseARM64+1<<13+1<<11) <= a.Reg && a.Reg < (RBaseARM64+1<<13+1<<11+1<<9) {
+				regCnt := int((a.Offset >> 9) & 7)
+				for i := 0; i < regCnt; i++ {
+					if i == 0 {
+						fmt.Fprintf(w, "[")
+					} else {
+						fmt.Fprintf(w, ",")
+					}
+					fmt.Fprintf(w, "%v", Rconv(int(a.Reg)+i))
+				}
+				fmt.Fprintf(w, "]")
+			} else {
+				fmt.Fprintf(w, "%v", RLconv(a.Offset))
+			}
+		default:
+			io.WriteString(w, RLconv(a.Offset))
+		}
 
 	case TYPE_SPECIAL:
 		io.WriteString(w, SPCconv(a.Offset))
@@ -388,6 +412,8 @@ func (a *Addr) writeNameTo(w io.Writer, abiDetail bool) {
 			fmt.Fprint(w, a.Offset)
 		case a.Offset == 0:
 			fmt.Fprintf(w, "(%v)", Rconv(int(a.Reg)))
+		case a.Scale == -1:
+			fmt.Fprintf(w, "(VL*%d)(%v)", a.Offset, Rconv(int(a.Reg)))
 		case a.Offset != 0:
 			fmt.Fprintf(w, "%d(%v)", a.Offset, Rconv(int(a.Reg)))
 		}
@@ -514,12 +540,12 @@ const (
 	RBaseAMD64   = 2 * 1024
 	RBaseARM     = 3 * 1024
 	RBasePPC64   = 4 * 1024  // range [4k, 8k)
-	RBaseARM64   = 8 * 1024  // range [8k, 13k)
-	RBaseMIPS    = 13 * 1024 // range [13k, 14k)
-	RBaseS390X   = 14 * 1024 // range [14k, 15k)
-	RBaseRISCV   = 15 * 1024 // range [15k, 16k)
-	RBaseWasm    = 16 * 1024
-	RBaseLOONG64 = 19 * 1024 // range [19K, 22k)
+	RBaseARM64   = 8 * 1024  // range [8k, 20k)
+	RBaseMIPS    = 20 * 1024 // range [20k, 21k)
+	RBaseS390X   = 21 * 1024 // range [21k, 22k)
+	RBaseRISCV   = 22 * 1024 // range [22k, 23k)
+	RBaseWasm    = 23 * 1024 // range [23k, 26k)
+	RBaseLOONG64 = 26 * 1024 // range [26K, 31k)
 )
 
 // RegisterRegister binds a pretty-printer (Rconv) for register

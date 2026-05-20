@@ -397,7 +397,8 @@ func (p *Parser) operand(a *obj.Addr) {
 	// Symbol: sym±offset(SB)
 	tok := p.next()
 	name := tok.String()
-	if tok.ScanToken == scanner.Ident && !p.atStartOfRegister(name) {
+	pattern, isPattern := p.patternSpecifier(name)
+	if tok.ScanToken == scanner.Ident && !p.atStartOfRegister(name) && !isPattern {
 		switch p.arch.Family {
 		case sys.ARM64:
 			// arm64 special operands.
@@ -427,6 +428,17 @@ func (p *Parser) operand(a *obj.Addr) {
 		return
 	}
 
+	// Pattern specifier is the operand of arm64 SVE instructions.
+	// POW2, VL1, VL32, ALL ...
+	if isPattern {
+		if prefix != 0 {
+			p.errorf("illegal use of pattern specifier")
+		}
+		a.Type = obj.TYPE_CONST
+		a.Offset = pattern
+		p.expectOperandEnd()
+		return
+	}
 	// Register: R1
 	if tok.ScanToken == scanner.Ident && p.atStartOfRegister(name) {
 		if p.atRegisterShift() {
@@ -444,7 +456,23 @@ func (p *Parser) operand(a *obj.Addr) {
 				a.Reg, _ = p.registerReference(name)
 				p.get(')')
 			}
+		} else if p.atGoverningPredicateRegister() {
+			// Pn/M or Pn/Z
+			a.Type = obj.TYPE_REG
+			name := tok.String()
+			if name[0] != 'P' || prefix != 0 {
+				p.errorf("invalid governing predicate registers")
+			}
+			reg, _ := p.registerReference(name)
+			p.get('/')
+			tok := p.next()
+			err := arch.ARM64GoverningPredicateRegister(a, reg, tok.String())
+			if err != nil {
+				p.errorf("%s", err.Error())
+			}
+			return
 		} else if p.atRegisterExtension() {
+			// Rn.xx, Vn.xx, Zn.xx or Pn.xx
 			a.Type = obj.TYPE_REG
 			p.registerExtension(a, tok.String(), prefix)
 			p.expectOperandEnd()
@@ -479,10 +507,27 @@ func (p *Parser) operand(a *obj.Addr) {
 			return
 		}
 		rname := tok.String()
-		p.back()
-		haveConstant = !p.atStartOfRegister(rname)
-		if !haveConstant {
-			p.back() // Put back the '('.
+		// VL is short for Vector Length and works for arm64 SVE instructions.
+		// (VL*imm)
+		if p.arch.Family == sys.ARM64 && rname == "VL" {
+			p.get('*')
+			signbit := 1
+			if p.peek() == '-' {
+				signbit = -1
+				p.get('-')
+			}
+			tok = p.next()
+			a.Offset = int64(p.atoi(tok.String())) * int64(signbit)
+			a.Scale = -1 // Arm64 does not use a.Scale. Setting a.Scale to -1 represents (VL*imm) for prettier printing.
+			p.next()
+			a.Type = obj.TYPE_MEM
+			haveConstant = false
+		} else {
+			p.back()
+			haveConstant = !p.atStartOfRegister(rname)
+			if !haveConstant {
+				p.back() // Put back the '('.
+			}
 		}
 	}
 	if haveConstant {
@@ -577,6 +622,50 @@ func (p *Parser) atRegisterExtension() bool {
 	default:
 		return false
 	}
+}
+
+// atGoverningPredicateRegister reports whether we are at the start of an ARM64 predicated register.
+func (p *Parser) atGoverningPredicateRegister() bool {
+	// ARM64 only.
+	if p.arch.Family != sys.ARM64 {
+		return false
+	}
+	// Pn/x
+	if p.peek() == '/' {
+		return true
+	}
+	return false
+}
+
+// pattern specifier, defaulting to ALL, encoded in integer.
+var patternEncode = map[string]arm64.Pattern{
+	// pattern encode
+	"POW2":  arm64.PAT_POW2,
+	"VL1":   arm64.PAT_VL1,
+	"VL2":   arm64.PAT_VL2,
+	"VL3":   arm64.PAT_VL3,
+	"VL4":   arm64.PAT_VL4,
+	"VL5":   arm64.PAT_VL5,
+	"VL6":   arm64.PAT_VL6,
+	"VL7":   arm64.PAT_VL7,
+	"VL8":   arm64.PAT_VL8,
+	"VL16":  arm64.PAT_VL16,
+	"VL32":  arm64.PAT_VL32,
+	"VL64":  arm64.PAT_VL64,
+	"VL128": arm64.PAT_VL128,
+	"VL256": arm64.PAT_VL256,
+	"MUL4":  arm64.PAT_MUL4,
+	"MUL3":  arm64.PAT_MUL3,
+	"ALL":   arm64.PAT_ALL,
+}
+
+// patternSpecifier parses pattern specifier.
+func (p *Parser) patternSpecifier(name string) (int64, bool) {
+	if p.arch.Family != sys.ARM64 {
+		return 0, false
+	}
+	v, ok := patternEncode[name]
+	return int64(v), ok
 }
 
 // registerReference parses a register given either the name, R10, or a parenthesized form, SPR(10).
@@ -721,7 +810,7 @@ func (p *Parser) registerShift(name string, prefix rune) int64 {
 // There is known to be a register (current token) and an extension operator (peeked token).
 func (p *Parser) registerExtension(a *obj.Addr, name string, prefix rune) {
 	if prefix != 0 {
-		p.errorf("prefix %c not allowed for shifted register: $%s", prefix, name)
+		p.errorf("prefix %c not allowed for extended register: $%s", prefix, name)
 	}
 
 	reg, ok := p.registerReference(name)
@@ -730,6 +819,37 @@ func (p *Parser) registerExtension(a *obj.Addr, name string, prefix rune) {
 		return
 	}
 
+	switch {
+	case arch.IsARM64ZRegister(int(reg)):
+		// Zn.<T>
+		// Zn.<T>.EXT
+		// Zn.<T>[idx]
+		if p.have('[') {
+			break
+		}
+		fallthrough
+	case arch.IsARM64PRegister(int(reg)):
+		// Pn.<T>
+		p.get('.')
+		tok := p.next()
+		var err error
+		reg, err = arch.ARM64RegisterScalable(tok.String(), name, reg)
+		if err != nil {
+			p.errorf("%s", err.Error())
+		}
+		if !p.more() {
+			// scalable register without extension type
+			a.Reg = reg
+			return
+		}
+		if p.peek() == ')' && a.Type == obj.TYPE_MEM {
+			// (Zn.<T>)(Zm.<T>)
+			a.Index = reg
+			return
+		}
+	default:
+		/* nothing */
+	}
 	isIndex := false
 	num := int16(0)
 	isAmount := true // Amount is zero by default
@@ -738,7 +858,7 @@ func (p *Parser) registerExtension(a *obj.Addr, name string, prefix rune) {
 		// (Rn)(Rm<<2), the shifted offset register.
 		ext = "LSL"
 	} else {
-		// (Rn)(Rm.UXTW<1), the extended offset register.
+		// (Rn)(Rm.UXTW<<1), the extended offset register.
 		// Rm.UXTW<<3, the extended register.
 		p.get('.')
 		tok := p.next()
@@ -965,6 +1085,22 @@ func (p *Parser) registerIndirect(a *obj.Addr, prefix rune) {
 	if !ok {
 		p.errorf("indirect through non-register %s", tok)
 	}
+	switch p.arch.Family {
+	case sys.ARM64:
+		if name[0] == 'Z' && name != "ZR" {
+			// arm64 sve Z register
+			p.get('.')
+			tok = p.next()
+			ext := tok.String()
+			var err error
+			r1, err = arch.ARM64RegisterScalable(ext, name, r1)
+			if err != nil {
+				p.errorf("%s", err.Error())
+			}
+		}
+	default:
+		/* nothing */
+	}
 	p.get(')')
 	a.Type = obj.TYPE_MEM
 	if r1 < 0 {
@@ -1087,18 +1223,20 @@ func (p *Parser) registerListARM(a *obj.Addr) {
 	// One range per loop.
 	var maxReg int
 	var bits uint16
-	var arrangement int64
+	var specifier, curSpecifier int64
+	var reg int16
 	switch p.arch.Family {
 	case sys.ARM:
 		maxReg = 16
 	case sys.ARM64:
 		maxReg = 32
 	default:
-		p.errorf("unexpected register list")
+		/* nothing */
 	}
 	firstReg := -1
 	nextReg := -1
 	regCnt := 0
+	name := ""
 ListLoop:
 	for {
 		tok := p.next()
@@ -1111,27 +1249,51 @@ ListLoop:
 		}
 		switch p.arch.Family {
 		case sys.ARM64:
-			// Vn.T
-			name := tok.String()
+			// Vn.T or Zn.T or Pn.T
+			name = tok.String()
 			r, ok := p.registerReference(name)
 			if !ok {
 				p.errorf("invalid register: %s", name)
 			}
-			reg := r - p.arch.Register["V0"]
 			p.get('.')
 			tok := p.next()
 			ext := tok.String()
-			curArrangement, err := arch.ARM64RegisterArrangement(reg, name, ext)
+			err := error(nil)
+			switch name[0] {
+			case 'Z':
+				// [Zt1.B, Zt2.B]
+				reg = r - p.arch.Register["Z0"]
+				if reg < 0 {
+					p.errorf("invalid register number: %s", name)
+				}
+				curSpecifier, err = arch.ARM64RegisterDatasize(ext)
+			case 'P':
+				// [Pt1.B, Pt2.B]
+				reg = r - p.arch.Register["P0"]
+				if reg < 0 {
+					p.errorf("invalid register number: %s", name)
+				}
+				curSpecifier, err = arch.ARM64RegisterDatasize(ext)
+			case 'V':
+				// [Vt1.B8, Vt2.B8]
+				reg = r - p.arch.Register["V0"]
+				if reg < 0 {
+					p.errorf("invalid register number: %s", name)
+				}
+				curSpecifier, err = arch.ARM64RegisterArrangement(reg, name, ext)
+			default:
+				p.errorf("expected V0/Z0/P0 through V31/Z31/P15; found: %s", name)
+			}
 			if err != nil {
 				p.errorf("%v", err)
 			}
 			if firstReg == -1 {
-				// only record the first register and arrangement
+				// only record the first register and arrangement or datasize specifier
 				firstReg = int(reg)
 				nextReg = firstReg
-				arrangement = curArrangement
-			} else if curArrangement != arrangement {
-				p.errorf("inconsistent arrangement in ARM64 register list")
+				specifier = curSpecifier
+			} else if curSpecifier != specifier {
+				p.errorf("inconsistent arrangement or datasize specifier in ARM64 register list")
 			} else if nextReg != int(reg) {
 				p.errorf("incontiguous register in ARM64 register list: %s", name)
 			}
@@ -1168,11 +1330,10 @@ ListLoop:
 	case sys.ARM:
 		a.Offset = int64(bits)
 	case sys.ARM64:
-		offset, err := arch.ARM64RegisterListOffset(firstReg, regCnt, arrangement)
+		err := arch.ARM64RegisterListOffset(a, name, firstReg, regCnt, specifier)
 		if err != nil {
 			p.errorf("%v", err)
 		}
-		a.Offset = offset
 	default:
 		p.errorf("register list not supported on this architecture")
 	}
