@@ -567,6 +567,7 @@
 (AtomicLoadPtr ...) => (LDAR  ...)
 
 (AtomicStore8       ...) => (STLRB ...)
+(AtomicStore16      ...) => (STLRH ...)
 (AtomicStore32      ...) => (STLRW ...)
 (AtomicStore64      ...) => (STLR  ...)
 (AtomicStorePtrNoWB ...) => (STLR  ...)

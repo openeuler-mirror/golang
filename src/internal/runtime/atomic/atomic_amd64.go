@@ -120,6 +120,9 @@ func Store(ptr *uint32, val uint32)
 func Store8(ptr *uint8, val uint8)
 
 //go:noescape
+func Store16(ptr *uint16, val uint16)
+
+//go:noescape
 func Store64(ptr *uint64, val uint64)
 
 //go:noescape

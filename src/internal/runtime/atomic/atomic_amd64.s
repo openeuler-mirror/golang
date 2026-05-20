@@ -180,6 +180,12 @@ TEXT ·Store8(SB), NOSPLIT, $0-9
 	XCHGB	AX, 0(BX)
 	RET
 
+TEXT ·Store16(SB), NOSPLIT, $0-10
+	MOVQ	ptr+0(FP), BX
+	MOVW	val+8(FP), AX
+	XCHGW	AX, 0(BX)
+	RET
+
 TEXT ·Store64(SB), NOSPLIT, $0-16
 	MOVQ	ptr+0(FP), BX
 	MOVQ	val+8(FP), AX

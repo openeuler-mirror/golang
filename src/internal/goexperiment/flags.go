@@ -151,4 +151,7 @@ type Flags struct {
 
 	// set tinysize to 32
 	TinySize bool
+
+	// Enable atomic
+	AtomicVar bool
 }

@@ -114,6 +114,12 @@ TEXT ·Store8(SB), NOSPLIT, $0-9
 	STLRB	R1, (R0)
 	RET
 
+TEXT ·Store16(SB), NOSPLIT|NOFRAME, $0-10
+	MOVD	ptr+0(FP), R0
+	MOVH	val+8(FP), R1
+	STLRH	R1, (R0)
+	RET
+
 TEXT ·Store64(SB), NOSPLIT, $0-16
 	MOVD	ptr+0(FP), R0
 	MOVD	val+8(FP), R1

@@ -1214,7 +1214,9 @@ func mallocgcTiny(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uint
 	// collector. Otherwise, on weakly ordered machines,
 	// the garbage collector could follow a pointer to x,
 	// but see uninitialized memory or stale heap bits.
-	publicationBarrier()
+	if !goexperiment.AtomicVar {
+		publicationBarrier()
+	}
 	// As x and the heap bits are initialized, update
 	// freeIndexForScan now so x is seen by the GC
 	// (including conservative scan) as an allocated object.
@@ -1224,7 +1226,11 @@ func mallocgcTiny(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uint
 	// object. Delaying this update until now ensures that
 	// conservative scanning considers this pointer dead until
 	// this point.
-	span.freeIndexForScan = span.freeindex
+	if goexperiment.AtomicVar {
+		atomicStoreFreeIndexForScan(span)
+	} else {
+		span.freeIndexForScan = span.freeindex
+	}
 
 	// Allocate black during GC.
 	// All slots hold nil so no scanning is needed.
@@ -1316,7 +1322,9 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero bool) (unsafe.Pointe
 	// collector. Otherwise, on weakly ordered machines,
 	// the garbage collector could follow a pointer to x,
 	// but see uninitialized memory or stale heap bits.
-	publicationBarrier()
+	if !goexperiment.AtomicVar {
+		publicationBarrier()
+	}
 	// As x and the heap bits are initialized, update
 	// freeIndexForScan now so x is seen by the GC
 	// (including conservative scan) as an allocated object.
@@ -1326,7 +1334,11 @@ func mallocgcSmallNoscan(size uintptr, typ *_type, needzero bool) (unsafe.Pointe
 	// object. Delaying this update until now ensures that
 	// conservative scanning considers this pointer dead until
 	// this point.
-	span.freeIndexForScan = span.freeindex
+	if goexperiment.AtomicVar {
+		atomicStoreFreeIndexForScan(span)
+	} else {
+		span.freeIndexForScan = span.freeindex
+	}
 
 	// Allocate black during GC.
 	// All slots hold nil so no scanning is needed.
@@ -1407,7 +1419,9 @@ func mallocgcSmallScanNoHeader(size uintptr, typ *_type, needzero bool) (unsafe.
 	// collector. Otherwise, on weakly ordered machines,
 	// the garbage collector could follow a pointer to x,
 	// but see uninitialized memory or stale heap bits.
-	publicationBarrier()
+	if !goexperiment.AtomicVar {
+		publicationBarrier()
+	}
 	// As x and the heap bits are initialized, update
 	// freeIndexForScan now so x is seen by the GC
 	// (including conservative scan) as an allocated object.
@@ -1417,7 +1431,11 @@ func mallocgcSmallScanNoHeader(size uintptr, typ *_type, needzero bool) (unsafe.
 	// object. Delaying this update until now ensures that
 	// conservative scanning considers this pointer dead until
 	// this point.
-	span.freeIndexForScan = span.freeindex
+	if goexperiment.AtomicVar {
+		atomicStoreFreeIndexForScan(span)
+	} else {
+		span.freeIndexForScan = span.freeindex
+	}
 
 	// Allocate black during GC.
 	// All slots hold nil so no scanning is needed.
@@ -1500,7 +1518,9 @@ func mallocgcSmallScanHeader(size uintptr, typ *_type, needzero bool) (unsafe.Po
 	// collector. Otherwise, on weakly ordered machines,
 	// the garbage collector could follow a pointer to x,
 	// but see uninitialized memory or stale heap bits.
-	publicationBarrier()
+	if !goexperiment.AtomicVar {
+		publicationBarrier()
+	}
 	// As x and the heap bits are initialized, update
 	// freeIndexForScan now so x is seen by the GC
 	// (including conservative scan) as an allocated object.
@@ -1510,7 +1530,11 @@ func mallocgcSmallScanHeader(size uintptr, typ *_type, needzero bool) (unsafe.Po
 	// object. Delaying this update until now ensures that
 	// conservative scanning considers this pointer dead until
 	// this point.
-	span.freeIndexForScan = span.freeindex
+	if goexperiment.AtomicVar {
+		atomicStoreFreeIndexForScan(span)
+	} else {
+		span.freeIndexForScan = span.freeindex
+	}
 
 	// Allocate black during GC.
 	// All slots hold nil so no scanning is needed.
@@ -1574,7 +1598,9 @@ func mallocgcLarge(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uin
 	// Otherwise, on weakly ordered machines, the garbage
 	// collector could follow a pointer to x, but see a stale
 	// largeType value.
-	publicationBarrier()
+	if !goexperiment.AtomicVar {
+		publicationBarrier()
+	}
 	// As x and the heap bits are initialized, update
 	// freeIndexForScan now so x is seen by the GC
 	// (including conservative scan) as an allocated object.
@@ -1584,7 +1610,11 @@ func mallocgcLarge(size uintptr, typ *_type, needzero bool) (unsafe.Pointer, uin
 	// object. Delaying this update until now ensures that
 	// conservative scanning considers this pointer dead until
 	// this point.
-	span.freeIndexForScan = span.freeindex
+	if goexperiment.AtomicVar {
+		atomicStoreFreeIndexForScan(span)
+	} else {
+		span.freeIndexForScan = span.freeindex
+	}
 
 	// Allocate black during GC.
 	// All slots hold nil so no scanning is needed.
