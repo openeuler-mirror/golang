@@ -1425,7 +1425,7 @@ func parseValue(val string, arch arch, loc string) (op opData, oparch, typ, auxi
 func opHasAuxInt(op opData) bool {
 	switch op.aux {
 	case "Bool", "Int8", "Int16", "Int32", "Int64", "Int128", "UInt8", "Float32", "Float64",
-		"SymOff", "CallOff", "SymValAndOff", "TypSize", "ARM64BitField", "FlagConstant", "CCop":
+		"SymOff", "CallOff", "SymValAndOff", "TypSize", "ARM64BitField", "FlagConstant", "CCop", "ARM64ConditionalParams":
 		return true
 	}
 	return false
@@ -1829,6 +1829,8 @@ func (op opData) auxIntType() string {
 		return "flagConstant"
 	case "ARM64BitField":
 		return "arm64BitField"
+	case "ARM64ConditionalParams":
+		return "arm64ConditionalParams"
 	default:
 		return "invalid"
 	}
