@@ -2502,6 +2502,10 @@ func rewriteStructStore(v *Value) *Value {
 	return mem
 }
 
+func isEnableBytesStringBytesOpt() bool {
+	return base.Flag.BytesStringBytesOpt
+}
+
 func isEnableAggressivePatterns() bool {
 	return base.Flag.AggressivePatterns
 }

@@ -129,6 +129,7 @@ type CmdFlags struct {
 	PgoProfile         string       "help:\"read profile or pre-process profile from `file`\""
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
 
+	BytesStringBytesOpt  bool "help:\"convert []byte(string([]byte)) to makeslicecopy\""
 	AggressivePatterns   bool "help:\"enable additional optimization patterns\""
 	AggressiveLoopRotate bool "help:\"enable aggressive loop rotate optimization, including keeping nested loops in place\""
 
