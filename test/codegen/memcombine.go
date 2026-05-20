@@ -1,4 +1,4 @@
-// asmcheck
+// asmcheck -gcflags=-d=aarch64ldst=all
 
 // Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -383,6 +383,25 @@ func fcall_uint32(a [2]uint32) [2]uint32 {
 	return fcall_uint32(fcall_uint32(a)) // amd64:`MOVQ`
 }
 
+func fcall_uint64(a [2]uint64) [2]uint64 {
+	return fcall_uint64(fcall_uint64(a)) // arm64:`LDP\tcommand-line-arguments\.a\(FP\),`,`STP\t\(R0, R1\)`
+}
+
+// Check load/store combining for morestack spilling.
+
+// arm64:`STP\t\(R0, R1\)`
+// arm64:`STP\t\(R2, R3\)`
+// arm64:`STP\t\(R4, R5\)`
+// arm64:`STP\t\(R6, R7\)`
+// arm64:`.*morestack_noctxt`
+// arm64:`LDP\t.+\(R0, R1\)`
+// arm64:`LDP\t.+\(R2, R3\)`
+// arm64:`LDP\t.+\(R4, R5\)`
+// arm64:`LDP\t.+\(R6, R7\)`
+func fcall_morestk(a, b, c, d, e, f, g, h uint64) uint64 {
+	return fcall_morestk(a, b, c, d, e, f, g, h)
+}
+
 // We want to merge load+op in the first function, but not in the
 // second. See Issue 19595.
 func load_op_merge(p, q *int) {
@@ -410,6 +429,12 @@ func safe_point(p, q *[2]*int) {
 	a, b := p[0], p[1] // amd64:-`MOVUPS`
 	runtime.GC()
 	q[0], q[1] = a, b // amd64:-`MOVUPS`
+}
+
+// Merging neighboring loads/stores
+
+func swap_elts(p *[5]*int64) {
+	p[0], p[3], p[1] = p[1], p[4], p[0] // arm64: `LDP\t\(R0\)`,`STP\t\(R[0-9]+, R[0-9]+\), \(R0\)`
 }
 
 // ------------- //

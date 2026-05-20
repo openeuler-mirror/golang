@@ -77,6 +77,7 @@ type DebugFlags struct {
 	ZeroCopy              int    `help:"enable zero-copy string->[]byte conversions" concurrent:"ok"`
 	ForceInline           int    `help:"enable force inline"`
 	ForceInlineLog        int    `help:"print force inline log"`
+	AArch64LdSt           string `help:"allow to merge loads and stores using ldp/stp on AArch64\nOne of: none, off, load, store, all, on"`
 
 	ConcurrentOk bool // true if only concurrentOk flags seen
 }

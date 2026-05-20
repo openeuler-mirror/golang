@@ -196,6 +196,8 @@ func ParseFlags() {
 
 	Debug.Checkptr = -1 // so we can tell whether it is set explicitly
 
+	Debug.AArch64LdSt = "none"
+
 	Flag.Cfg.ImportMap = make(map[string]string)
 
 	objabi.AddVersionFlag() // -V
@@ -294,6 +296,7 @@ func ParseFlags() {
 	Ctxt.Flag_shared = Ctxt.Flag_dynlink || Ctxt.Flag_shared
 	Ctxt.Flag_optimize = Flag.N == 0
 	Ctxt.Debugasm = int(Flag.S)
+	Ctxt.AArch64LdSt = Debug.AArch64LdSt
 	Ctxt.Flag_maymorestack = Debug.MayMoreStack
 	Ctxt.Flag_noRefName = Debug.NoRefName != 0
 

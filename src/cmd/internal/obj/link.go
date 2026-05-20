@@ -785,6 +785,13 @@ type InlMark struct {
 	id int32
 }
 
+func (im *InlMark) AppearsNop() *Prog {
+	if im.p.As == ANOP {
+		return im.p
+	}
+	return nil
+}
+
 // Mark p as the instruction to set as the pc when
 // "unwinding" the inlining global frame id. Usually it should be
 // instruction with a file:line at the callsite, and occur
@@ -1129,6 +1136,7 @@ type Link struct {
 	Debugasm           int
 	Debugvlog          bool
 	Debugpcln          string
+	AArch64LdSt        string
 	Flag_shared        bool
 	Flag_dynlink       bool
 	Flag_linkshared    bool

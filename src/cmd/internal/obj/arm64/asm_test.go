@@ -256,3 +256,73 @@ func TestPCALIGN(t *testing.T) {
 		}
 	}
 }
+
+// TestLdStPairGenerated verifies that consecutive load/store instructions
+// with consecutive addresses are optimized into LDP/STP pairs.
+func runAssemblerLdSt(t *testing.T, srcdata string) []byte {
+	dir := t.TempDir()
+	defer os.RemoveAll(dir)
+	srcfile := filepath.Join(dir, "testdata.s")
+	outfile := filepath.Join(dir, "testdata.o")
+	if err := os.WriteFile(srcfile, []byte(srcdata), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cmd := testenv.Command(t, testenv.GoToolPath(t), "tool", "asm", "-S", "-d=aarch64ldst=all", "-o", outfile, srcfile)
+	cmd.Env = append(os.Environ(), "GOOS=linux", "GOARCH=arm64")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("The build failed: %v, output:\n%s", err, out)
+	}
+	return out
+}
+
+// TestLdStPairGenerated verifies that consecutive load/store instructions
+// with consecutive addresses are optimized into LDP/STP pairs.
+func TestLdStPairGenerated(t *testing.T) {
+	testenv.MustHaveGoBuild(t)
+
+	stpCode := `TEXT ·teststp(SB),$0-0
+	MOVD R0, 16(RSP)
+	MOVD R0, 20(RSP)
+	MOVD R1, 24(RSP)
+	MOVD R2, 8(RSP)
+	RET
+`
+	ldpCode := `TEXT ·testldp(SB),$0-0
+	MOVD 16(RSP), R0
+	MOVD 20(RSP), R2
+	MOVD 24(RSP), R1
+	RET
+`
+
+	testCases := []struct {
+		name    string
+		code    string
+		pattern string // regexp pattern to match
+	}{
+		{
+			"STP optimization",
+			stpCode,
+			`\tSTP\t\(R2, R0\), 8\(RSP\)`,
+		},
+		{
+			"LDP optimization",
+			ldpCode,
+			`\tLDP\t16\(RSP\), \(R0, R1\)`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := runAssemblerLdSt(t, tc.code)
+			matched, err := regexp.MatchString(tc.pattern, string(out))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !matched {
+				t.Errorf("%s failed!\ninput:\n%s\noutput:\n%s\n",
+					tc.name, tc.code, out)
+			}
+		})
+	}
+}
