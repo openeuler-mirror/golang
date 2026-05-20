@@ -546,7 +546,10 @@ func ssaGenValue(s *ssagen.State, v *ssa.Value) {
 		p.To.Reg = v.Reg()
 	case ssa.OpARM64LDAR,
 		ssa.OpARM64LDARB,
-		ssa.OpARM64LDARW:
+		ssa.OpARM64LDARW,
+		ssa.OpARM64LDAPR,
+		ssa.OpARM64LDAPRB,
+		ssa.OpARM64LDAPRW:
 		p := s.Prog(v.Op.Asm())
 		p.From.Type = obj.TYPE_MEM
 		p.From.Reg = v.Args[0].Reg()

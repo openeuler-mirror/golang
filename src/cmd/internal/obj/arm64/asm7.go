@@ -244,6 +244,10 @@ func LDSTX(sz uint32, o2 uint32, l uint32, o1 uint32, o0 uint32) uint32 {
 	return sz<<30 | 0x8<<24 | o2<<23 | l<<22 | o1<<21 | o0<<15
 }
 
+func LDAPR(sz uint32) uint32 {
+	return sz<<30 | 7<<27 | 0x2FF0<<10
+}
+
 func FPCMP(m uint32, s uint32, type_ uint32, op uint32, op2 uint32) uint32 {
 	return m<<31 | s<<29 | 0x1E<<24 | type_<<22 | 1<<21 | op<<14 | 8<<10 | op2
 }
@@ -821,6 +825,7 @@ var optab = []Optab{
 	{ASWPD, C_REGZR, C_NONE, C_NONE, C_ZAUTO, C_REGZR, 47, 4, REGSP, 0, 0},
 	{ACASPD, C_PAIR, C_NONE, C_NONE, C_ZOREG, C_PAIR, 106, 4, 0, 0, 0},
 	{ACASPD, C_PAIR, C_NONE, C_NONE, C_ZAUTO, C_PAIR, 106, 4, REGSP, 0, 0},
+	{ALDAPR, C_ZOREG, C_NONE, C_NONE, C_REGZR, C_NONE, 58, 4, 0, 0, 0},
 	{ALDAR, C_ZOREG, C_NONE, C_NONE, C_REGZR, C_NONE, 58, 4, 0, 0, 0},
 	{ALDXR, C_ZOREG, C_NONE, C_NONE, C_REGZR, C_NONE, 58, 4, 0, 0, 0},
 	{ALDAXR, C_ZOREG, C_NONE, C_NONE, C_REGZR, C_NONE, 58, 4, 0, 0, 0},
@@ -3322,6 +3327,11 @@ func buildop(ctxt *obj.Link) {
 
 		case AMRS, AMSR:
 			break
+
+		case ALDAPR:
+			oprangeset(ALDAPRW, t)
+			oprangeset(ALDAPRB, t)
+			oprangeset(ALDAPRH, t)
 
 		case ALDAR:
 			oprangeset(ALDARW, t)
@@ -7117,6 +7127,12 @@ func (c *ctxt7) asmout(p *obj.Prog, out []uint32) (count int) {
 	case 58: /* ldar/ldarb/ldarh/ldaxp/ldxp/ldaxr/ldxr */
 		o1 = c.opload(p, p.As)
 
+		if p.As == ALDAPR || p.As == ALDAPRW || p.As == ALDAPRB || p.As == ALDAPRH {
+			o1 |= uint32(p.From.Reg&31) << 5
+			o1 |= uint32(p.To.Reg & 31)
+			break
+		}
+
 		o1 |= 0x1F << 16
 		o1 |= uint32(p.From.Reg&31) << 5
 		if p.As == ALDXP || p.As == ALDXPW || p.As == ALDAXP || p.As == ALDAXPW {
@@ -9732,6 +9748,18 @@ func (c *ctxt7) op0(p *obj.Prog, a obj.As) uint32 {
  */
 func (c *ctxt7) opload(p *obj.Prog, a obj.As) uint32 {
 	switch a {
+	case ALDAPR:
+		return LDAPR(3)
+
+	case ALDAPRW:
+		return LDAPR(2)
+
+	case ALDAPRB:
+		return LDAPR(0)
+
+	case ALDAPRH:
+		return LDAPR(1)
+
 	case ALDAR:
 		return LDSTX(3, 1, 1, 0, 1) | 0x1F<<10
 

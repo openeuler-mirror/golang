@@ -175,6 +175,9 @@ const (
 	LD3R
 	LD4
 	LD4R
+	LDAPR
+	LDAPRB
+	LDAPRH
 	LDAR
 	LDARB
 	LDARH
@@ -644,6 +647,9 @@ var opstr = [...]string{
 	LD3R:      "LD3R",
 	LD4:       "LD4",
 	LD4R:      "LD4R",
+	LDAPR:     "LDAPR",
+	LDAPRB:    "LDAPRB",
+	LDAPRH:    "LDAPRH",
 	LDAR:      "LDAR",
 	LDARB:     "LDARB",
 	LDARH:     "LDARH",
@@ -1265,6 +1271,14 @@ var instFormats = [...]instFormat{
 	{0xffe0001f, 0xd4400000, HLT, instArgs{arg_immediate_0_65535_imm16}, nil},
 	// ISB {<option>|<imm>}
 	{0xfffff0ff, 0xd50330df, ISB, instArgs{arg_option_ISB_BI_system_CRm}, nil},
+	// LDAPR <Wt>, [<Xn|SP>{, #0}]
+	{0xfffffc00, 0xb8bfc000, LDAPR, instArgs{arg_Wt, arg_Xns_mem}, nil},
+	// LDAPR <Xt>, [<Xn|SP>{, #0}]
+	{0xfffffc00, 0xf8bfc000, LDAPR, instArgs{arg_Xt, arg_Xns_mem}, nil},
+	// LDAPRB <Wt>, [<Xn|SP>{, #0}]
+	{0xfffffc00, 0x38bfc000, LDAPRB, instArgs{arg_Wt, arg_Xns_mem}, nil},
+	// LDAPRH <Wt>, [<Xn|SP>{, #0}]
+	{0xfffffc00, 0x78bfc000, LDAPRH, instArgs{arg_Wt, arg_Xns_mem}, nil},
 	// LDAR <Wt>, [<Xn|SP>{, #0}]
 	{0xffe08000, 0x88c08000, LDAR, instArgs{arg_Wt, arg_Xns_mem}, nil},
 	// LDAR <Xt>, [<Xn|SP>{, #0}]
