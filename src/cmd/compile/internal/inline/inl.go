@@ -1001,7 +1001,21 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 	}
 
 	lineOffset := pgoir.NodeLineOffset(n, caller)
-	csi := pgoir.CallSiteInfo{LineOffset: lineOffset, Caller: caller}
+	parentCaller := caller
+	baseOffset := lineOffset
+	if base.Debug.PGOInline == 2 {
+		parentCallerName := ir.LinkFuncName(caller)
+		parentInlIdx := base.Ctxt.PosTable.Pos(n.Pos()).Base().InliningIndex()
+		if parentInlIdx >= 0 {
+			parentCallerName = base.Ctxt.InlTree.InlinedFunction(parentInlIdx).Name
+		}
+		if f, err := pgoir.LookupFunc(parentCallerName); err == nil {
+			parentCaller = f
+			lineOffset = pgoir.NodeLineOffset(n, parentCaller)
+		}
+	}
+
+	csi := pgoir.CallSiteInfo{LineOffset: lineOffset, Caller: parentCaller}
 	_, hot := candHotEdgeMap[csi]
 
 	if metric <= maxCost {
@@ -1017,6 +1031,10 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 		return false, maxCost, metric, false
 	}
 
+	if base.Debug.PGODebug > 0 && base.Debug.PGOInline == 2 && baseOffset != lineOffset {
+		fmt.Printf("changed offset from %v to %v; callee = %v, parent caller = %v (start line: %v), root caller = %v\n", baseOffset, lineOffset, ir.LinkFuncName(callee), ir.LinkFuncName(parentCaller), int(base.Ctxt.InnermostPos(parentCaller.Pos()).RelLine()), ir.LinkFuncName(caller))
+	}
+
 	// Hot
 
 	if bigCaller {
@@ -1024,6 +1042,15 @@ func inlineCostOK(n *ir.CallExpr, caller, callee *ir.Func, bigCaller, closureCal
 			fmt.Printf("hot-big check disallows inlining for call %s (cost %d) at %v in big function %s\n", ir.PkgFuncName(callee), callee.Inl.Cost, ir.Line(n), ir.PkgFuncName(caller))
 		}
 		return false, maxCost, metric, false
+	}
+
+	if base.Debug.PGOInline == 2 {
+		if caller.Pragma&ir.Nosplit != 0 && parentCaller != caller {
+			if base.Debug.PGODebug > 0 {
+				fmt.Printf("%v: prevent inlining of hot call %s (cost %d) in function %s: root function is nosplit. Parent caller = %v\n", ir.Line(n), ir.PkgFuncName(callee), callee.Inl.Cost, ir.PkgFuncName(caller), ir.LinkFuncName(parentCaller))
+			}
+			return false, maxCost, metric, false
+		}
 	}
 
 	if metric > inlineHotMaxBudget {

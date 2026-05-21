@@ -71,6 +71,31 @@ func (b *BS) NS(i uint) (uint, bool) {
 	return 0, false
 }
 
+func (b *BS) MS(i uint) (uint, bool) {
+	x := int(i >> lWSize)
+	if x >= len(b.s) {
+		return 0, false
+	}
+	w := b.s[x]
+	w = w >> (i & (wSize - 1))
+	if w != 0 {
+		return i + T(w), true
+	}
+	x = x + 1
+	for x < len(b.s) {
+		if b.s[x] != 0 {
+			return uint(x)*wSize + T(b.s[x]), true
+		}
+		x = x + 1
+ 
+	}
+	return 0, false
+}
+ 
+func (b *BS) MSWrapper(i uint) (uint, bool) {
+	return b.MS(i)
+}
+
 func A() {
 	s := N(100000)
 	for i := 0; i < 1000; i += 30 {
@@ -81,10 +106,53 @@ func A() {
 		for i, e := s.NS(0); e; i, e = s.NS(i + 1) {
 			c++
 		}
+		for i, e := s.MSWrapper(0); e; i, e = s.MSWrapper(i + 1) {
+			c++
+		}
+	}
+}
+
+func (b *BS) NoSplitMS(i uint) (uint, bool) {
+	x := int(i >> lWSize)
+	if x >= len(b.s) {
+		return 0, false
+	}
+	w := b.s[x]
+	w = w >> (i & (wSize - 1))
+	if w != 0 {
+		return i + T(w), true
+	}
+	x = x + 1
+	for x < len(b.s) {
+		if b.s[x] != 0 {
+			return uint(x)*wSize + T(b.s[x]), true
+		}
+		x = x + 1
+ 
+	}
+	return 0, false
+}
+ 
+func (b *BS) NoSplitMSWrapper(i uint) (uint, bool) {
+	return b.NoSplitMS(i)
+}
+ 
+//go:nosplit
+func NoSplitA() {
+	s := N(100000)
+	for i := 0; i < 1000; i += 30 {
+		s.S(uint(i))
+	}
+	for j := 0; j < 1000; j++ {
+		c := uint(0)
+		for i, e := s.NoSplitMSWrapper(0); e; i, e = s.NoSplitMSWrapper(i + 1) {
+			c++
+		}
 	}
 }
 
 func main() {
 	time.Sleep(time.Second)
 	A()
+	NoSplitA()
 }

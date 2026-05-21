@@ -1,13 +1,43 @@
 GO PREPROFILE V1
+example.com/pgo/inline.(*BS).NoSplitMSWrapper
+example.com/pgo/inline.(*BS).NoSplitMS
+1 58
+example.com/pgo/inline.NoSplitA
+example.com/pgo/inline.(*BS).NoSplitMSWrapper
+7 58
+example.com/pgo/inline.(*BS).MSWrapper
+example.com/pgo/inline.(*BS).MS
+1 54
+example.com/pgo/inline.A
+example.com/pgo/inline.(*BS).MSWrapper
+10 54
 example.com/pgo/inline.A
 example.com/pgo/inline.(*BS).NS
-7 129
+7 49
+example.com/pgo/inline.(*BS).MS
+example.com/pgo/inline.T
+8 4
 example.com/pgo/inline.(*BS).NS
 example.com/pgo/inline.T
-8 3
-example.com/pgo/inline.(*BS).NS
+8 2
+example.com/pgo/inline.(*BS).NoSplitMS
 example.com/pgo/inline.T
 13 2
+example.com/pgo/inline.(*BS).MS
+example.com/pgo/inline.T
+13 1
+example.com/pgo/inline.(*BS).NS
+runtime.asyncPreempt
+11 1
 example.com/pgo/inline.benchmarkB
 example.com/pgo/inline.A
-18 1
+21 1
+runtime.(*spanSet).push
+runtime/internal/atomic.(*Pointer[go.shape.struct { runtime.lfnode; runtime.popped runtime/internal/atomic.Uint32; runtime.spans [512]runtime.atomicMSpanPointer }]).StoreNoWB
+55 1
+runtime.(*sweepLocked).sweep
+runtime.(*spanSet).push
+259 1
+runtime/internal/atomic.(*Pointer[go.shape.struct { runtime.lfnode; runtime.popped runtime/internal/atomic.Uint32; runtime.spans [512]runtime.atomicMSpanPointer }]).StoreNoWB
+runtime/internal/atomic.(*UnsafePointer).StoreNoWB
+1 1

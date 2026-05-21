@@ -18,31 +18,37 @@ func benchmarkB(b *testing.B) {
 
 	for i := 0; true; {
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break
 		}
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break
 		}
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break
 		}
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break
 		}
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break
 		}
 		A()
+		NoSplitA()
 		i = i + 1
 		if i >= b.N {
 			break

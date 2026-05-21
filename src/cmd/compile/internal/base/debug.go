@@ -67,7 +67,7 @@ type DebugFlags struct {
 	MayMoreStack          string `help:"call named function before all stack growth checks" concurrent:"ok"`
 	PGODebug              int    `help:"debug profile-guided optimizations"`
 	PGOHash               string `help:"hash value for debugging profile-guided optimizations" concurrent:"ok"`
-	PGOInline             int    `help:"enable profile-guided inlining" concurrent:"ok"`
+	PGOInline             int    `help:"enable profile-guided inlining (0 => off, 1 => default, 2 => multi-level mode)" concurrent:"ok"`
 	PGOInlineCDFThreshold string `help:"cumulative threshold percentage for determining call sites as hot candidates for inlining" concurrent:"ok"`
 	PGOInlineBudget       int    `help:"inline budget for hot functions" concurrent:"ok"`
 	PGODevirtualize       int    `help:"enable profile-guided devirtualization; 0 to disable, 1 to enable interface devirtualization, 2 to enable function devirtualization" concurrent:"ok"`
