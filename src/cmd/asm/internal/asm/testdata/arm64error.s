@@ -420,4 +420,8 @@ TEXT errors(SB),$0
 	AESE	V1.B16, V2.B8                                    // ERROR "invalid arrangement"
 	SHA256SU1	V1.S4, V2.B16, V3.S4                     // ERROR "invalid arrangement"
 	SHA1H	V1.B16, V2.B16                                   // ERROR "invalid operands"
+	RPRFM	(R1), RSP, PLDKEEP								 // ERROR "illegal combination"
+	RPRFM	2(RSP), R4, PSTSTRM								 // ERROR "illegal combination"
+	RPRFM 	(R2), R3, $100									 // ERROR "range prefetch immediate not in the range 0 to 63"
+	RPRFM	(R5), R6, PLDL1KEEP								 // ERROR "illegal range prefetch operand"
 	RET
