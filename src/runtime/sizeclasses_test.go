@@ -43,6 +43,20 @@ func TestSizeClassArrayMaxValue(t *testing.T) {
 	} else if goexperiment.PageShift14 && getSizeClassMaxValue(runtime.Size_to_class128[:]) != 70 {
 		t.Errorf("when pagesize is 16k, expect the max value in array Size_to_class128 is 70, see runtime/sizeclasses_14.go, limited by cmd/compile/internal/ssa/prove.go")
 	}
+
+	if goexperiment.PageNum {
+		if runtime.PageNumberMult != 8 || runtime.PageShift != 13 {
+			t.Errorf("PageNum experiment: expected PageNumberMult=8, PageShift=13; got PageNumberMult=%d, PageShift=%d", runtime.PageNumberMult, runtime.PageShift)
+		}
+	} else if goexperiment.PageShift14 {
+		if runtime.PageNumberMult != 1 || runtime.PageShift != 14 {
+			t.Errorf("PageShift14 experiment: expected PageNumberMult=1, PageShift=14; got PageNumberMult=%d, PageShift=%d", runtime.PageNumberMult, runtime.PageShift)
+		}
+	} else {
+		if runtime.PageNumberMult != 1 || runtime.PageShift != 13 {
+			t.Errorf("default configuration: expected PageNumberMult=1, PageShift=13; got PageNumberMult=%d, PageShift=%d", runtime.PageNumberMult, runtime.PageShift)
+		}
+	}
 }
 
 func runTestWithOptions(t *testing.T, test string, options ...string) {
