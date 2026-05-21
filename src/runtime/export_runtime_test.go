@@ -7,6 +7,7 @@ import "unsafe"
 var Class_to_size = class_to_size
 var Size_to_class8 = size_to_class8
 var Size_to_class128 = size_to_class128
+var PageNumberMult = _PageNumberMaxMult
 var PageShift = _PageShift
 
 func TryClearSpanFunc() (needzero uint8, cleared bool) {

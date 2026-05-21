@@ -86,14 +86,16 @@ package runtime
 //     16384    14         32768
 
 const (
-	minHeapAlign    = 8
-	_MaxSmallSize   = 32768
-	smallSizeDiv    = 8
-	smallSizeMax    = 1024
-	largeSizeDiv    = 128
-	_NumSizeClasses = 71
-	_PageShift      = 14
-	maxObjsPerSpan  = 2048
+	minHeapAlign              = 8
+	_MaxSmallSize             = 32768
+	smallSizeDiv              = 8
+	smallSizeMax              = 1024
+	largeSizeDiv              = 128
+	_NumSizeClasses           = 71
+	_PageShift                = 14
+	maxObjsPerSpan            = 2048
+	_PageNumberMaxMult        = 1
+	_PageNumberMultForMinSize = 1
 )
 
 var class_to_size = [_NumSizeClasses]uint16{0, 8, 16, 24, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 256, 288, 320, 352, 384, 416, 448, 480, 512, 576, 640, 704, 768, 832, 896, 960, 1024, 1152, 1280, 1408, 1536, 1792, 2048, 2304, 2688, 2944, 3200, 3584, 4096, 4608, 5376, 6144, 6528, 6912, 8192, 9344, 9728, 10880, 12288, 13056, 13568, 13952, 14336, 16384, 18688, 19072, 19584, 20480, 21760, 24576, 27264, 28672, 32768}
