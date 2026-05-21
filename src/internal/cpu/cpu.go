@@ -74,7 +74,10 @@ var ARM64 struct {
 	HasATOMICS bool
 	HasCPUID   bool
 	HasDIT     bool
+	HasSVE     bool
+	HasSVE2    bool
 	IsNeoverse bool
+	IsKunpeng  bool
 	_          CacheLinePad
 }
 
@@ -150,6 +153,10 @@ var S390X struct {
 // before normal init functions are run. env is set by runtime if the OS supports
 // cpu feature options in GODEBUG.
 func Initialize(env string) {
+	if env == "preCpuinit" {
+		doinit()
+		return
+	}
 	doinit()
 	processOptions(env)
 }

@@ -181,6 +181,8 @@ type Goarm64Features struct {
 	Crypto bool
 	// Hashmap func controlGroupMatchH2 with intrinsic implementation
 	IntrinsicMatchH2 bool
+	// Kunpeng memory optimize
+	KpMemOpt bool
 }
 
 func (g Goarm64Features) String() string {
@@ -194,19 +196,24 @@ func (g Goarm64Features) String() string {
 	if g.IntrinsicMatchH2 {
 		arm64Str += ",intrinsicmatchh2"
 	}
+	if g.KpMemOpt {
+		arm64Str += ",kpmemopt"
+	}
 	return arm64Str
 }
 
 func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	const (
-		lseOpt    = ",lse"
-		cryptoOpt = ",crypto"
+		lseOpt           = ",lse"
+		cryptoOpt        = ",crypto"
 		intrinsicMatchH2 = ",intrinsicmatchh2"
+		KpMemOpt         = ",kpmemopt"
 	)
 
 	g.LSE = false
 	g.Crypto = false
 	g.IntrinsicMatchH2 = false
+	g.KpMemOpt = false
 	// We allow any combination of suffixes, in any order
 	for {
 		if strings.HasSuffix(v, lseOpt) {
@@ -227,20 +234,31 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 			continue
 		}
 
+		if strings.HasSuffix(v, KpMemOpt) {
+			g.KpMemOpt = true
+			v = v[:len(v)-len(KpMemOpt)]
+			continue
+		}
 		break
 	}
 
 	switch v {
 	case "v8.0":
 		g.Version = v
-	case "v8.1", "v8.2", "v8.3", "v8.4", "v8.5", "v8.6", "v8.7", "v8.8", "v8.9",
+		g.KpMemOpt = false
+	case "v8.1":
+		g.Version = v
+		// LSE extension is mandatory starting from 8.1
+		g.LSE = true
+		g.KpMemOpt = false
+	case "v8.2", "v8.3", "v8.4", "v8.5", "v8.6", "v8.7", "v8.8", "v8.9",
 		"v9.0", "v9.1", "v9.2", "v9.3", "v9.4", "v9.5":
 		g.Version = v
 		// LSE extension is mandatory starting from 8.1
 		g.LSE = true
 	default:
-		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q and/or %q",
-			lseOpt, cryptoOpt, intrinsicMatchH2)
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q and/or %q",
+			lseOpt, cryptoOpt, intrinsicMatchH2, KpMemOpt)
 		g.Version = DefaultGOARM64
 	}
 

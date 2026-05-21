@@ -758,6 +758,13 @@ func cpuinit(env string) {
 	}
 }
 
+// Initialization primarily responsible for capturing hardware information.
+func preCpuinit() {
+	if GOARCH == "arm64" {
+		cpu.Initialize("preCpuinit")
+	}
+}
+
 // getGodebugEarly extracts the environment variable GODEBUG from the environment on
 // Unix-like operating systems and returns it. This function exists to extract GODEBUG
 // early before much of the runtime is initialized.
@@ -833,6 +840,7 @@ func schedinit() {
 	ticks.init() // run as early as possible
 	moduledataverify()
 	stackinit()
+	preCpuinit()
 	mallocinit()
 	godebug := getGodebugEarly()
 	cpuinit(godebug) // must run before alginit

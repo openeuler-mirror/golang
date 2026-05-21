@@ -1203,6 +1203,9 @@ func (c *gcControllerState) commit(isSweepDone bool) {
 	gcPercentHeapGoal := ^uint64(0)
 	if gcPercent := c.gcPercent.Load(); gcPercent >= 0 {
 		gcPercentHeapGoal = c.heapMarked + (c.heapMarked+c.lastStackScan.Load()+c.globalsScan.Load())*uint64(gcPercent)/100
+		if goexperiment.PageNum {
+			gcPercentHeapGoal += 100 * 1024 * 1024
+		}
 	}
 	// Apply the minimum heap size here. It's defined in terms of gcPercent
 	// and is only updated by functions that call commit.

@@ -20,6 +20,7 @@ import _ "unsafe" // for linkname
 //
 //go:linkname HWCap
 var HWCap uint
+var HWCap2 uint
 
 // HWCAP bits. These are exposed by Linux.
 const (
@@ -31,7 +32,13 @@ const (
 	hwcap_ATOMICS = 1 << 8
 	hwcap_CPUID   = 1 << 11
 	hwcap_SHA512  = 1 << 21
+	hwcap_SVE     = 1 << 22
 	hwcap_DIT     = 1 << 24
+)
+
+// HWCAP2 bits
+const (
+	hwcap2_SVE2 = 1 << 1
 )
 
 func hwcapInit(os string) {
@@ -45,6 +52,8 @@ func hwcapInit(os string) {
 	ARM64.HasCRC32 = isSet(HWCap, hwcap_CRC32)
 	ARM64.HasCPUID = isSet(HWCap, hwcap_CPUID)
 	ARM64.HasSHA512 = isSet(HWCap, hwcap_SHA512)
+	ARM64.HasSVE = isSet(HWCap, hwcap_SVE)
+	ARM64.HasSVE2 = isSet(HWCap2, hwcap2_SVE2)
 	ARM64.HasDIT = isSet(HWCap, hwcap_DIT)
 
 	// The Samsung S9+ kernel reports support for atomics, but not all cores
@@ -70,6 +79,13 @@ func hwcapInit(os string) {
 		if implementer == 'A' && (part_num == 0xd0c || part_num == 0xd40 ||
 			part_num == 0xd49 || part_num == 0xd4f) {
 			ARM64.IsNeoverse = true
+		}
+		// d01 - Kunpeng 920
+		// d02 - Kunpeng 920(Enhanced)
+		// d06 - Kunpeng 950
+		if implementer == 'H' && (part_num == 0xd01 || part_num == 0xd02 ||
+			part_num == 0xd06) {
+			ARM64.IsKunpeng = true
 		}
 	}
 }

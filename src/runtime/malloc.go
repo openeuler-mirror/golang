@@ -118,6 +118,9 @@ const (
 	pageShift = _PageShift
 	pageSize  = _PageSize
 
+	pageNumberMultiplier           = _PageNumberMaxMult
+	pageNumberMultiplierForMinSize = _PageNumberMultForMinSize
+
 	_PageSize = 1 << _PageShift
 	_PageMask = _PageSize - 1
 
@@ -373,6 +376,9 @@ var (
 )
 
 func mallocinit() {
+	if goexperiment.MallocOptPrint {
+		print("pageSize = ", pageSize, ", pageNumberMultiplierForMinSize = ", pageNumberMultiplierForMinSize, "\n")
+	}
 	if class_to_size[_TinySizeClass] != _TinySize {
 		throw("bad TinySizeClass")
 	}
@@ -432,23 +438,7 @@ func mallocinit() {
 	//
 	// While we're here, also check to make sure all these size classes'
 	// span sizes are one page. Some code relies on this.
-	minSizeForMallocHeaderIsSizeClass := false
-	sizeClassesUpToMinSizeForMallocHeaderAreOnePage := true
-	for i := 0; i < len(class_to_size); i++ {
-		if class_to_allocnpages[i] > 1 {
-			sizeClassesUpToMinSizeForMallocHeaderAreOnePage = false
-		}
-		if minSizeForMallocHeader == uintptr(class_to_size[i]) {
-			minSizeForMallocHeaderIsSizeClass = true
-			break
-		}
-	}
-	if !minSizeForMallocHeaderIsSizeClass {
-		throw("min size of malloc header is not a size class boundary")
-	}
-	if !sizeClassesUpToMinSizeForMallocHeaderAreOnePage {
-		throw("expected all size classes up to min size for malloc header to fit in one-page spans")
-	}
+	checkMinimumSize()
 	// Check that the pointer bitmap for all small sizes without a malloc header
 	// fits in a word.
 	if minSizeForMallocHeader/goarch.PtrSize > 8*goarch.PtrSize {

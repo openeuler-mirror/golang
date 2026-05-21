@@ -972,7 +972,7 @@ var optab = []Optab{
 	{AZLASTA, C_ZARNG, C_PREG, C_NONE, C_REGZR, C_NONE, 44, 4, 0, SVE, 0},
 	{AZLASTA, C_ZARNG, C_PREG, C_NONE, C_ARNG, C_NONE, 45, 4, 0, SVE, 0},
 	{AZCNTP, C_PARNG, C_PREG, C_NONE, C_REGZR, C_NONE, 46, 4, 0, SVE, 0},
-	{AZSADDV, C_ZARNG, C_PREG, C_NONE, C_VREG, C_NONE, 47, 4, 0, SVE, 0},
+	{AZSADDV, C_ZARNG, C_PREG, C_NONE, C_ARNG, C_NONE, 47, 4, 0, SVE, 0},
 
 	{obj.AUNDEF, C_NONE, C_NONE, C_NONE, C_NONE, C_NONE, 90, 4, 0, 0, 0},
 	{obj.APCDATA, C_VCON, C_NONE, C_NONE, C_VCON, C_NONE, 0, 0, 0, 0, 0},
@@ -5995,6 +5995,10 @@ func (c *ctxt7) asmoutsve(p *obj.Prog, out []uint32) (count int) {
 		vd := p.To.Reg
 
 		an := c.parseArng(zn)
+		ad := c.parseArng(vd)
+		if ad != ARNG_2D {
+			c.ctxt.Diag("invalid arrangement: %v", p)
+		}
 		sz := c.sveDataSize(an)
 		if p.As == AZSADDV && sz == 3 {
 			c.ctxt.Diag("invalid arrangement: %v", p)
