@@ -541,7 +541,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 	for p := c.cursym.Func().Text; p != nil; p = p.Link {
 		switch p.As {
 		case obj.ATEXT:
-			p.Mark |= LEAF
+			p.Mark |= LEAF | LABEL
 
 		case ABL,
 			obj.ADUFFZERO,
@@ -838,7 +838,14 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 				q.To.SetTarget(end)
 			}
 
+		case AB, ABL:
+			if p.Link != nil {
+				p.Link.Mark |= LABEL
+			}
 		case obj.ARET:
+			if p.Link != nil {
+				p.Link.Mark |= LABEL
+			}
 			nocache(p)
 			if p.From.Type == obj.TYPE_CONST {
 				c.ctxt.Diag("using BECOME (%v) is not supported!", p)
@@ -1067,6 +1074,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 			q5.To.Type = obj.TYPE_REG
 			q5.To.Reg = REGFP
 			q1.From.SetTarget(q5)
+			q5.Mark |= LABEL
 			p = q5
 
 		case obj.ADUFFZERO:
@@ -1117,6 +1125,7 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 			q5.Reg = REGSP
 			q5.To.Type = obj.TYPE_REG
 			q5.To.Reg = REGFP
+			q5.Mark |= LABEL
 			q1.From.SetTarget(q5)
 			p = q5
 		}
@@ -1152,6 +1161,337 @@ func preprocess(ctxt *obj.Link, cursym *obj.LSym, newprog obj.ProgAlloc) {
 			p.From.Type = obj.TYPE_REG
 			p.From.Reg = int16(REG_LSL + r + (shift&7)<<5)
 			p.From.Offset = 0
+		}
+		if p.To.Type == obj.TYPE_BRANCH && p.To.Val != nil {
+			label := p.To.Val.(*obj.Prog)
+			if label != nil {
+				label.Mark |= LABEL
+			}
+		}
+		if p.From.Type == obj.TYPE_BRANCH && p.From.Val != nil {
+			label := p.From.Val.(*obj.Prog)
+			if label != nil {
+				label.Mark |= LABEL
+			}
+		}
+	}
+
+	for _, jt := range cursym.Func().JumpTables {
+		for _, p := range jt.Targets {
+			p.Mark |= LABEL
+		}
+	}
+
+	if c.ctxt.Flag_optimize {
+		mergeLoads, mergeStores := false, false
+		switch c.ctxt.AArch64LdSt {
+		case "all", "on":
+			mergeLoads = true
+			mergeStores = true
+		case "load":
+			mergeLoads = true
+		case "store":
+			mergeStores = true
+		case "none", "off":
+		default:
+			c.ctxt.Diag("unknown value: %v; expected one of: all, on, load, store, none, off",
+				c.ctxt.AArch64LdSt)
+		}
+		if mergeLoads || mergeStores {
+			optimizeLdSt(&c, mergeLoads, mergeStores)
+			fixMarkedNops(&c)
+		}
+	}
+}
+
+// Compare two given Addrs to find out cases where there is same base
+// and different offset. In this case, comparison is successful and the
+// offset difference is calculated. Also, detect if the given addresses
+// can be assumed disjoint.
+func addrCmp(a1, a2 *obj.Addr) (off int64, ok bool, disjoint bool) {
+	isGlobal := func(a *obj.Addr) bool {
+		return a.Name == obj.NAME_EXTERN || a.Name == obj.NAME_STATIC
+	}
+
+	disjoint = false
+	ok = a1.Type == obj.TYPE_MEM && a2.Type == obj.TYPE_MEM
+	if !ok {
+		return
+	}
+	if a1.Sym != a2.Sym && isGlobal(a1) && isGlobal(a2) {
+		disjoint = true
+		ok = false
+		return
+	}
+	if a1.Name != a2.Name &&
+		(a1.Reg == REGSP && isGlobal(a2) || isGlobal(a1) && a2.Reg == REGSP) {
+		disjoint = true
+		ok = false
+		return
+	}
+	if a1.Name != a2.Name && a1.Reg == a2.Reg {
+		disjoint = true
+		ok = false
+		return
+	}
+
+	ok = (a1.Reg == a2.Reg) && (a1.Index == a2.Index) && (a1.Scale == a2.Scale) &&
+		(a1.Name == a2.Name) && (a1.Class == a2.Class)
+	if !ok {
+		return
+	}
+	ok = (a1.Val == nil) && (a2.Val == nil) &&
+		(a1.Scale == 0) && (a2.Scale == 0)
+	if !ok {
+		return
+	}
+	if a1.Sym != a2.Sym && a1.Name != obj.NAME_PARAM && a1.Name != obj.NAME_AUTO {
+		// for a param, offset is in parameters area
+		ok = false
+	}
+	if !ok {
+		return
+	}
+	off = a2.Offset - a1.Offset
+	return
+}
+
+func saveMemInstPhysRegRefs(p *obj.Prog, store bool, reads *[]int16, writes *[]int16) {
+	if store {
+		*reads = append(*reads, p.To.Reg)
+		*reads = append(*reads, p.From.Reg)
+	} else {
+		*writes = append(*writes, p.To.Reg)
+		*reads = append(*reads, p.From.Reg)
+	}
+}
+
+// Currently only 8-byte memory instructions (and their pairs) are supported.
+const amovdSize = 8
+const pairSize = amovdSize * 2
+
+// If for some instruction we only need to consider its register reads and writes,
+// i.e. it would not have any other dependency with the load or store instruction,
+// add the registers read/written into corresponding slices and return true.
+func allowInBetween(p *obj.Prog, addr1 *obj.Addr, reads *[]int16, writes *[]int16) (ok bool) {
+	switch p.As {
+	case AADD, AADC, ASUB, AAND, AORR, AEOR, AADDW, AADCW, ASUBW, AANDW, AORRW, AEORW:
+		ok = true
+		if p.From.Type == obj.TYPE_REG {
+			*reads = append(*reads, p.From.Reg)
+		} else if p.From.Type != obj.TYPE_CONST {
+			ok = false
+			return
+		}
+		*reads = append(*reads, p.Reg)
+		*writes = append(*writes, p.To.Reg)
+		return
+	case AMOVD:
+		info := analyzeLdSt(p)
+		if info.kind == isCopy {
+			*reads = append(*reads, p.From.Reg)
+			*writes = append(*writes, p.To.Reg)
+			ok = true
+		} else if info.kind == isLoad || info.kind == isStore {
+			ok = false
+			if addr1 != nil {
+				diff, sameBase, disjoint := addrCmp(addr1, info.addr)
+				if disjoint || (sameBase && (diff >= pairSize || diff <= -pairSize)) {
+					saveMemInstPhysRegRefs(p, info.kind == isStore, reads, writes)
+					ok = true
+					return
+				}
+			}
+		}
+	case obj.ANOP:
+		ok = true
+	default:
+		ok = false
+	}
+	return
+}
+
+const (
+	isUnknown = iota
+	isCopy
+	isLoad
+	isStore
+)
+
+type MemInstInfo struct {
+	kind   uint8
+	addr   *obj.Addr
+	size   int64
+	valreg int16
+}
+
+func analyzeLdSt(p *obj.Prog) MemInstInfo {
+	if p.As != AMOVD || p.Scond != 0 {
+		return MemInstInfo{kind: isUnknown}
+	}
+	toReg := p.To.Type == obj.TYPE_REG
+	fromReg := p.From.Type == obj.TYPE_REG
+	if toReg && !fromReg {
+		// This is load into p.To.Reg
+		return MemInstInfo{kind: isLoad, addr: &p.From, size: amovdSize, valreg: p.To.Reg}
+	}
+	if fromReg && !toReg {
+		// This is store of p.From.Reg's value
+		return MemInstInfo{kind: isStore, addr: &p.To, size: amovdSize, valreg: p.From.Reg}
+	}
+	if fromReg && toReg {
+		// This is a reg-to-reg copy
+		return MemInstInfo{kind: isCopy, size: amovdSize}
+	}
+	return MemInstInfo{kind: isUnknown}
+}
+
+func physRegDep(reads, writes []int16, readval, readptr, write int16) bool {
+	for _, r := range reads {
+		if r == write {
+			return true // anti-dependency
+		}
+	}
+	for _, w := range writes {
+		if w == write {
+			return true // output dependency
+		}
+		if w == readval || w == readptr {
+			return true // data dependency
+		}
+		if w < REG_R0 || w > REG_R27 {
+			return true // treat conservatively
+		}
+	}
+	return false
+}
+
+func regOk(r int16) bool {
+	return (r >= REG_R0 && r <= REG_R31) || r == REG_RSP
+}
+
+// Perform the merge and return true in case of success.
+func mergeLdStPair(p1, p2 *obj.Prog, info1 MemInstInfo, offDiff int64) bool {
+	var opVal *obj.Addr
+	var opPtr *obj.Addr
+	var newOpc obj.As
+	var valreg2 int16
+	if info1.kind == isStore {
+		newOpc = ASTP
+		opVal = &p1.From
+		opPtr = &p1.To
+		valreg2 = p2.From.Reg
+	} else {
+		newOpc = ALDP
+		opVal = &p1.To
+		opPtr = &p1.From
+		valreg2 = p2.To.Reg
+		if info1.valreg == valreg2 {
+			return false
+		}
+		if info1.valreg == info1.addr.Reg || valreg2 == info1.addr.Reg {
+			return false
+		}
+	}
+	valreg1 := info1.valreg
+	if !regOk(valreg1) || !regOk(valreg2) {
+		return false
+	}
+	p1.As = newOpc
+	if offDiff < 0 {
+		opPtr.Offset += offDiff
+		valreg1, valreg2 = valreg2, valreg1
+	}
+	opVal.Type = obj.TYPE_REGREG
+	opVal.Reg = valreg1
+	opVal.Offset = int64(valreg2)
+	obj.Nopout(p2)
+	return true
+}
+
+// Merge load/store pairs having consecutive address, for example, consider a pair like:
+// str     x0, [sp, #16]
+// str     x1, [sp, #24]
+// These two instructions would be merged into one:
+// stp     x0, x1, [sp, #16]
+func optimizeLdSt(c *ctxt7, mergeLoads, mergeStores bool) {
+	var reads, writes []int16
+
+	for p1 := c.cursym.Func().Text; p1.Link != nil; p1 = p1.Link {
+		info1 := analyzeLdSt(p1)
+		if !(mergeLoads && info1.kind == isLoad) &&
+			!(mergeStores && info1.kind == isStore) {
+			continue
+		}
+		var pair *obj.Prog = nil
+		// offDiff stores the resulting offset difference.
+		// While we are looking for a store p2 (pair for store p1), it's also
+		// used to keep the intermediate store offset difference from p1,
+		// only if it may overlap with resulting pair.
+		// We only need to know if there exists such negative or positive offset (but
+		// if there are both, we cannot form store pair on any side of p1 anyway).
+		var offDiff int64 = 0
+		reads = reads[:0]
+		writes = writes[:0]
+		for p2 := p1.Link; p2 != nil && (p2.Mark&LABEL == 0); p2 = p2.Link {
+			info2 := analyzeLdSt(p2)
+			loads := info1.kind == isLoad && info2.kind == isLoad
+			stores := info1.kind == isStore && info2.kind == isStore
+			if !loads && !stores || info1.size != info2.size {
+				if allowInBetween(p2, info1.addr, &reads, &writes) {
+					continue
+				}
+				break
+			}
+			if len(reads) != 0 || len(writes) != 0 { // check possible dependency
+				const noreg = int16(REG_V31 + 1)
+				ptr := info2.addr.Reg
+				if loads && physRegDep(reads, writes, noreg, ptr, info2.valreg) ||
+					stores && physRegDep(reads, writes, info2.valreg, ptr, noreg) {
+					break
+				}
+			}
+			diff, ok, disjoint := addrCmp(info1.addr, info2.addr)
+			if !ok {
+				if disjoint {
+					saveMemInstPhysRegRefs(p2, info2.kind == isStore, &reads, &writes)
+					continue
+				}
+				break
+			}
+			if diff != info1.size && diff != -info1.size {
+				if info1.kind == isLoad {
+					writes = append(writes, p2.To.Reg)
+				} else if diff < pairSize && diff > -pairSize {
+					// A store in p2 is possibly overlapping with future pair either
+					// on left (negative diff) or right (positive diff): remember that.
+					if offDiff == 0 {
+						offDiff = diff
+					} else if (offDiff < 0) != (diff < 0) { // possible overlap on both sides of p1
+						break
+					}
+				}
+				continue
+			}
+			if offDiff != 0 && (offDiff < 0) == (diff < 0) {
+				// can't pair stores on this side of p1 due to overlapping stores in between
+				continue
+			}
+			pair, offDiff = p2, diff
+			break
+		}
+		if pair != nil {
+			mergeLdStPair(p1, pair, info1, offDiff)
+		}
+	}
+}
+
+func fixMarkedNops(c *ctxt7) {
+	// LdSt replaces any merged instruction with ANOP, intentionally not emitted.
+	// But if it was used for inline marks, prefer to emit it (change to ANOOP).
+	for _, inlMark := range c.cursym.Func().InlMarks {
+		if p := inlMark.AppearsNop(); p != nil {
+			p.As = ANOOP
 		}
 	}
 }

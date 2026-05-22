@@ -47,6 +47,15 @@ func main() {
 	ctxt.Flag_shared = *flags.Shared || *flags.Dynlink
 	ctxt.Flag_maymorestack = flags.DebugFlags.MayMoreStack
 	ctxt.Debugpcln = flags.DebugFlags.PCTab
+
+	if flags.DebugFlags.AArch64LdSt != "" {
+		ctxt.AArch64LdSt = flags.DebugFlags.AArch64LdSt
+	} else {
+		// Usually AArch64 load/store merging works fine for assembly code,
+		// but it's possible to do some address calculation + branch, where
+		// we can't detect the LABELs. So, disable by default.
+		ctxt.AArch64LdSt = "off"
+	}
 	ctxt.IsAsm = true
 	ctxt.Pkgpath = *flags.Importpath
 	switch *flags.Spectre {
