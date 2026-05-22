@@ -21,6 +21,12 @@ import (
 const profFile = "inline_hot.pprof"
 const preProfFile = "inline_hot.pprof.node_map"
 
+type InlChain struct {
+	Callee       string
+	ParentCaller string
+	RootCaller   string
+}
+
 func buildPGOInliningTest(t *testing.T, dir string, gcflag string) []byte {
 	const pkg = "example.com/pgo/inline"
 
@@ -70,6 +76,22 @@ func testPGOIntendedInlining(t *testing.T, dir string, profFile string) {
 		"(*BS).NS": true,
 	}
 
+	mustInlChain := map[InlChain]bool{
+		{
+			pkg + "." + "(*BS).MS",
+			pkg + "." + "(*BS).MSWrapper",
+			pkg + "." + "A",
+		}: true,
+	}
+ 
+	mustNotInlChain := map[InlChain]bool{
+		{
+			pkg + "." + "(*BS).NoSplitMS",
+			pkg + "." + "(*BS).NoSplitMSWrapper",
+			pkg + "." + "NoSplitA",
+		}: true,
+	}
+
 	notInlinedReason := make(map[string]string)
 	for _, fname := range want {
 		fullName := pkg + "." + fname
@@ -89,7 +111,7 @@ func testPGOIntendedInlining(t *testing.T, dir string, profFile string) {
 
 	// Build the test with the profile. Use a smaller threshold to test.
 	// TODO: maybe adjust the test to work with default threshold.
-	gcflag := fmt.Sprintf("-m -m -pgoprofile=%s -d=pgoinlinebudget=160,pgoinlinecdfthreshold=90", profFile)
+	gcflag := fmt.Sprintf("-m -m -pgoprofile=%s -d=pgoinlinebudget=160,pgoinlinecdfthreshold=90,pgodebug=1,pgoinline=2", profFile)
 	out := buildPGOInliningTest(t, dir, gcflag)
 
 	scanner := bufio.NewScanner(bytes.NewReader(out))
@@ -97,6 +119,8 @@ func testPGOIntendedInlining(t *testing.T, dir string, profFile string) {
 	canInline := regexp.MustCompile(`: can inline ([^ ]*)`)
 	haveInlined := regexp.MustCompile(`: inlining call to ([^ ]*)`)
 	cannotInline := regexp.MustCompile(`: cannot inline ([^ ]*): (.*)`)
+	changedOffset := regexp.MustCompile(`changed offset from -?\d+ to \d+; callee = (.*), parent caller = (.*) \(start line: \d+\), root caller = (.*)`)
+	preventNosplit := regexp.MustCompile(`: prevent inlining of hot call (.*) \(cost \d+\) in function (.*): root function is nosplit. Parent caller = (.*)`)
 	for scanner.Scan() {
 		line := scanner.Text()
 		t.Logf("child: %s", line)
@@ -130,6 +154,30 @@ func testPGOIntendedInlining(t *testing.T, dir string, profFile string) {
 			delete(expectedNotInlinedList, fullName)
 			continue
 		}
+		if m := changedOffset.FindStringSubmatch(line); m != nil {
+			callee, parentCaller, rootCaller := m[1], m[2], m[3]
+			chain := InlChain{
+				Callee:       callee,
+				ParentCaller: parentCaller,
+				RootCaller:   rootCaller,
+			}
+			if _, ok := mustInlChain[chain]; ok {
+				delete(mustInlChain, chain)
+				continue
+			}
+		}
+		if m := preventNosplit.FindStringSubmatch(line); m != nil {
+			callee, parentCaller, rootCaller := m[1], m[3], m[2]
+			chain := InlChain{
+				Callee:       callee,
+				ParentCaller: parentCaller,
+				RootCaller:   rootCaller,
+			}
+			if _, ok := mustNotInlChain[chain]; ok {
+				delete(mustNotInlChain, chain)
+				continue
+			}
+		}
 	}
 	if err := scanner.Err(); err != nil {
 		t.Fatalf("error reading output: %v", err)
@@ -142,6 +190,14 @@ func testPGOIntendedInlining(t *testing.T, dir string, profFile string) {
 	// the functions in the expectedNotInlinedList are marked with caninline.
 	for fullName, _ := range expectedNotInlinedList {
 		t.Errorf("%s was expected not inlined", fullName)
+	}
+	for chain, _ := range mustInlChain {
+		t.Errorf("Inlining chain (callee = %v, parent caller = %v, root caller = %v) was expected but was not inlined",
+			chain.Callee, chain.ParentCaller, chain.RootCaller)
+	}
+	for chain, _ := range mustNotInlChain {
+		t.Errorf("Expected inlining prevention in chain: callee = %v, parent caller = %v, root caller = %v",
+			chain.Callee, chain.ParentCaller, chain.RootCaller)
 	}
 }
 
@@ -344,10 +400,10 @@ func TestPGOHash(t *testing.T) {
 	pprof := filepath.Join(dir, profFile)
 	// build with -trimpath so the source location (thus the hash)
 	// does not depend on the temporary directory path.
-	gcflag0 := fmt.Sprintf("-pgoprofile=%s -trimpath %s=>%s -d=pgoinlinebudget=160,pgoinlinecdfthreshold=90,pgodebug=1", pprof, dir, pkg)
+	gcflag0 := fmt.Sprintf("-pgoprofile=%s -trimpath %s=>%s -d=pgoinlinebudget=160,pgoinlinecdfthreshold=90,pgodebug=1,pgoinline=2", pprof, dir, pkg)
 
 	// Check that a hash match allows PGO inlining.
-	const srcPos = "example.com/pgo/inline/inline_hot.go:81:19"
+	const srcPos = "example.com/pgo/inline/inline_hot.go:106:19"
 	const hashMatch = "pgohash triggered " + srcPos + " (inline)"
 	pgoDebugRE := regexp.MustCompile(`hot-budget check allows inlining for call .* at ` + strings.ReplaceAll(srcPos, ".", "\\."))
 	hash := "v1" // 1 matches srcPos, v for verbose (print source location)

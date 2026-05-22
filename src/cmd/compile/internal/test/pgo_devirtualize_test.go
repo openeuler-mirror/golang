@@ -49,7 +49,7 @@ go 1.21
 
 	// Build the test with the profile.
 	pprof := filepath.Join(dir, pgoProfileName)
-	gcflag := fmt.Sprintf("-gcflags=-m=2 -pgoprofile=%s -d=pgodebug=3", pprof)
+	gcflag := fmt.Sprintf("-gcflags=-m=2 -pgoprofile=%s -d=pgodebug=3,pgoinline=2", pprof)
 	out := filepath.Join(dir, "test.exe")
 	cmd = testenv.CleanCmdEnv(testenv.Command(t, testenv.GoToolPath(t), "test", "-o", out, gcflag, "."))
 	cmd.Dir = dir
