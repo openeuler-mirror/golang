@@ -53,7 +53,7 @@ func TestConfigFlags(t *testing.T) {
 		t.Errorf("Wrong parsing of GOARM64=v8.0,lsb")
 	}
 	os.Setenv("GOARM64", "v8.0,lse")
-	if goarm64().Version != "v8.0" || goarm64().LSE != true || goarm64().Crypto != false {
+	if goarm64().Version != "v8.0" || goarm64().LSE != true || goarm64().Crypto != false || goarm64().RPRFM != false {
 		t.Errorf("Wrong parsing of GOARM64=v8.0,lse")
 	}
 	os.Setenv("GOARM64", "v8.0,crypto")
@@ -71,6 +71,14 @@ func TestConfigFlags(t *testing.T) {
 	os.Setenv("GOARM64", "v9.0")
 	if goarm64().Version != "v9.0" || goarm64().LSE != true || goarm64().Crypto != false {
 		t.Errorf("Wrong parsing of GOARM64=v9.0")
+	}
+	os.Setenv("GOARM64", "v8.0,lse,rprfm")
+	if goarm64().Version != "v8.0" || goarm64().LSE != true || goarm64().RPRFM != false {
+		t.Errorf("Wrong parsing of GOARM64=v8.0,lse,rprfm")
+	}
+	os.Setenv("GOARM64", "v8.9,lse,rprfm")
+	if goarm64().Version != "v8.9" || goarm64().LSE != true || goarm64().RPRFM != true {
+		t.Errorf("Wrong parsing of GOARM64=v8.9,lse,rprfm")
 	}
 }
 

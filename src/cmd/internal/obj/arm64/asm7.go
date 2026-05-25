@@ -866,6 +866,8 @@ var optab = []Optab{
 	{AMSR, C_VCON, C_NONE, C_NONE, C_SPOP, C_NONE, 37, 4, 0, 0, 0},
 	{APRFM, C_UOREG32K, C_NONE, C_NONE, C_SPOP, C_NONE, 91, 4, 0, 0, 0},
 	{APRFM, C_UOREG32K, C_NONE, C_NONE, C_LCON, C_NONE, 91, 4, 0, 0, 0},
+	{ARPRFM, C_ZOREG, C_REG, C_NONE, C_SPOP, C_NONE, 109, 4, 0, 0, 0},
+	{ARPRFM, C_ZOREG, C_REG, C_NONE, C_LCON, C_NONE, 109, 4, 0, 0, 0},
 	{ADMB, C_VCON, C_NONE, C_NONE, C_NONE, C_NONE, 51, 4, 0, 0, 0},
 	{AHINT, C_VCON, C_NONE, C_NONE, C_NONE, C_NONE, 52, 4, 0, 0, 0},
 	{ASYS, C_VCON, C_NONE, C_NONE, C_NONE, C_NONE, 50, 4, 0, 0, 0},
@@ -1016,6 +1018,17 @@ var prfopfield = map[SpecialOperand]uint32{
 	SPOP_PSTL2STRM: 19,
 	SPOP_PSTL3KEEP: 20,
 	SPOP_PSTL3STRM: 21,
+}
+
+var rprfopfield = map[SpecialOperand]uint32{
+	// The 6-bit 'operation' = [option2][option0][S][Rt2][Rt1][Rt0].
+	// Four named values (ARM Arch Ref Manual):
+	//   PLDKEEP (0b000000), PSTKEEP (0b000001),
+	//   PLDSTRM (0b000100), PSTSTRM (0b000101).
+	SPOP_PLDKEEP: 0,
+	SPOP_PSTKEEP: 1,
+	SPOP_PLDSTRM: 4,
+	SPOP_PSTSTRM: 5,
 }
 
 // sysInstFields helps convert SYS alias instructions to SYS instructions.
@@ -3449,6 +3462,7 @@ func buildop(ctxt *obj.Link) {
 			AVDUP,
 			AVMOVI,
 			APRFM,
+			ARPRFM,
 			AVEXT,
 			AVXAR:
 			break
@@ -8460,6 +8474,73 @@ func (c *ctxt7) asmout(p *obj.Prog, out []uint32) (count int) {
 			o1 |= uint32(0x1F)
 		}
 		o1 |= uint32(SYSARG4(int(op.op1), int(op.cn), int(op.cm), int(op.op2)))
+
+	case 108: /* vshrn{2} $shift, Vn.<Tb>, Vd.<Ta> */
+		at := uint8((p.To.Reg >> 5) & 15)
+		af := uint8((p.Reg >> 5) & 15)
+		shift := uint32(p.From.Offset)
+
+		var Q, imax, size uint32
+
+		if p.As == AVSHRN2 {
+			Q = 1
+		}
+		switch pack(Q, af, at) {
+		case pack(0, ARNG_8H, ARNG_8B), pack(1, ARNG_8H, ARNG_16B):
+			size, imax = 8, 15
+		case pack(0, ARNG_4S, ARNG_4H), pack(1, ARNG_4S, ARNG_8H):
+			size, imax = 16, 31
+		case pack(0, ARNG_2D, ARNG_2S), pack(1, ARNG_2D, ARNG_4S):
+			size, imax = 32, 63
+		default:
+			c.ctxt.Diag("operand mismatch: %v\n", p)
+		}
+
+		imm := size + shift
+		if imm > imax {
+			c.ctxt.Diag("shift out of range: %v", p)
+		}
+
+		o1 = c.opirr(p, p.As)
+		rt := int((p.To.Reg) & 31)
+		rf := int((p.Reg) & 31)
+
+		o1 |= ((Q & 1) << 30) | (imm & 0x7f << 16) | (uint32(rf&31) << 5) | uint32(rt&31)
+
+	case 109: /* rprfm (Rn), Rm, <rprfop | $imm6> */
+		srcReg := p.From.Reg  // Rn - register with base address
+		rangeReg := p.Reg     // Rm - register with prefetch metadata
+		var operation uint32
+		var ok bool
+
+		// Operation is either a 6-bit immediate or a named prefetch op.
+		if p.To.Type == obj.TYPE_CONST {
+			operation = uint32(p.To.Offset)
+			if operation > 63 {
+				c.ctxt.Diag("range prefetch immediate not in the range 0 to 63: %v", p)
+			}
+		} else {
+			operation, ok = rprfopfield[SpecialOperand(p.To.Offset)]
+			if !ok {
+				c.ctxt.Diag("illegal range prefetch operand, expected PLDKEEP, PSTKEEP, PLDSTRM or PSTSTRM: %v", p)
+			}
+		}
+
+		// Bit placement: the 6-bit value is scattered to match the
+		// architectural encoding (bits 15,13,12,2-0). This is because the
+		// instruction word reuses fields from the base load/store hint space.
+		//   option2 (bit5) -> bit15 (<<10)
+		//   option0 (bit4) -> bit13 (<<9)
+		//   S       (bit3) -> bit12 (<<9)
+		//   Rt<2:0> (bits2-0) -> bits2-0 (no shift)
+		// Rt<4:3> are already set by c.opirr() and are fixed for RPRFM.
+		option2 := (operation & 32) << 10
+		option0 := (operation & 16) << 9
+		s := (operation & 8) << 9
+		rt := operation & 7
+
+		o1 = c.opirr(p, p.As)
+		o1 |= (uint32(rangeReg&31)<<16) | (uint32(srcReg&31)<<5) | option2 | option0 | s | rt
 	}
 	out[0] = o1
 	out[1] = o2
@@ -9367,6 +9448,12 @@ func (c *ctxt7) opirr(p *obj.Prog, a obj.As) uint32 {
 
 	case APRFM:
 		return 0xf9<<24 | 2<<22
+
+	case ARPRFM:
+		return 0xf8<<24 | 5<<21 | 18<<10 | 3<<3
+
+	case AVSHRN, AVSHRN2:
+		return 0xF<<24 | 0x21<<10
 	}
 
 	c.ctxt.Diag("%v: bad irr %v", p, a)

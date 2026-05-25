@@ -183,6 +183,8 @@ type Goarm64Features struct {
 	IntrinsicMatchH2 bool
 	// Kunpeng memory optimize
 	KpMemOpt bool
+	// RPRFM enables range prefetch
+	RPRFM bool
 }
 
 func (g Goarm64Features) String() string {
@@ -199,6 +201,9 @@ func (g Goarm64Features) String() string {
 	if g.KpMemOpt {
 		arm64Str += ",kpmemopt"
 	}
+	if g.RPRFM {
+		arm64Str += ",rprfm"
+	}
 	return arm64Str
 }
 
@@ -208,12 +213,14 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		cryptoOpt        = ",crypto"
 		intrinsicMatchH2 = ",intrinsicmatchh2"
 		KpMemOpt         = ",kpmemopt"
+		rprfmOpt         = ",rprfm"
 	)
 
 	g.LSE = false
 	g.Crypto = false
 	g.IntrinsicMatchH2 = false
 	g.KpMemOpt = false
+	g.RPRFM = false
 	// We allow any combination of suffixes, in any order
 	for {
 		if strings.HasSuffix(v, lseOpt) {
@@ -239,6 +246,12 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 			v = v[:len(v)-len(KpMemOpt)]
 			continue
 		}
+
+		if strings.HasSuffix(v, rprfmOpt) {
+			g.RPRFM = true
+			v = v[:len(v)-len(rprfmOpt)]
+			continue
+		}
 		break
 	}
 
@@ -257,9 +270,16 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		// LSE extension is mandatory starting from 8.1
 		g.LSE = true
 	default:
-		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q and/or %q",
-			lseOpt, cryptoOpt, intrinsicMatchH2, KpMemOpt)
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q and/or %q",
+			lseOpt, cryptoOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt)
 		g.Version = DefaultGOARM64
+	}
+
+	// RPRFM requires armv8.9 or later.
+	major := g.Version[1]
+	minor := g.Version[3]
+	if major <= '8' && minor < '9' {
+		g.RPRFM = false
 	}
 
 	return
