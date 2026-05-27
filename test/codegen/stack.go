@@ -1,4 +1,4 @@
-// asmcheck
+// asmcheck -gcflags=-aggressivedse
 
 // Copyright 2018 The Go Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style
@@ -6,7 +6,10 @@
 
 package codegen
 
-import "runtime"
+import (
+	"runtime"
+	"unsafe"
+)
 
 // This file contains code generation tests related to the use of the
 // stack.
@@ -112,6 +115,29 @@ func Defer() {
 	}
 	// amd64:`CALL\truntime\.deferprocStack`
 	defer func() {}()
+}
+
+// Check that no stack frame space is needed for simple slice initialization with underlying structure.
+type mySlice struct {
+	array unsafe.Pointer
+	len   int
+	cap   int
+}
+
+// amd64:"TEXT\t.*, [$]0-"
+func sliceInit(base uintptr) []uintptr {
+	const ptrSize = 8
+	size := uintptr(4096)
+	bitmapSize := size / ptrSize / 8
+	elements := int(bitmapSize / ptrSize)
+	var sl mySlice
+	sl = mySlice{
+		unsafe.Pointer(base + size - bitmapSize),
+		elements,
+		elements,
+	}
+	// amd64:-"POPQ",-"SP"
+	return *(*[]uintptr)(unsafe.Pointer(&sl))
 }
 
 // Check that stack slots are shared among values of the same

@@ -725,17 +725,20 @@
 
 // Load of store of same address, with compatibly typed value and same size
 (Load <t1> p1 (Store {t2} p2 x _))
+	&& !isEnableAggressiveDse()
 	&& isSamePtr(p1, p2)
 	&& t1.Compare(x.Type) == types.CMPeq
 	&& t1.Size() == t2.Size()
 	=> x
 (Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 x _)))
+	&& !isEnableAggressiveDse()
 	&& isSamePtr(p1, p3)
 	&& t1.Compare(x.Type) == types.CMPeq
 	&& t1.Size() == t2.Size()
 	&& disjoint(p3, t3.Size(), p2, t2.Size())
 	=> x
 (Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 _ (Store {t4} p4 x _))))
+	&& !isEnableAggressiveDse()
 	&& isSamePtr(p1, p4)
 	&& t1.Compare(x.Type) == types.CMPeq
 	&& t1.Size() == t2.Size()
@@ -743,9 +746,54 @@
 	&& disjoint(p4, t4.Size(), p3, t3.Size())
 	=> x
 (Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 _ (Store {t4} p4 _ (Store {t5} p5 x _)))))
+	&& !isEnableAggressiveDse()
 	&& isSamePtr(p1, p5)
 	&& t1.Compare(x.Type) == types.CMPeq
 	&& t1.Size() == t2.Size()
+	&& disjoint(p5, t5.Size(), p2, t2.Size())
+	&& disjoint(p5, t5.Size(), p3, t3.Size())
+	&& disjoint(p5, t5.Size(), p4, t4.Size())
+	=> x
+
+// Aggressive Load-of-Store forwarding (enabled by -aggressivedse).
+//
+// These mirror the conservative rules above but with two deliberate changes:
+//   1. copyCompatibleType(t1, x.Type) replaces the exact CMPeq match, so
+//      same-size integer-to-integer and pointer-shaped-to-pointer-shaped
+//      forwards are allowed even when the load and store types differ.
+//   2. The size check is against the INNER store's type (t3/t4/t5) — the
+//      store whose pointer matches p1 and whose value x is being forwarded.
+//      That store's bytes survive any later outer stores thanks to the
+//      disjoint() predicates, so the load must read exactly its width. The
+//      conservative rules compare t1.Size() to t2.Size() (the OUTERMOST
+//      store), which is only equivalent to the check here when every
+//      nested store happens to share the same size.
+(Load <t1> p1 (Store {t2} p2 x _))
+	&& isEnableAggressiveDse()
+	&& isSamePtr(p1, p2)
+	&& copyCompatibleType(t1, x.Type)
+	&& t1.Size() == t2.Size()
+	=> x
+(Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 x _)))
+	&& isEnableAggressiveDse()
+	&& isSamePtr(p1, p3)
+	&& copyCompatibleType(t1, x.Type)
+	&& t1.Size() == t3.Size()
+	&& disjoint(p3, t3.Size(), p2, t2.Size())
+	=> x
+(Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 _ (Store {t4} p4 x _))))
+	&& isEnableAggressiveDse()
+	&& isSamePtr(p1, p4)
+	&& copyCompatibleType(t1, x.Type)
+	&& t1.Size() == t4.Size()
+	&& disjoint(p4, t4.Size(), p2, t2.Size())
+	&& disjoint(p4, t4.Size(), p3, t3.Size())
+	=> x
+(Load <t1> p1 (Store {t2} p2 _ (Store {t3} p3 _ (Store {t4} p4 _ (Store {t5} p5 x _)))))
+	&& isEnableAggressiveDse()
+	&& isSamePtr(p1, p5)
+	&& copyCompatibleType(t1, x.Type)
+	&& t1.Size() == t5.Size()
 	&& disjoint(p5, t5.Size(), p2, t2.Size())
 	&& disjoint(p5, t5.Size(), p3, t3.Size())
 	&& disjoint(p5, t5.Size(), p4, t4.Size())

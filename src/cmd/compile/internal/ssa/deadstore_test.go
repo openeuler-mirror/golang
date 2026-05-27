@@ -5,8 +5,10 @@
 package ssa
 
 import (
+	"cmd/compile/internal/base"
 	"cmd/compile/internal/types"
 	"cmd/internal/src"
+	"internal/buildcfg"
 	"testing"
 )
 
@@ -130,7 +132,184 @@ func TestDeadStoreUnsafe(t *testing.T) {
 	}
 }
 
+// withAggressiveDse toggles base.Flag.AggressiveDse for the duration of a
+// test, restoring the prior value on return. Tests use this rather than
+// setting the flag directly so that a panic or t.Fatal inside the test body
+// cannot leak the flag to subsequent tests.
+func withAggressiveDse(t *testing.T, on bool) {
+	prev := base.Flag.AggressiveDse
+	base.Flag.AggressiveDse = on
+	t.Cleanup(func() { base.Flag.AggressiveDse = prev })
+}
+
+// TestAggressiveDseIntSignednessForward: int32 store forwards to uint32 load
+// under -aggressivedse (copyCompatibleType accepts same-size int↔int), but
+// NOT under the conservative rule (CMPeq fails on distinct signedness).
+//
+// After the (Load (Store ...)) rule rewrites ld to OpCopy, copy-input
+// elimination rewrites sOut.Args[1] from ld to x, at which point ld.Uses==0
+// and applyRewrite resets ld to OpInvalid. So the success check is on
+// sOut.Args[1] == x, not on ld.Op itself.
+func TestAggressiveDseIntSignednessForward(t *testing.T) {
+	if buildcfg.GOARCH != "arm64" {
+		t.Skip("aggressivedse tests only run on arm64")
+	}
+	c := testConfig(t)
+	tt := c.config.Types
+	build := func() fun {
+		name := c.Temp(tt.Int32)
+		nameOut := c.Temp(tt.UInt32)
+		return c.Fun("entry",
+			Bloc("entry",
+				Valu("mem0", OpInitMem, types.TypeMem, 0, nil),
+				Valu("sp", OpSP, tt.Uintptr, 0, nil),
+				Valu("addr", OpLocalAddr, types.NewPtr(tt.Int32), 0, name, "sp", "mem0"),
+				Valu("addrOut", OpLocalAddr, types.NewPtr(tt.UInt32), 0, nameOut, "sp", "mem0"),
+				Valu("x", OpConst32, tt.Int32, 42, nil),
+				Valu("s", OpStore, types.TypeMem, 0, tt.Int32, "addr", "x", "mem0"),
+				Valu("ld", OpLoad, tt.UInt32, 0, nil, "addr", "s"),
+				Valu("sOut", OpStore, types.TypeMem, 0, tt.UInt32, "addrOut", "ld", "s"),
+				Goto("exit")),
+			Bloc("exit",
+				Exit("sOut")))
+	}
+
+	// Conservative: must NOT forward — sOut's stored value stays as ld.
+	withAggressiveDse(t, false)
+	fun1 := build()
+	CheckFunc(fun1.f)
+	opt(fun1.f)
+	if sOut1 := fun1.values["sOut"]; sOut1.Args[1] == fun1.values["x"] {
+		t.Errorf("conservative mode: load was forwarded but int32↔uint32 should fail CMPeq")
+	}
+
+	// Aggressive: must forward — sOut's stored value is rewritten to x directly.
+	withAggressiveDse(t, true)
+	fun2 := build()
+	CheckFunc(fun2.f)
+	opt(fun2.f)
+	sOut2 := fun2.values["sOut"]
+	if sOut2.Args[1] != fun2.values["x"] {
+		t.Errorf("aggressive mode: expected sOut to store x directly, got %v", sOut2.Args[1])
+	}
+}
+
+// TestAggressiveDseUnsafePtrForward: *int32 store forwards to *byte load
+// under aggressive mode via the pointer-shaped branch of copyCompatibleType.
+func TestAggressiveDseUnsafePtrForward(t *testing.T) {
+	if buildcfg.GOARCH != "arm64" {
+		t.Skip("aggressivedse tests only run on arm64")
+	}
+	c := testConfig(t)
+	tt := c.config.Types
+	int32Ptr := types.NewPtr(tt.Int32)
+	build := func() fun {
+		name := c.Temp(int32Ptr)
+		nameOut := c.Temp(tt.BytePtr)
+		return c.Fun("entry",
+			Bloc("entry",
+				Valu("mem0", OpInitMem, types.TypeMem, 0, nil),
+				Valu("sp", OpSP, tt.Uintptr, 0, nil),
+				Valu("addr", OpLocalAddr, types.NewPtr(int32Ptr), 0, name, "sp", "mem0"),
+				Valu("addrOut", OpLocalAddr, types.NewPtr(tt.BytePtr), 0, nameOut, "sp", "mem0"),
+				Valu("x", OpConstNil, int32Ptr, 0, nil),
+				Valu("s", OpStore, types.TypeMem, 0, int32Ptr, "addr", "x", "mem0"),
+				Valu("ld", OpLoad, tt.BytePtr, 0, nil, "addr", "s"),
+				Valu("sOut", OpStore, types.TypeMem, 0, tt.BytePtr, "addrOut", "ld", "s"),
+				Goto("exit")),
+			Bloc("exit",
+				Exit("sOut")))
+	}
+
+	withAggressiveDse(t, true)
+	fun := build()
+	CheckFunc(fun.f)
+	opt(fun.f)
+	sOut := fun.values["sOut"]
+	if sOut.Args[1] != fun.values["x"] {
+		t.Errorf("aggressive mode: expected sOut to store x directly, got %v", sOut.Args[1])
+	}
+}
+
+// TestAggressiveDseNoFloatIntMix: a same-size float→int reinterpret must NOT
+// be forwarded even under -aggressivedse, because bit patterns carry
+// different semantic meaning.
+func TestAggressiveDseNoFloatIntMix(t *testing.T) {
+	if buildcfg.GOARCH != "arm64" {
+		t.Skip("aggressivedse tests only run on arm64")
+	}
+	c := testConfig(t)
+	tt := c.config.Types
+	build := func() fun {
+		name := c.Temp(tt.Float32)
+		nameOut := c.Temp(tt.Int32)
+		return c.Fun("entry",
+			Bloc("entry",
+				Valu("mem0", OpInitMem, types.TypeMem, 0, nil),
+				Valu("sp", OpSP, tt.Uintptr, 0, nil),
+				Valu("addr", OpLocalAddr, types.NewPtr(tt.Float32), 0, name, "sp", "mem0"),
+				Valu("addrOut", OpLocalAddr, types.NewPtr(tt.Int32), 0, nameOut, "sp", "mem0"),
+				Valu("x", OpConst32F, tt.Float32, 0, nil),
+				Valu("s", OpStore, types.TypeMem, 0, tt.Float32, "addr", "x", "mem0"),
+				Valu("ld", OpLoad, tt.Int32, 0, nil, "addr", "s"),
+				Valu("sOut", OpStore, types.TypeMem, 0, tt.Int32, "addrOut", "ld", "s"),
+				Goto("exit")),
+			Bloc("exit",
+				Exit("sOut")))
+	}
+
+	withAggressiveDse(t, true)
+	fun := build()
+	CheckFunc(fun.f)
+	opt(fun.f)
+	if sOut := fun.values["sOut"]; sOut.Args[1] == fun.values["x"] {
+		t.Errorf("aggressive mode must not forward float→int reinterpret")
+	}
+}
+
+// TestAggressiveDseSizeMismatchNoForward: even in aggressive mode, a size
+// mismatch between load and source-store must block forwarding — this
+// directly exercises the t1.Size() == t3.Size() check that replaced the
+// upstream t1.Size() == t2.Size() in the nested rules.
+func TestAggressiveDseSizeMismatchNoForward(t *testing.T) {
+	if buildcfg.GOARCH != "arm64" {
+		t.Skip("aggressivedse tests only run on arm64")
+	}
+	c := testConfig(t)
+	tt := c.config.Types
+	build := func() fun {
+		name := c.Temp(tt.Int32)
+		nameOut := c.Temp(tt.Int8)
+		return c.Fun("entry",
+			Bloc("entry",
+				Valu("mem0", OpInitMem, types.TypeMem, 0, nil),
+				Valu("sp", OpSP, tt.Uintptr, 0, nil),
+				Valu("addr", OpLocalAddr, types.NewPtr(tt.Int32), 0, name, "sp", "mem0"),
+				Valu("addrOut", OpLocalAddr, types.NewPtr(tt.Int8), 0, nameOut, "sp", "mem0"),
+				Valu("x", OpConst32, tt.Int32, 0xDEAD, nil),
+				Valu("s", OpStore, types.TypeMem, 0, tt.Int32, "addr", "x", "mem0"),
+				// Narrow load at the same address — different size.
+				Valu("ld", OpLoad, tt.Int8, 0, nil, "addr", "s"),
+				Valu("sOut", OpStore, types.TypeMem, 0, tt.Int8, "addrOut", "ld", "s"),
+				Goto("exit")),
+			Bloc("exit",
+				Exit("sOut")))
+	}
+
+	withAggressiveDse(t, true)
+	fun := build()
+	CheckFunc(fun.f)
+	opt(fun.f)
+	if sOut := fun.values["sOut"]; sOut.Args[1] == fun.values["x"] {
+		t.Errorf("aggressive mode must not forward across size mismatch")
+	}
+}
+
 func TestDeadStoreSmallStructInit(t *testing.T) {
+	base.Flag.AggressiveDse = true
+	defer func() {
+		base.Flag.AggressiveDse = false
+	}()
 	c := testConfig(t)
 	ptrType := c.config.Types.BytePtr
 	typ := types.NewStruct([]*types.Field{
