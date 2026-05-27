@@ -49,7 +49,10 @@ func Load64(ptr *uint64) uint64
 func Loadp(ptr unsafe.Pointer) unsafe.Pointer
 
 //go:noescape
-func LoadAcq(addr *uint32) uint32
+func LoadAcq(ptr *uint32) uint32
+
+//go:noescape
+func LoadAcq8(ptr *uint8) uint8
 
 //go:noescape
 func LoadAcq64(ptr *uint64) uint64

@@ -383,6 +383,9 @@ func asmArgs(a *Action, p *load.Package) []any {
 		if err == nil && g.LSE {
 			args = append(args, "-D", "GOARM64_LSE")
 		}
+		if err == nil && g.Rcpc {
+			args = append(args, "-D", "GOARM64_RCPC")
+		}
 		if err == nil && g.RPRFM {
 			args = append(args, "-D", "GOARM64_RPRFM")
 		}

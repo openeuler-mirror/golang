@@ -80,15 +80,44 @@ TEXT ·Loadp(SB),NOSPLIT,$0-16
 
 // uint32 ·LoadAcq(uint32 volatile* addr)
 TEXT ·LoadAcq(SB),NOSPLIT,$0-12
+#ifdef GOARM64_RCPC
+	MOVD	ptr+0(FP), R0
+	LDAPRW	(R0), R0
+	MOVW	R0, ret+8(FP)
+	RET
+#else
 	B	·Load(SB)
+#endif
+
+// uint8 ·LoadAcq8(uint8 volatile* addr)
+TEXT ·LoadAcq8(SB),NOSPLIT,$0-9
+#ifdef GOARM64_RCPC
+	MOVD	ptr+0(FP), R0
+	LDAPRB	(R0), R0
+	MOVB	R0, ret+8(FP)
+	RET
+#else
+	B	·Load8(SB)
+#endif
 
 // uint64 ·LoadAcquintptr(uint64 volatile* addr)
 TEXT ·LoadAcq64(SB),NOSPLIT,$0-16
+#ifdef GOARM64_RCPC
+	MOVD	ptr+0(FP), R0
+	LDAPR	(R0), R0
+	MOVD	R0, ret+8(FP)
+	RET
+#else
 	B	·Load64(SB)
+#endif
 
 // uintptr ·LoadAcq64(uintptr volatile* addr)
 TEXT ·LoadAcquintptr(SB),NOSPLIT,$0-16
+#ifdef GOARM64_RCPC
+	B	·LoadAcq64(SB)
+#else
 	B	·Load64(SB)
+#endif
 
 TEXT ·StorepNoWB(SB), NOSPLIT, $0-16
 	B	·Store64(SB)

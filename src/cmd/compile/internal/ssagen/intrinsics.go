@@ -108,7 +108,13 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 
 	var p4 []*sys.Arch
 	var p8 []*sys.Arch
-	var lwatomics []*sys.Arch
+	var lwatomicsAcq, lwatomicsRel []*sys.Arch
+
+	arm64Rcpc := sys.ARM64
+	if !buildcfg.GOARM64.Rcpc {
+		arm64Rcpc = 0
+	}
+
 	for _, a := range sys.Archs {
 		if a.PtrSize == 4 {
 			p4 = append(p4, a)
@@ -116,7 +122,10 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			p8 = append(p8, a)
 		}
 		if a.Family != sys.PPC64 {
-			lwatomics = append(lwatomics, a)
+			if a.Family != arm64Rcpc {
+				lwatomicsAcq = append(lwatomicsAcq, a)
+			}
+			lwatomicsRel = append(lwatomicsRel, a)
 		}
 	}
 	all := sys.Archs[:]
@@ -246,14 +255,14 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT32], v)
 		},
-		sys.PPC64)
+		sys.PPC64, arm64Rcpc)
 	addF("internal/runtime/atomic", "LoadAcq64",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			v := s.newValue2(ssa.OpAtomicLoadAcq64, types.NewTuple(types.Types[types.TUINT64], types.TypeMem), args[0], s.mem())
 			s.vars[memVar] = s.newValue1(ssa.OpSelect1, types.TypeMem, v)
 			return s.newValue1(ssa.OpSelect0, types.Types[types.TUINT64], v)
 		},
-		sys.PPC64)
+		sys.PPC64, arm64Rcpc)
 	addF("internal/runtime/atomic", "Loadp",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
 			v := s.newValue2(ssa.OpAtomicLoadPtr, types.NewTuple(s.f.Config.Types.BytePtr, types.TypeMem), args[0], s.mem())
@@ -681,8 +690,8 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 	alias("internal/runtime/atomic", "Loaduintptr", "internal/runtime/atomic", "Load64", p8...)
 	alias("internal/runtime/atomic", "Loaduint", "internal/runtime/atomic", "Load", p4...)
 	alias("internal/runtime/atomic", "Loaduint", "internal/runtime/atomic", "Load64", p8...)
-	alias("internal/runtime/atomic", "LoadAcq", "internal/runtime/atomic", "Load", lwatomics...)
-	alias("internal/runtime/atomic", "LoadAcq64", "internal/runtime/atomic", "Load64", lwatomics...)
+	alias("internal/runtime/atomic", "LoadAcq", "internal/runtime/atomic", "Load", lwatomicsAcq...)
+	alias("internal/runtime/atomic", "LoadAcq64", "internal/runtime/atomic", "Load64", lwatomicsAcq...)
 	alias("internal/runtime/atomic", "LoadAcquintptr", "internal/runtime/atomic", "LoadAcq", p4...)
 	alias("sync", "runtime_LoadAcquintptr", "internal/runtime/atomic", "LoadAcq", p4...) // linknamed
 	alias("internal/runtime/atomic", "LoadAcquintptr", "internal/runtime/atomic", "LoadAcq64", p8...)
@@ -693,8 +702,8 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 	alias("internal/runtime/atomic", "Storeint64", "internal/runtime/atomic", "Store64", all...)
 	alias("internal/runtime/atomic", "Storeuintptr", "internal/runtime/atomic", "Store", p4...)
 	alias("internal/runtime/atomic", "Storeuintptr", "internal/runtime/atomic", "Store64", p8...)
-	alias("internal/runtime/atomic", "StoreRel", "internal/runtime/atomic", "Store", lwatomics...)
-	alias("internal/runtime/atomic", "StoreRel64", "internal/runtime/atomic", "Store64", lwatomics...)
+	alias("internal/runtime/atomic", "StoreRel", "internal/runtime/atomic", "Store", lwatomicsRel...)
+	alias("internal/runtime/atomic", "StoreRel64", "internal/runtime/atomic", "Store64", lwatomicsRel...)
 	alias("internal/runtime/atomic", "StoreReluintptr", "internal/runtime/atomic", "StoreRel", p4...)
 	alias("sync", "runtime_StoreReluintptr", "internal/runtime/atomic", "StoreRel", p4...) // linknamed
 	alias("internal/runtime/atomic", "StoreReluintptr", "internal/runtime/atomic", "StoreRel64", p8...)
@@ -719,7 +728,7 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 	alias("internal/runtime/atomic", "Casuintptr", "internal/runtime/atomic", "Cas64", p8...)
 	alias("internal/runtime/atomic", "Casp1", "internal/runtime/atomic", "Cas", p4...)
 	alias("internal/runtime/atomic", "Casp1", "internal/runtime/atomic", "Cas64", p8...)
-	alias("internal/runtime/atomic", "CasRel", "internal/runtime/atomic", "Cas", lwatomics...)
+	alias("internal/runtime/atomic", "CasRel", "internal/runtime/atomic", "Cas", lwatomicsRel...)
 
 	// Aliases for atomic And/Or operations
 	alias("internal/runtime/atomic", "Anduintptr", "internal/runtime/atomic", "And64", sys.ArchARM64, sys.ArchLoong64)

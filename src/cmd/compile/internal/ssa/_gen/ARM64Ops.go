@@ -655,6 +655,9 @@ func init() {
 		{name: "LDAR", argLength: 2, reg: gpload, asm: "LDAR", faultOnNilArg0: true},
 		{name: "LDARB", argLength: 2, reg: gpload, asm: "LDARB", faultOnNilArg0: true},
 		{name: "LDARW", argLength: 2, reg: gpload, asm: "LDARW", faultOnNilArg0: true},
+		{name: "LDAPR", argLength: 2, reg: gpload, asm: "LDAPR", faultOnNilArg0: true},
+		{name: "LDAPRB", argLength: 2, reg: gpload, asm: "LDAPRB", faultOnNilArg0: true},
+		{name: "LDAPRW", argLength: 2, reg: gpload, asm: "LDAPRW", faultOnNilArg0: true},
 
 		// atomic stores.
 		// store arg1 to arg0. arg2=mem. returns memory. auxint must be zero.

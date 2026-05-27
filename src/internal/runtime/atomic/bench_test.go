@@ -35,6 +35,22 @@ func BenchmarkAtomicLoad(b *testing.B) {
 	}
 }
 
+func BenchmarkAtomicLoadAcq(b *testing.B) {
+	var x uint32
+	sink = &x
+	for i := 0; i < b.N; i++ {
+		_ = atomic.LoadAcq(&x)
+	}
+}
+
+func BenchmarkAtomicLoadAcq64(b *testing.B) {
+	var x uint64
+	sink = &x
+	for i := 0; i < b.N; i++ {
+		_ = atomic.LoadAcq64(&x)
+	}
+}
+
 func BenchmarkAtomicStore(b *testing.B) {
 	var x uint32
 	sink = &x

@@ -528,6 +528,12 @@ func rewriteValueARM64(v *Value) bool {
 	case OpAtomicLoad8:
 		v.Op = OpARM64LDARB
 		return true
+	case OpAtomicLoadAcq32:
+		v.Op = OpARM64LDAPRW
+		return true
+	case OpAtomicLoadAcq64:
+		v.Op = OpARM64LDAPR
+		return true
 	case OpAtomicLoadPtr:
 		v.Op = OpARM64LDAR
 		return true

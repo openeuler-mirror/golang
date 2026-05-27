@@ -179,6 +179,7 @@ type Goarm64Features struct {
 	// * FEAT_SHA1, which includes the SHA1* instructions.
 	// * FEAT_SHA256, which includes the SHA256* instructions.
 	Crypto bool
+	Rcpc   bool
 	// Hashmap func controlGroupMatchH2 with intrinsic implementation
 	IntrinsicMatchH2 bool
 	// Kunpeng memory optimize
@@ -194,6 +195,9 @@ func (g Goarm64Features) String() string {
 	}
 	if g.Crypto {
 		arm64Str += ",crypto"
+	}
+	if g.Rcpc {
+		arm64Str += ",rcpc"
 	}
 	if g.IntrinsicMatchH2 {
 		arm64Str += ",intrinsicmatchh2"
@@ -211,6 +215,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	const (
 		lseOpt           = ",lse"
 		cryptoOpt        = ",crypto"
+		rcpcOpt          = ",rcpc"
 		intrinsicMatchH2 = ",intrinsicmatchh2"
 		KpMemOpt         = ",kpmemopt"
 		rprfmOpt         = ",rprfm"
@@ -218,6 +223,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 
 	g.LSE = false
 	g.Crypto = false
+	g.Rcpc = false
 	g.IntrinsicMatchH2 = false
 	g.KpMemOpt = false
 	g.RPRFM = false
@@ -232,6 +238,12 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		if strings.HasSuffix(v, cryptoOpt) {
 			g.Crypto = true
 			v = v[:len(v)-len(cryptoOpt)]
+			continue
+		}
+
+		if strings.HasSuffix(v, rcpcOpt) {
+			g.Rcpc = true
+			v = v[:len(v)-len(rcpcOpt)]
 			continue
 		}
 
@@ -270,8 +282,8 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		// LSE extension is mandatory starting from 8.1
 		g.LSE = true
 	default:
-		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q and/or %q",
-			lseOpt, cryptoOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt)
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q, %q and/or %q",
+			lseOpt, cryptoOpt, rcpcOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt)
 		g.Version = DefaultGOARM64
 	}
 
