@@ -10,8 +10,11 @@ import (
 	"internal/goarch"
 )
 
+// Keeping this const helps optimizations (e.g. aggressiveprove)
+// to reason about its value and eliminate bound checks.
+const minSizeForMallocHeader = goarch.PtrSize * ptrBits
+
 func checkMinimumSize() {
-	minSizeForMallocHeader = goarch.PtrSize * ptrBits
 	minSizeForMallocHeaderIsSizeClass := false
 	sizeClassesUpToMinSizeForMallocHeaderAreMultPage := true
 	for i := 0; i < len(class_to_size); i++ {

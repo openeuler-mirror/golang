@@ -203,6 +203,17 @@ func initForceInlineFuncList() {
 			"runtime.bgsweep":                {},
 		}
 
+	case 2:
+		// Inline mallocgc sub-functions into mallocgc itself.
+		// This helps aggressiveprove to optimize away bound checks in resulting mallocgc.
+		forceInlineMap = map[string]struct{}{
+			"runtime.mallocgcTiny":              {},
+			"runtime.mallocgcSmallNoscan":       {},
+			"runtime.mallocgcSmallScanNoHeader": {},
+			"runtime.mallocgcSmallScanHeader":   {},
+			"runtime.mallocgcLarge":             {},
+		}
+
 	default:
 		base.Errorf("-forceinline does not support setting to %d", base.Debug.ForceInline)
 		base.ErrorExit()

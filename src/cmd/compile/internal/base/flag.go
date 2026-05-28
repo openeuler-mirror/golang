@@ -133,6 +133,7 @@ type CmdFlags struct {
 	AggressivePatterns   bool "help:\"enable additional optimization patterns\""
 	AggressiveDse        bool "help:\"enable aggressive dse optimization\""
 	AggressiveLoopRotate bool "help:\"enable aggressive loop rotate optimization, including keeping nested loops in place\""
+	AggressiveProve      bool "help:\"enable additional rules to prove more bound checks\""
 
 	// Configuration derived from flags; not a flag itself.
 	Cfg struct {

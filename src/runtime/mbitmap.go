@@ -100,8 +100,6 @@ const (
 	// span has malloc headers.
 )
 
-var minSizeForMallocHeader uintptr
-
 // heapBitsInSpan returns true if the size of an object implies its ptr/scalar
 // data is stored at the end of the span, and is accessible via span.heapBits.
 //
