@@ -389,6 +389,9 @@ func asmArgs(a *Action, p *load.Package) []any {
 		if err == nil && g.RPRFM {
 			args = append(args, "-D", "GOARM64_RPRFM")
 		}
+		if err == nil && g.ABIInternal {
+			args = append(args, "-D", "GOARM64_ABIINTERNAL")
+		}
 	}
 
 	return args
