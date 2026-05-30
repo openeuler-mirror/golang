@@ -23,7 +23,7 @@ loop:
 
 done:
     PTRUE P0.H
-    ZUADDV Z0.H, P0, V2.D2
+    ZUADDV Z0.H, P0, V2
     VMOV V2.D[0], R0
     MOVD $11541, R1
     UDIV R1, R0, R0
