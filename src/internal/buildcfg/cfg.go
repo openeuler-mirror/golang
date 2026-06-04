@@ -186,6 +186,8 @@ type Goarm64Features struct {
 	KpMemOpt bool
 	// RPRFM enables range prefetch
 	RPRFM bool
+	// ABIInternal enables the bytealg ABIInternal implementation.
+	ABIInternal bool
 }
 
 func (g Goarm64Features) String() string {
@@ -208,6 +210,9 @@ func (g Goarm64Features) String() string {
 	if g.RPRFM {
 		arm64Str += ",rprfm"
 	}
+	if g.ABIInternal {
+		arm64Str += ",abiinternal"
+	}
 	return arm64Str
 }
 
@@ -219,6 +224,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		intrinsicMatchH2 = ",intrinsicmatchh2"
 		KpMemOpt         = ",kpmemopt"
 		rprfmOpt         = ",rprfm"
+		abiInternalOpt   = ",abiinternal"
 	)
 
 	g.LSE = false
@@ -227,6 +233,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	g.IntrinsicMatchH2 = false
 	g.KpMemOpt = false
 	g.RPRFM = false
+	g.ABIInternal = false
 	// We allow any combination of suffixes, in any order
 	for {
 		if strings.HasSuffix(v, lseOpt) {
@@ -264,6 +271,11 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 			v = v[:len(v)-len(rprfmOpt)]
 			continue
 		}
+		if strings.HasSuffix(v, abiInternalOpt) {
+			g.ABIInternal = true
+			v = v[:len(v)-len(abiInternalOpt)]
+			continue
+		}
 		break
 	}
 
@@ -282,8 +294,8 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		// LSE extension is mandatory starting from 8.1
 		g.LSE = true
 	default:
-		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q, %q and/or %q",
-			lseOpt, cryptoOpt, rcpcOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt)
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q, %q, %q and/or %q",
+			lseOpt, cryptoOpt, rcpcOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt, abiInternalOpt)
 		g.Version = DefaultGOARM64
 	}
 
