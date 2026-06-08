@@ -1,335 +1,342 @@
 # Supported SVE instructions
 
-The following instructions are supported:
+The following table lists the SVE instructions supported by the Go ARM64 assembler. The Arm-style column keeps the
+operand order and notation used by the Arm reference manual. The Go assembly syntax column shows the accepted Go
+assembler form, including the Go mnemonic prefix and operand order. The Case column is the `asmoutsve` encoding case in
+`asm7.go`.
 
-| Name                                          | Instruction (in Arm style)                                                          | As                | Case |
-|-----------------------------------------------|-------------------------------------------------------------------------------------|-------------------|------|
-| ABS                                           | `ABS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZABS              | 17   |
-| AESD                                          | `AESD <Zdn>.B, <Zdn>.B, <Zm>.B`                                                     | ZAESD             | 36   |
-| AESE                                          | `AESE <Zdn>.B, <Zdn>.B, <Zm>.B`                                                     | ZAESE             | 36   |
-| AESIMC                                        | `AESIMC <Zdn>.B, <Zdn>.B`                                                           | ZAESIMC           | 37   |
-| AESMC                                         | `AESMC <Zdn>.B, <Zdn>.B`                                                            | ZAESMC            | 37   |
-| ADD (immediate)                               | `ADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                       | ZADD              | 3    |
-| ADD (vectors, predicated)                     | `ADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZADD              | 2    |
-| ADD (vectors, unpredicated)                   | `ADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | ZADD              | 1    |
-| AND (immediate)                               | `AND <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZAND              | 5    |
-| AND (predicates)                              | `AND <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | PAND              | 6    |
-| AND (vectors, predicated)                     | `AND <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZAND              | 2    |
-| AND (vectors, unpredicated)                   | `AND <Zd>.D, <Zn>.D, <Zm>.D`                                                        | ZAND              | 4    |
-| ANDS                                          | `ANDS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PANDS             | 6    |
-| ASR (immediate, predicated)                   | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | ZASR              | 15   |
-| ASR (immediate, unpredicated)                 | `ASR <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | ZASR              | 18   |
-| ASR (vectors)                                 | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZASR              | 16   |
-| ASR (wide elements, predicated)               | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | ZASR              | 16   |
-| ASR (wide elements, unpredicated)             | `ASR <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | ZASR              | 19   |
-| ASRD                                          | `ASRD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                       | ZASRD             | 15   |
-| ASRR                                          | `ASRR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZASRR             | 16   |
-| BIC (immediate)                               | `BIC <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZBIC              | 5    |
-| BIC (predicates)                              | `BIC <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | PBIC              | 6    |
-| BIC (vectors, predicated)                     | `BIC <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZBIC              | 2    |
-| BIC (vectors, unpredicated)                   | `BIC <Zd>.D, <Zn>.D, <Zm>.D`                                                        | ZBIC              | 4    |
-| BICS                                          | `BICS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PBICS             | 6    |
-| BRKA                                          | `BRKA <Pd>.B, <Pg>/<ZM>, <Pn>.B`                                                    | PBRKA             | 31   |
-| BRKAS                                         | `BRKAS <Pd>.B, <Pg>/Z, <Pn>.B`                                                      | PBRKAS            | 31   |
-| BRKB                                          | `BRKB <Pd>.B, <Pg>/<ZM>, <Pn>.B`                                                    | PBRKB             | 31   |
-| BRKBS                                         | `BRKBS <Pd>.B, <Pg>/Z, <Pn>.B`                                                      | PBRKBS            | 31   |
-| BRKN                                          | `BRKN <Pdm>.B, <Pg>/Z, <Pn>.B, <Pdm>.B`                                             | PBRKN             | 30   |
-| BRKNS                                         | `BRKNS <Pdm>.B, <Pg>/Z, <Pn>.B, <Pdm>.B`                                            | PBRKNS            | 30   |
-| BRKPA                                         | `BRKPA <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | PBRKPA            | 6    |
-| BRKPAS                                        | `BRKPAS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                             | PBRKPAS           | 6    |
-| BRKPB                                         | `BRKPB <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | PBRKPB            | 6    |
-| BRKPBS                                        | `BRKPBS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                             | PBRKPBS           | 6    |
-| CLS                                           | `CLS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZCLS              | 17   |
-| CLZ                                           | `CLZ <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZCLZ              | 17   |
-| CMPEQ (immediate)                             | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPEQ            | 13   |
-| CMPEQ (vectors)                               | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPEQ            | 12   |
-| CMPEQ (wide elements)                         | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPEQ            | 12   |
-| CMPGT (immediate)                             | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPGT            | 13   |
-| CMPGT (vectors)                               | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPGT            | 12   |
-| CMPGT (wide elements)                         | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPGT            | 12   |
-| CMPGE (immediate)                             | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPGE            | 13   |
-| CMPGE (vectors)                               | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPGE            | 12   |
-| CMPGE (wide elements)                         | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPGE            | 12   |
-| CMPHI (immediate)                             | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPHI            | 13   |
-| CMPHI (vectors)                               | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPHI            | 12   |
-| CMPHI (wide elements)                         | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPHI            | 12   |
-| CMPHS (immediate)                             | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPHS            | 13   |
-| CMPHS (vectors)                               | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPHS            | 12   |
-| CMPHS (wide elements)                         | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPHS            | 12   |
-| CMPLE (immediate)                             | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPLE            | 13   |
-| CMPLE (vectors)                               | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPLE            | 12   |
-| CMPLE (wide elements)                         | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPLE            | 12   |
-| CMPLO (immediate)                             | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPLO            | 13   |
-| CMPLO (vectors)                               | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPLO            | 12   |
-| CMPLO (wide elements)                         | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPLO            | 12   |
-| CMPLS (immediate)                             | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPLS            | 13   |
-| CMPLS (vectors)                               | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPLS            | 12   |
-| CMPLS (wide elements)                         | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPLS            | 12   |
-| CMPLT (immediate)                             | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPLT            | 13   |
-| CMPLT (vectors)                               | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPLT            | 12   |
-| CMPLT (wide elements)                         | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPLT            | 12   |
-| CMPNE (immediate)                             | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | ZCMPNE            | 13   |
-| CMPNE (vectors)                               | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | ZCMPNE            | 12   |
-| CMPNE (wide elements)                         | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | ZCMPNE            | 12   |
-| CNOT                                          | `CNOT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZCNOT             | 17   |
-| CNT                                           | `CNT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZCNT              | 17   |
-| CNTB                                          | `CNTB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTB             | 42   |
-| CNTD                                          | `CNTD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTD             | 42   |
-| CNTH                                          | `CNTH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTH             | 42   |
-| CNTP (predicate)                              | `CNTP <Xd>, <Pg>, <Pn>.<T>`                                                         | ZCNTP             | 46   |
-| CNTW                                          | `CNTW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZCNTW             | 42   |
-| DECB (scalar)                                 | `DECB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECB             | 42   |
-| DECD (scalar)                                 | `DECD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECD             | 42   |
-| DECD (vector)                                 | `DECD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | ZDECD             | 43   |
-| DECH (scalar)                                 | `DECH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECH             | 42   |
-| DECH (vector)                                 | `DECH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | ZDECH             | 43   |
-| DECW (scalar)                                 | `DECW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZDECW             | 42   |
-| DECW (vector)                                 | `DECW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | ZDECW             | 43   |
-| DUP (immediate)                               | `DUP <Zd>.<T>, #<imm>{, <shift>}`                                                   | ZDUP              | 3    |
-| DUP (indexed)                                 | `DUP <Zd>.<T>, <Zn>.<T>[<imm>]`                                                     | ZDUP              | 8    |
-| DUP (scalar)                                  | `DUP <Zd>.<T>, <R><n\|SP>`                                                          | ZDUP              | 7    |
-| EON                                           | `EON <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZEON              | 5    |
-| EOR (immediate)                               | `EOR <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZEOR              | 5    |
-| EOR (predicates)                              | `EOR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | PEOR              | 6    |
-| EOR (vectors, predicated)                     | `EOR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZEOR              | 2    |
-| EOR (vectors, unpredicated)                   | `EOR <Zd>.D, <Zn>.D, <Zm>.D`                                                        | ZEOR              | 4    |
-| EORS                                          | `EORS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PEORS             | 6    |
-| FABS                                          | `FABS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZFABS             | 17   |
-| FNEG                                          | `FNEG <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZFNEG             | 17   |
-| INCB (scalar)                                 | `INCB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCB             | 42   |
-| INCD (scalar)                                 | `INCD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCD             | 42   |
-| INCD (vector)                                 | `INCD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | ZINCD             | 43   |
-| INCH (scalar)                                 | `INCH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCH             | 42   |
-| INCH (vector)                                 | `INCH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | ZINCH             | 43   |
-| INCW (scalar)                                 | `INCW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | ZINCW             | 42   |
-| INCW (vector)                                 | `INCW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | ZINCW             | 43   |
-| INDEX (immediate, scalar)                     | `INDEX <Zd>.<T>, #<imm>, <R><m>`                                                    | ZINDEX            | 26   |
-| INDEX (immediates)                            | `INDEX <Zd>.<T>, #<imm1>, #<imm2>`                                                  | ZINDEX            | 26   |
-| INDEX (scalar, immediate)                     | `INDEX <Zd>.<T>, <R><n>, #<imm>`                                                    | ZINDEX            | 26   |
-| INDEX (scalars)                               | `INDEX <Zd>.<T>, <R><n>, <R><m>`                                                    | ZINDEX            | 26   |
-| LASTA (scalar)                                | `LASTA <R><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTA           | 44   |
-| LASTA (SIMD&FP scalar)                        | `LASTA <V><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTA           | 45   |
-| LASTB (scalar)                                | `LASTB <R><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTB           | 44   |
-| LASTB (SIMD&FP scalar)                        | `LASTB <V><d>, <Pg>, <Zn>.<T>`                                                      | AZLASTB           | 45   |
-| LD1B (scalar plus immediate, single register) | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1B             | 32   |
-| LD1B (scalar plus scalar, single register)    | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                                       | ZLD1B             | 33   |
-| LD1D (scalar plus immediate, single register) | `LD1D { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1D             | 32   |
-| LD1D (scalar plus scalar, single register)    | `LD1D { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`                               | ZLD1D             | 33   |
-| LD1H (scalar plus immediate, single register) | `LD1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1H             | 32   |
-| LD1H (scalar plus scalar, single register)    | `LD1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                               | ZLD1H             | 33   |
-| LD1SB (scalar plus immediate)                 | `LD1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | ZLD1SB            | 32   |
-| LD1SB (scalar plus scalar)                    | `LD1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                                      | ZLD1SB            | 33   |
-| LD1SH (scalar plus immediate)                 | `LD1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | ZLD1SH            | 32   |
-| LD1SH (scalar plus scalar)                    | `LD1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                              | ZLD1SH            | 33   |
-| LD1SW (scalar plus immediate)                 | `LD1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                            | ZLD1SW            | 32   |
-| LD1SW (scalar plus scalar)                    | `LD1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                                | ZLD1SW            | 33   |
-| LD1W (scalar plus immediate, single register) | `LD1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLD1W             | 32   |
-| LD1W (scalar plus scalar, single register)    | `LD1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                               | ZLD1W             | 33   |
-| LD2B (scalar plus immediate)                  | `LD2B { <Zt1>.B, <Zt2>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | ZLD2B             | 34   |
-| LD2B (scalar plus scalar)                     | `LD2B { <Zt1>.B, <Zt2>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                               | ZLD2B             | 35   |
-| LD2D (scalar plus immediate)                  | `LD2D { <Zt1>.D, <Zt2>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | ZLD2D             | 34   |
-| LD2D (scalar plus scalar)                     | `LD2D { <Zt1>.D, <Zt2>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`                       | ZLD2D             | 35   |
-| LD2H (scalar plus immediate)                  | `LD2H { <Zt1>.H, <Zt2>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | ZLD2H             | 34   |
-| LD2H (scalar plus scalar)                     | `LD2H { <Zt1>.H, <Zt2>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                       | ZLD2H             | 35   |
-| LD2Q (scalar plus immediate)                  | `LD2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | ZLD2Q             | 34   |
-| LD2Q (scalar plus scalar)                     | `LD2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`                       | ZLD2Q             | 35   |
-| LD2W (scalar plus immediate)                  | `LD2W { <Zt1>.S, <Zt2>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | ZLD2W             | 34   |
-| LD2W (scalar plus scalar)                     | `LD2W { <Zt1>.S, <Zt2>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                       | ZLD2W             | 35   |
-| LD3B (scalar plus immediate)                  | `LD3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | ZLD3B             | 34   |
-| LD3B (scalar plus scalar)                     | `LD3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                      | ZLD3B             | 35   |
-| LD3D (scalar plus immediate)                  | `LD3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | ZLD3D             | 34   |
-| LD3D (scalar plus scalar)                     | `LD3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`              | ZLD3D             | 35   |
-| LD3H (scalar plus immediate)                  | `LD3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | ZLD3H             | 34   |
-| LD3H (scalar plus scalar)                     | `LD3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`              | ZLD3H             | 35   |
-| LD3Q (scalar plus immediate)                  | `LD3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | ZLD3Q             | 34   |
-| LD3Q (scalar plus scalar)                     | `LD3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`              | ZLD3Q             | 35   |
-| LD3W (scalar plus immediate)                  | `LD3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | ZLD3W             | 34   |
-| LD3W (scalar plus scalar)                     | `LD3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`              | ZLD3W             | 35   |
-| LD4B (scalar plus immediate)                  | `LD4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | ZLD4B             | 34   |
-| LD4B (scalar plus scalar)                     | `LD4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`             | ZLD4B             | 35   |
-| LD4D (scalar plus immediate)                  | `LD4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | ZLD4D             | 34   |
-| LD4D (scalar plus scalar)                     | `LD4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`     | ZLD4D             | 35   |
-| LD4H (scalar plus immediate)                  | `LD4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | ZLD4H             | 34   |
-| LD4H (scalar plus scalar)                     | `LD4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`     | ZLD4H             | 35   |
-| LD4Q (scalar plus immediate)                  | `LD4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | ZLD4Q             | 34   |
-| LD4Q (scalar plus scalar)                     | `LD4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`     | ZLD4Q             | 35   |
-| LD4W (scalar plus immediate)                  | `LD4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | ZLD4W             | 34   |
-| LD4W (scalar plus scalar)                     | `LD4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`     | ZLD4W             | 35   |
-| LDFF1B (scalar plus scalar)                   | `LDFF1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>}]`                                   | ZLDFF1B           | 33   |
-| LDFF1D (scalar plus scalar)                   | `LDFF1D { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #3}]`                             | ZLDFF1D           | 33   |
-| LDFF1H (scalar plus scalar)                   | `LDFF1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #1}]`                           | ZLDFF1H           | 33   |
-| LDFF1SB (scalar plus scalar)                  | `LDFF1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>}]`                                  | ZLDFF1SB          | 33   |
-| LDFF1SH (scalar plus scalar)                  | `LDFF1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #1}]`                          | ZLDFF1SH          | 33   |
-| LDFF1SW (scalar plus scalar)                  | `LDFF1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #2}]`                            | ZLDFF1SW          | 33   |
-| LDFF1W (scalar plus scalar)                   | `LDFF1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #2}]`                           | ZLDFF1W           | 33   |
-| LDNF1B                                        | `LDNF1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | ZLDNF1B           | 32   |
-| LDNF1D                                        | `LDNF1D { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | ZLDNF1D           | 32   |
-| LDNF1H                                        | `LDNF1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | ZLDNF1H           | 32   |
-| LDNF1SB                                       | `LDNF1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                        | ZLDNF1SB          | 32   |
-| LDNF1SH                                       | `LDNF1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                        | ZLDNF1SH          | 32   |
-| LDNF1SW                                       | `LDNF1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | ZLDNF1SW          | 32   |
-| LDNF1W                                        | `LDNF1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | ZLDNF1W           | 32   |
-| LSL (immediate, predicated)                   | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | ZLSL              | 15   |
-| LSL (immediate, unpredicated)                 | `LSL <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | ZLSL              | 18   |
-| LSL (vectors)                                 | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZLSL              | 16   |
-| LSL (wide elements, predicated)               | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | ZLSL              | 16   |
-| LSL (wide elements, unpredicated)             | `LSL <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | ZLSL              | 19   |
-| LSLR                                          | `LSLR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZLSLR             | 16   |
-| LSR (immediate, predicated)                   | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | ZLSR              | 15   |
-| LSR (immediate, unpredicated)                 | `LSR <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | ZLSR              | 18   |
-| LSR (vectors)                                 | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZLSR              | 16   |
-| LSR (wide elements, predicated)               | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | ZLSR              | 16   |
-| LSR (wide elements, unpredicated)             | `LSR <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | ZLSR              | 19   |
-| LSRR                                          | `LSRR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZLSRR             | 16   |
-| MUL (immediate)                               | `MUL <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                  | ZMUL              | 3    |
-| MUL (indexed)                                 | `MUL <Zd>.<T>, <Zn>.<T>, <Zm>.<T>[<imm>]`                                           | ZMUL              | 9    |
-| MUL (vectors, predicated)                     | `MUL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZMUL              | 2    |
-| MUL (vectors, unpredicated)                   | `MUL <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | ZMUL              | 1    |
-| NAND                                          | `NAND <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PNAND             | 6    |
-| NANDS                                         | `NANDS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | PNANDS            | 6    |
-| NEG                                           | `NEG <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZNEG              | 17   |
-| NOR                                           | `NOR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | PNOR              | 6    |
-| NORS                                          | `NORS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PNORS             | 6    |
-| NOT (vector)                                  | `NOT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | ZNOT              | 17   |
-| ORN (immediate)                               | `ORN <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZORN              | 5    |
-| ORN (predicates)                              | `ORN <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | PORN              | 6    |
-| ORNS                                          | `ORNS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PORNS             | 6    |
-| ORR (immediate)                               | `ORR <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | ZORR              | 5    |
-| ORR (predicates)                              | `ORR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | ZORR              | 6    |
-| ORR (vectors, predicated)                     | `ORR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZORR              | 2    |
-| ORR (vectors, unpredicated)                   | `ORR <Zd>.D, <Zn>.D, <Zm>.D`                                                        | ZORR              | 4    |
-| ORRS                                          | `ORRS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | PORRS             | 6    |
-| PFALSE                                        | `PFALSE <Pd>.B`                                                                     | PFALSE            | 22   |
-| PFIRST                                        | `PFIRST <Pdn>.B, <Pg>, <Pdn>.B`                                                     | PFIRST            | 21   |
-| PMUL                                          | `PMUL <Zd>.B, <Zn>.B, <Zm>.B`                                                       | ZPMUL             | 1    |
-| PTEST                                         | `PTEST <Pg>, <Pn>.B`                                                                | PTEST             | 20   |
-| PTRUE (predicate)                             | `PTRUE <Pd>.<T>{, <pattern>}`                                                       | PTRUE             | 25   |
-| PTRUES                                        | `PTRUES <Pd>.<T>{, <pattern>}`                                                      | PTRUES            | 25   |
-| PNEXT                                         | `PNEXT <Pdn>.<T>, <Pv>, <Pdn>.<T>`                                                  | PNEXT             | 24   |
-| PUNPKHI                                       | `PUNPKHI <Pd>.H, <Pn>.B`                                                            | PUNPKHI           | 27   |
-| PUNPKLO                                       | `PUNPKLO <Pd>.H, <Pn>.B`                                                            | PUNPKLO           | 27   |
-| RDFFR (predicated)                            | `RDFFR <Pd>.B, <Pg>/Z`                                                              | PRDFFR            | 23   |
-| RDFFR (unpredicated)                          | `RDFFR <Pd>.B`                                                                      | PRDFFR            | 23   |
-| RDFFRS                                        | `RDFFRS <Pd>.B, <Pg>/Z`                                                             | PRDFFRS           | 23   |
-| SABD                                          | `SABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSABD             | 2    |
-| SADDV                                         | `SADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | ZSADDV            | 47   |
-| SDIV                                          | `SDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSDIV             | 2    |
-| SDIVR                                         | `SDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZSDIVR            | 2    |
-| SEL (predicates)                              | `SEL <Pd>.B, <Pg>, <Pn>.B, <Pm>.B`                                                  | PSEL              | 6    |
-| SEL (vectors)                                 | `SEL <Zd>.<T>, <Pv>, <Zn>.<T>, <Zm>.<T>`                                            | ZSEL              | 14   |
-| SMAX (immediate)                              | `SMAX <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | ZSMAX             | 3    |
-| SMAX (vectors)                                | `SMAX <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSMAX             | 2    |
-| SMIN (immediate)                              | `SMIN <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | ZSMIN             | 3    |
-| SMIN (vectors)                                | `SMIN <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSMIN             | 2    |
-| SMULH (predicated)                            | `SMULH <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZSMULH            | 2    |
-| SMULH (unpredicated)                          | `SMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZSMULH            | 1    |
-| SQADD (immediate)                             | `SQADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | ZSQADD            | 3    |
-| SQADD (vectors, predicated)                   | `SQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZSQADD            | 2    |
-| SQADD (vectors, unpredicated)                 | `SQADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZSQADD            | 1    |
-| SQDMULH (vectors)                             | `SQDMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                              | ZSQDMULH          | 1    |
-| SQRDMULH (vectors)                            | `SQRDMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                             | ZSQRDMULH         | 1    |
-| SQSHL (immediate)                             | `SQSHL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | ZSQSHL            | 15   |
-| SQSHLU                                        | `SQSHLU <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                     | ZSQSHLU           | 15   |
-| SQSUB (immediate)                             | `SQSUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | ZSQSUB            | 3    |
-| SQSUB (vectors, predicated)                   | `SQSUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZSQSUB            | 2    |
-| SQSUB (vectors, unpredicated)                 | `SQSUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZSQSUB            | 1    |
-| SQSUBR                                        | `SQSUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | ZSQSUBR           | 2    |
-| SRSHR                                         | `SRSHR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | ZSRSHR            | 15   |
-| ST1B (scalar plus immediate, single register) | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1B             | 38   |
-| ST1B (scalar plus scalar, single register)    | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>]`                                         | ZST1B             | 39   |
-| ST1D (scalar plus immediate, single register) | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1D             | 38   |
-| ST1D (scalar plus scalar, single register)    | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                                 | ZST1D             | 39   |
-| ST1H (scalar plus immediate, single register) | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1H             | 38   |
-| ST1H (scalar plus scalar, single register)    | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                                 | ZST1H             | 39   |
-| ST1W (scalar plus immediate, single register) | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | ZST1W             | 38   |
-| ST1W (scalar plus scalar, single register)    | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                                 | ZST1W             | 39   |
-| ST2B (scalar plus immediate)                  | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2B             | 40   |
-| ST2B (scalar plus scalar)                     | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                                 | ZST2B             | 41   |
-| ST2D (scalar plus immediate)                  | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2D             | 40   |
-| ST2D (scalar plus scalar)                     | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                         | ZST2D             | 41   |
-| ST2H (scalar plus immediate)                  | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2H             | 40   |
-| ST2H (scalar plus scalar)                     | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                         | ZST2H             | 41   |
-| ST2Q (scalar plus immediate)                  | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2Q             | 40   |
-| ST2Q (scalar plus scalar)                     | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                         | ZST2Q             | 41   |
-| ST2W (scalar plus immediate)                  | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | ZST2W             | 40   |
-| ST2W (scalar plus scalar)                     | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                         | ZST2W             | 41   |
-| ST3B (scalar plus immediate)                  | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3B             | 40   |
-| ST3B (scalar plus scalar)                     | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                        | ZST3B             | 41   |
-| ST3D (scalar plus immediate)                  | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3D             | 40   |
-| ST3D (scalar plus scalar)                     | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                | ZST3D             | 41   |
-| ST3H (scalar plus immediate)                  | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3H             | 40   |
-| ST3H (scalar plus scalar)                     | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                | ZST3H             | 41   |
-| ST3Q (scalar plus immediate)                  | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3Q             | 40   |
-| ST3Q (scalar plus scalar)                     | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                | ZST3Q             | 41   |
-| ST3W (scalar plus immediate)                  | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | ZST3W             | 40   |
-| ST3W (scalar plus scalar)                     | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                | ZST3W             | 41   |
-| ST4B (scalar plus immediate)                  | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4B             | 40   |
-| ST4B (scalar plus scalar)                     | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>, <Xm>]`               | ZST4B             | 41   |
-| ST4D (scalar plus immediate)                  | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4D             | 40   |
-| ST4D (scalar plus scalar)                     | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`       | ZST4D             | 41   |
-| ST4H (scalar plus immediate)                  | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4H             | 40   |
-| ST4H (scalar plus scalar)                     | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`       | ZST4H             | 41   |
-| ST4Q (scalar plus immediate)                  | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4Q             | 40   |
-| ST4Q (scalar plus scalar)                     | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`       | ZST4Q             | 41   |
-| ST4W (scalar plus immediate)                  | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | ZST4W             | 40   |
-| ST4W (scalar plus scalar)                     | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`       | ZST4W             | 41   |
-| SUB (immediate)                               | `SUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                       | ZSUB              | 3    |
-| SUB (vectors, predicated)                     | `SUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | ZSUB              | 2    |
-| SUB (vectors, unpredicated)                   | `SUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | ZSUB              | 1    |
-| SUBR (immediate)                              | `SUBR <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                      | ZSUBR             | 3    |
-| SUBR (vectors)                                | `SUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZSUBR             | 2    |
-| SUQADD                                        | `SUQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | ZSUQADD           | 2    |
-| SXTB                                          | `SXTB <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZSXTB             | 17   |
-| SXTH                                          | `SXTH <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZSXTH             | 17   |
-| SXTW                                          | `SXTW <Zd>.D, <Pg>/M, <Zn>.D`                                                       | ZSXTW             | 17   |
-| TRN1 (predicates)                             | `TRN1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | UTRN1             | 28   |
-| TRN1 (vectors)                                | `TRN1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZTRN1             | 29   |
-| TRN2 (predicates)                             | `TRN2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | UTRN2             | 28   |
-| TRN2 (vectors)                                | `TRN2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZTRN2             | 29   |
-| UABD                                          | `UABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUABD             | 2    |
-| UADDV                                         | `UADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | ZUADDV            | 47   |
-| UDIV                                          | `UDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUDIV             | 2    |
-| UDIVR                                         | `UDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZUDIVR            | 2    |
-| UMAX (immediate)                              | `UMAX <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | ZUMAX             | 3    |
-| UMAX (vectors)                                | `UMAX <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUMAX             | 2    |
-| UMIN (immediate)                              | `UMIN <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | ZUMIN             | 3    |
-| UMIN (vectors)                                | `UMIN <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | ZUMIN             | 2    |
-| UMULH (predicated)                            | `UMULH <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZUMULH            | 2    |
-| UMULH (unpredicated)                          | `UMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZUMULH            | 1    |
-| UQADD (immediate)                             | `UQADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | ZUQADD            | 3    |
-| UQADD (vectors, predicated)                   | `UQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZUQADD            | 2    |
-| UQADD (vectors, unpredicated)                 | `UQADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZUQADD            | 1    |
-| UQSHL (immediate)                             | `UQSHL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | ZUQSHL            | 15   |
-| UQSUB (immediate)                             | `UQSUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | ZUQSUB            | 3    |
-| UQSUB (vectors, predicated)                   | `UQSUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | ZUQSUB            | 2    |
-| UQSUB (vectors, unpredicated)                 | `UQSUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | ZUQSUB            | 1    |
-| UQSUBR                                        | `UQSUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | ZUQSUBR           | 2    |
-| URSHR                                         | `URSHR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | ZURSHR            | 15   |
-| USQADD                                        | `USQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | ZUSQADD           | 2    |
-| UXTB                                          | `UXTB <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZUXTB             | 17   |
-| UXTH                                          | `UXTH <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | ZUXTH             | 17   |
-| UXTW                                          | `UXTW <Zd>.D, <Pg>/M, <Zn>.D`                                                       | ZUXTW             | 17   |
-| UZP1 (predicates)                             | `UZP1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | PUZP1             | 28   |
-| UZP1 (vectors)                                | `UZP1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZUZP1             | 29   |
-| UZP2 (predicates)                             | `UZP2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | PUZP2             | 28   |
-| UZP2 (vectors)                                | `UZP2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZUZP2             | 29   |
-| WHILEGE (predicate pair)                      | `WHILEGE { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILEGE           | 11   |
-| WHILEGE (predicate)                           | `WHILEGE <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILEGE, WHILEGEW | 10   |
-| WHILEGT (predicate pair)                      | `WHILEGT { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILEGT           | 11   |
-| WHILEGT (predicate)                           | `WHILEGT <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILEGT, WHILEGTW | 10   |
-| WHILEHI (predicate pair)                      | `WHILEHI { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILEHI           | 11   |
-| WHILEHI (predicate)                           | `WHILEHI <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILEHI, WHILEHIW | 10   |
-| WHILEHS (predicate pair)                      | `WHILEHS { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILEHS           | 11   |
-| WHILEHS (predicate)                           | `WHILEHS <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILEHS, WHILEHSW | 10   |
-| WHILELE (predicate pair)                      | `WHILELE { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILELE           | 11   |
-| WHILELE (predicate)                           | `WHILELE <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILELE, WHILELEW | 10   |
-| WHILELO (predicate pair)                      | `WHILELO { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILELO           | 11   |
-| WHILELO (predicate)                           | `WHILELO <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILELO, WHILELOW | 10   |
-| WHILELS (predicate pair)                      | `WHILELS { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILELS           | 11   |
-| WHILELS (predicate)                           | `WHILELS <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILELS, WHILELSW | 10   |
-| WHILELT (predicate pair)                      | `WHILELT { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | WHILELT           | 11   |
-| WHILELT (predicate)                           | `WHILELT <Pd>.<T>, <R><n>, <R><m>`                                                  | WHILELT, WHILELTW | 10   |
-| ZIP1 (predicates)                             | `ZIP1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | PZIP1             | 28   |
-| ZIP1 (vectors)                                | `ZIP1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZZIP1             | 29   |
-| ZIP2 (predicates)                             | `ZIP2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | PZIP2             | 28   |
-| ZIP2 (vectors)                                | `ZIP2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | ZZIP2             | 29   |
+Go assembly uses source operands before destination operands. It writes immediates with `$`, governing predicates as
+`Pn/M` or `Pn/Z`, vector register lists with square brackets such as `[Z0.B, Z1.B]`, and VL-scaled addresses as
+`(VL*n)(Rn)`.
+
+| Name                                          | Instruction (in Arm style)                                                          | Go assembly syntax                                                 | Case |
+|-----------------------------------------------|-------------------------------------------------------------------------------------|--------------------------------------------------------------------|------|
+| ABS                                           | `ABS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZABS Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| AESD                                          | `AESD <Zdn>.B, <Zdn>.B, <Zm>.B`                                                     | `ZAESD Zm.B, Zdn.B, Zdn.B`                                         | 36   |
+| AESE                                          | `AESE <Zdn>.B, <Zdn>.B, <Zm>.B`                                                     | `ZAESE Zm.B, Zdn.B, Zdn.B`                                         | 36   |
+| AESIMC                                        | `AESIMC <Zdn>.B, <Zdn>.B`                                                           | `ZAESIMC Zdn.B, Zdn.B`                                             | 37   |
+| AESMC                                         | `AESMC <Zdn>.B, <Zdn>.B`                                                            | `ZAESMC Zdn.B, Zdn.B`                                              | 37   |
+| ADD (immediate)                               | `ADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                       | `ZADD $imm, Zdn.<T>, Zdn.<T>`                                      | 3    |
+| ADD (vectors, predicated)                     | `ADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZADD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| ADD (vectors, unpredicated)                   | `ADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | `ZADD Zm.<T>, Zn.<T>, Zd.<T>`                                      | 1    |
+| AND (immediate)                               | `AND <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZAND $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| AND (predicates)                              | `AND <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PAND Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| AND (vectors, predicated)                     | `AND <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZAND Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| AND (vectors, unpredicated)                   | `AND <Zd>.D, <Zn>.D, <Zm>.D`                                                        | `ZAND Zm.D, Zn.D, Zd.D`                                            | 4    |
+| ANDS                                          | `ANDS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PANDS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| ASR (immediate, predicated)                   | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | `ZASR $const, Zdn.<T>, Pg/M, Zdn.<T>`                              | 15   |
+| ASR (immediate, unpredicated)                 | `ASR <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | `ZASR $const, Zn.<T>, Zd.<T>`                                      | 18   |
+| ASR (vectors)                                 | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZASR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 16   |
+| ASR (wide elements, predicated)               | `ASR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | `ZASR Zm.D, Zdn.<T>, Pg/M, Zdn.<T>`                                | 16   |
+| ASR (wide elements, unpredicated)             | `ASR <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | `ZASR Zm.D, Zn.<T>, Zd.<T>`                                        | 19   |
+| ASRD                                          | `ASRD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                       | `ZASRD $const, Zdn.<T>, Pg/M, Zdn.<T>`                             | 15   |
+| ASRR                                          | `ASRR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZASRR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 16   |
+| BIC (immediate)                               | `BIC <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZBIC $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| BIC (predicates)                              | `BIC <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PBIC Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| BIC (vectors, predicated)                     | `BIC <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZBIC Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| BIC (vectors, unpredicated)                   | `BIC <Zd>.D, <Zn>.D, <Zm>.D`                                                        | `ZBIC Zm.D, Zn.D, Zd.D`                                            | 4    |
+| BICS                                          | `BICS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PBICS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| BRKA                                          | `BRKA <Pd>.B, <Pg>/<ZM>, <Pn>.B`                                                    | `PBRKA Pn.B, Pg/ZM, Pd.B`                                          | 31   |
+| BRKAS                                         | `BRKAS <Pd>.B, <Pg>/Z, <Pn>.B`                                                      | `PBRKAS Pn.B, Pg/Z, Pd.B`                                          | 31   |
+| BRKB                                          | `BRKB <Pd>.B, <Pg>/<ZM>, <Pn>.B`                                                    | `PBRKB Pn.B, Pg/ZM, Pd.B`                                          | 31   |
+| BRKBS                                         | `BRKBS <Pd>.B, <Pg>/Z, <Pn>.B`                                                      | `PBRKBS Pn.B, Pg/Z, Pd.B`                                          | 31   |
+| BRKN                                          | `BRKN <Pdm>.B, <Pg>/Z, <Pn>.B, <Pdm>.B`                                             | `PBRKN Pdm.B, Pn.B, Pg/Z, Pdm.B`                                   | 30   |
+| BRKNS                                         | `BRKNS <Pdm>.B, <Pg>/Z, <Pn>.B, <Pdm>.B`                                            | `PBRKNS Pdm.B, Pn.B, Pg/Z, Pdm.B`                                  | 30   |
+| BRKPA                                         | `BRKPA <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | `PBRKPA Pm.B, Pn.B, Pg/Z, Pd.B`                                    | 6    |
+| BRKPAS                                        | `BRKPAS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                             | `PBRKPAS Pm.B, Pn.B, Pg/Z, Pd.B`                                   | 6    |
+| BRKPB                                         | `BRKPB <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | `PBRKPB Pm.B, Pn.B, Pg/Z, Pd.B`                                    | 6    |
+| BRKPBS                                        | `BRKPBS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                             | `PBRKPBS Pm.B, Pn.B, Pg/Z, Pd.B`                                   | 6    |
+| CLS                                           | `CLS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZCLS Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| CLZ                                           | `CLZ <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZCLZ Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| CMPEQ (immediate)                             | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPEQ $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPEQ (vectors)                               | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPEQ Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPEQ (wide elements)                         | `CMPEQ <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPEQ Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPGT (immediate)                             | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPGT $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPGT (vectors)                               | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPGT Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPGT (wide elements)                         | `CMPGT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPGT Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPGE (immediate)                             | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPGE $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPGE (vectors)                               | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPGE Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPGE (wide elements)                         | `CMPGE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPGE Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPHI (immediate)                             | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPHI $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPHI (vectors)                               | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPHI Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPHI (wide elements)                         | `CMPHI <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPHI Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPHS (immediate)                             | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPHS $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPHS (vectors)                               | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPHS Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPHS (wide elements)                         | `CMPHS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPHS Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPLE (immediate)                             | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPLE $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPLE (vectors)                               | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPLE Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPLE (wide elements)                         | `CMPLE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPLE Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPLO (immediate)                             | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPLO $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPLO (vectors)                               | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPLO Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPLO (wide elements)                         | `CMPLO <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPLO Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPLS (immediate)                             | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPLS $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPLS (vectors)                               | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPLS Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPLS (wide elements)                         | `CMPLS <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPLS Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPLT (immediate)                             | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPLT $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPLT (vectors)                               | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPLT Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPLT (wide elements)                         | `CMPLT <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPLT Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CMPNE (immediate)                             | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, #<imm>`                                          | `ZCMPNE $imm, Zn.<T>, Pg/Z, Pd.<T>`                                | 13   |
+| CMPNE (vectors)                               | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.<T>`                                        | `ZCMPNE Zm.<T>, Zn.<T>, Pg/Z, Pd.<T>`                              | 12   |
+| CMPNE (wide elements)                         | `CMPNE <Pd>.<T>, <Pg>/Z, <Zn>.<T>, <Zm>.D`                                          | `ZCMPNE Zm.D, Zn.<T>, Pg/Z, Pd.<T>`                                | 12   |
+| CNOT                                          | `CNOT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZCNOT Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| CNT                                           | `CNT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZCNT Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| CNTB                                          | `CNTB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZCNTB {{$imm, }pattern, }Rdn`                                     | 42   |
+| CNTD                                          | `CNTD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZCNTD {{$imm, }pattern, }Rdn`                                     | 42   |
+| CNTH                                          | `CNTH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZCNTH {{$imm, }pattern, }Rdn`                                     | 42   |
+| CNTP (predicate)                              | `CNTP <Xd>, <Pg>, <Pn>.<T>`                                                         | `ZCNTP Pn.<T>, Pg, Rd`                                             | 46   |
+| CNTW                                          | `CNTW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZCNTW {{$imm, }pattern, }Rdn`                                     | 42   |
+| DECB (scalar)                                 | `DECB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZDECB {{$imm, }pattern, }Rdn`                                     | 42   |
+| DECD (scalar)                                 | `DECD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZDECD {{$imm, }pattern, }Rdn`                                     | 42   |
+| DECD (vector)                                 | `DECD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | `ZDECD {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| DECH (scalar)                                 | `DECH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZDECH {{$imm, }pattern, }Rdn`                                     | 42   |
+| DECH (vector)                                 | `DECH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | `ZDECH {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| DECW (scalar)                                 | `DECW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZDECW {{$imm, }pattern, }Rdn`                                     | 42   |
+| DECW (vector)                                 | `DECW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | `ZDECW {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| DUP (immediate)                               | `DUP <Zd>.<T>, #<imm>{, <shift>}`                                                   | `ZDUP $imm, Zd.<T>`                                                | 3    |
+| DUP (indexed)                                 | `DUP <Zd>.<T>, <Zn>.<T>[<imm>]`                                                     | `ZDUP Zn.<T>[imm], Zd.<T>`                                         | 8    |
+| DUP (scalar)                                  | `DUP <Zd>.<T>, <R><n\|SP>`                                                          | `ZDUP Rn\|RSP, Zd.<T>`                                             | 7    |
+| EON                                           | `EON <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZEON $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| EOR (immediate)                               | `EOR <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZEOR $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| EOR (predicates)                              | `EOR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PEOR Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| EOR (vectors, predicated)                     | `EOR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZEOR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| EOR (vectors, unpredicated)                   | `EOR <Zd>.D, <Zn>.D, <Zm>.D`                                                        | `ZEOR Zm.D, Zn.D, Zd.D`                                            | 4    |
+| EORS                                          | `EORS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PEORS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| FABS                                          | `FABS <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZFABS Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| FNEG                                          | `FNEG <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZFNEG Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| INCB (scalar)                                 | `INCB <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZINCB {{$imm, }pattern, }Rdn`                                     | 42   |
+| INCD (scalar)                                 | `INCD <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZINCD {{$imm, }pattern, }Rdn`                                     | 42   |
+| INCD (vector)                                 | `INCD <Zdn>.D{, <pattern>{, MUL #<imm>}}`                                           | `ZINCD {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| INCH (scalar)                                 | `INCH <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZINCH {{$imm, }pattern, }Rdn`                                     | 42   |
+| INCH (vector)                                 | `INCH <Zdn>.H{, <pattern>{, MUL #<imm>}}`                                           | `ZINCH {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| INCW (scalar)                                 | `INCW <Xdn>{, <pattern>{, MUL #<imm>}}`                                             | `ZINCW {{$imm, }pattern, }Rdn`                                     | 42   |
+| INCW (vector)                                 | `INCW <Zdn>.S{, <pattern>{, MUL #<imm>}}`                                           | `ZINCW {{$imm, }pattern, }Zdn.<T>`                                 | 43   |
+| INDEX (immediate, scalar)                     | `INDEX <Zd>.<T>, #<imm>, <R><m>`                                                    | `ZINDEX $imm, Rm, Zd.<T>`                                          | 26   |
+| INDEX (immediates)                            | `INDEX <Zd>.<T>, #<imm1>, #<imm2>`                                                  | `ZINDEX $imm1, $imm2, Zd.<T>`                                      | 26   |
+| INDEX (scalar, immediate)                     | `INDEX <Zd>.<T>, <R><n>, #<imm>`                                                    | `ZINDEX Rn, $imm, Zd.<T>`                                          | 26   |
+| INDEX (scalars)                               | `INDEX <Zd>.<T>, <R><n>, <R><m>`                                                    | `ZINDEX Rn, Rm, Zd.<T>`                                            | 26   |
+| LASTA (scalar)                                | `LASTA <R><d>, <Pg>, <Zn>.<T>`                                                      | `ZLASTA Zn.<T>, Pg, Rd`                                            | 44   |
+| LASTA (SIMD&FP scalar)                        | `LASTA <V><d>, <Pg>, <Zn>.<T>`                                                      | `ZLASTA Zn.<T>, Pg, Vd`                                            | 45   |
+| LASTB (scalar)                                | `LASTB <R><d>, <Pg>, <Zn>.<T>`                                                      | `ZLASTB Zn.<T>, Pg, Rd`                                            | 44   |
+| LASTB (SIMD&FP scalar)                        | `LASTB <V><d>, <Pg>, <Zn>.<T>`                                                      | `ZLASTB Zn.<T>, Pg, Vd`                                            | 45   |
+| LD1B (scalar plus immediate, single register) | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | `ZLD1B (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                          | 32   |
+| LD1B (scalar plus scalar, single register)    | `LD1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                                       | `ZLD1B (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                     | 33   |
+| LD1D (scalar plus immediate, single register) | `LD1D { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | `ZLD1D (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                          | 32   |
+| LD1D (scalar plus scalar, single register)    | `LD1D { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`                               | `ZLD1D (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                     | 33   |
+| LD1H (scalar plus immediate, single register) | `LD1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | `ZLD1H (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                          | 32   |
+| LD1H (scalar plus scalar, single register)    | `LD1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                               | `ZLD1H (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                     | 33   |
+| LD1SB (scalar plus immediate)                 | `LD1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | `ZLD1SB (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                         | 32   |
+| LD1SB (scalar plus scalar)                    | `LD1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                                      | `ZLD1SB (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                    | 33   |
+| LD1SH (scalar plus immediate)                 | `LD1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | `ZLD1SH (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                         | 32   |
+| LD1SH (scalar plus scalar)                    | `LD1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                              | `ZLD1SH (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                    | 33   |
+| LD1SW (scalar plus immediate)                 | `LD1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                            | `ZLD1SW (VL*imm)(Rn\|RSP), Pg/Z, [Zt.D]`                           | 32   |
+| LD1SW (scalar plus scalar)                    | `LD1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                                | `ZLD1SW (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.D]`                      | 33   |
+| LD1W (scalar plus immediate, single register) | `LD1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | `ZLD1W (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                          | 32   |
+| LD1W (scalar plus scalar, single register)    | `LD1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                               | `ZLD1W (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt.<T>]`                     | 33   |
+| LD2B (scalar plus immediate)                  | `LD2B { <Zt1>.B, <Zt2>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | `ZLD2B (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.B, Zt2.B]`                    | 34   |
+| LD2B (scalar plus scalar)                     | `LD2B { <Zt1>.B, <Zt2>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                               | `ZLD2B (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.B, Zt2.B]`               | 35   |
+| LD2D (scalar plus immediate)                  | `LD2D { <Zt1>.D, <Zt2>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | `ZLD2D (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.D, Zt2.D]`                    | 34   |
+| LD2D (scalar plus scalar)                     | `LD2D { <Zt1>.D, <Zt2>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`                       | `ZLD2D (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.D, Zt2.D]`               | 35   |
+| LD2H (scalar plus immediate)                  | `LD2H { <Zt1>.H, <Zt2>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | `ZLD2H (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.H, Zt2.H]`                    | 34   |
+| LD2H (scalar plus scalar)                     | `LD2H { <Zt1>.H, <Zt2>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`                       | `ZLD2H (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.H, Zt2.H]`               | 35   |
+| LD2Q (scalar plus immediate)                  | `LD2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | `ZLD2Q (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.Q, Zt2.Q]`                    | 34   |
+| LD2Q (scalar plus scalar)                     | `LD2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`                       | `ZLD2Q (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.Q, Zt2.Q]`               | 35   |
+| LD2W (scalar plus immediate)                  | `LD2W { <Zt1>.S, <Zt2>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                   | `ZLD2W (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.S, Zt2.S]`                    | 34   |
+| LD2W (scalar plus scalar)                     | `LD2W { <Zt1>.S, <Zt2>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`                       | `ZLD2W (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.S, Zt2.S]`               | 35   |
+| LD3B (scalar plus immediate)                  | `LD3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | `ZLD3B (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.B, Zt2.B, Zt3.B]`             | 34   |
+| LD3B (scalar plus scalar)                     | `LD3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`                      | `ZLD3B (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.B, Zt2.B, Zt3.B]`        | 35   |
+| LD3D (scalar plus immediate)                  | `LD3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | `ZLD3D (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.D, Zt2.D, Zt3.D]`             | 34   |
+| LD3D (scalar plus scalar)                     | `LD3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`              | `ZLD3D (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.D, Zt2.D, Zt3.D]`        | 35   |
+| LD3H (scalar plus immediate)                  | `LD3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | `ZLD3H (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.H, Zt2.H, Zt3.H]`             | 34   |
+| LD3H (scalar plus scalar)                     | `LD3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`              | `ZLD3H (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.H, Zt2.H, Zt3.H]`        | 35   |
+| LD3Q (scalar plus immediate)                  | `LD3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | `ZLD3Q (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.Q, Zt2.Q, Zt3.Q]`             | 34   |
+| LD3Q (scalar plus scalar)                     | `LD3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`              | `ZLD3Q (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.Q, Zt2.Q, Zt3.Q]`        | 35   |
+| LD3W (scalar plus immediate)                  | `LD3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`          | `ZLD3W (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.S, Zt2.S, Zt3.S]`             | 34   |
+| LD3W (scalar plus scalar)                     | `LD3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`              | `ZLD3W (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.S, Zt2.S, Zt3.S]`        | 35   |
+| LD4B (scalar plus immediate)                  | `LD4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | `ZLD4B (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.B, Zt2.B, Zt3.B, Zt4.B]`      | 34   |
+| LD4B (scalar plus scalar)                     | `LD4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>/Z, [<Xn\|SP>, <Xm>]`             | `ZLD4B (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.B, Zt2.B, Zt3.B, Zt4.B]` | 35   |
+| LD4D (scalar plus immediate)                  | `LD4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | `ZLD4D (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.D, Zt2.D, Zt3.D, Zt4.D]`      | 34   |
+| LD4D (scalar plus scalar)                     | `LD4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #3]`     | `ZLD4D (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.D, Zt2.D, Zt3.D, Zt4.D]` | 35   |
+| LD4H (scalar plus immediate)                  | `LD4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | `ZLD4H (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.H, Zt2.H, Zt3.H, Zt4.H]`      | 34   |
+| LD4H (scalar plus scalar)                     | `LD4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #1]`     | `ZLD4H (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.H, Zt2.H, Zt3.H, Zt4.H]` | 35   |
+| LD4Q (scalar plus immediate)                  | `LD4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | `ZLD4Q (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.Q, Zt2.Q, Zt3.Q, Zt4.Q]`      | 34   |
+| LD4Q (scalar plus scalar)                     | `LD4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #4]`     | `ZLD4Q (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.Q, Zt2.Q, Zt3.Q, Zt4.Q]` | 35   |
+| LD4W (scalar plus immediate)                  | `LD4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]` | `ZLD4W (VL*imm)(Rn\|RSP), Pg/Z, [Zt1.S, Zt2.S, Zt3.S, Zt4.S]`      | 34   |
+| LD4W (scalar plus scalar)                     | `LD4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>/Z, [<Xn\|SP>, <Xm>, LSL #2]`     | `ZLD4W (Rn\|RSP)(Rm{<<shift}), Pg/Z, [Zt1.S, Zt2.S, Zt3.S, Zt4.S]` | 35   |
+| LDFF1B (scalar plus scalar)                   | `LDFF1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>}]`                                   | `ZLDFF1B (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.<T>]`                 | 33   |
+| LDFF1D (scalar plus scalar)                   | `LDFF1D { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #3}]`                             | `ZLDFF1D (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.D]`                   | 33   |
+| LDFF1H (scalar plus scalar)                   | `LDFF1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #1}]`                           | `ZLDFF1H (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.<T>]`                 | 33   |
+| LDFF1SB (scalar plus scalar)                  | `LDFF1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>}]`                                  | `ZLDFF1SB (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.<T>]`                | 33   |
+| LDFF1SH (scalar plus scalar)                  | `LDFF1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #1}]`                          | `ZLDFF1SH (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.<T>]`                | 33   |
+| LDFF1SW (scalar plus scalar)                  | `LDFF1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #2}]`                            | `ZLDFF1SW (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.D]`                  | 33   |
+| LDFF1W (scalar plus scalar)                   | `LDFF1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, <Xm>, LSL #2}]`                           | `ZLDFF1W (Rn\|RSP){(Rm{<<shift})}, Pg/Z, [Zt.<T>]`                 | 33   |
+| LDNF1B                                        | `LDNF1B { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | `ZLDNF1B (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                        | 32   |
+| LDNF1D                                        | `LDNF1D { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                           | `ZLDNF1D (VL*imm)(Rn\|RSP), Pg/Z, [Zt.D]`                          | 32   |
+| LDNF1H                                        | `LDNF1H { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | `ZLDNF1H (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                        | 32   |
+| LDNF1SB                                       | `LDNF1SB { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                        | `ZLDNF1SB (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                       | 32   |
+| LDNF1SH                                       | `LDNF1SH { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                        | `ZLDNF1SH (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                       | 32   |
+| LDNF1SW                                       | `LDNF1SW { <Zt>.D }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                          | `ZLDNF1SW (VL*imm)(Rn\|RSP), Pg/Z, [Zt.D]`                         | 32   |
+| LDNF1W                                        | `LDNF1W { <Zt>.<T> }, <Pg>/Z, [<Xn\|SP>{, #<imm>, MUL VL}]`                         | `ZLDNF1W (VL*imm)(Rn\|RSP), Pg/Z, [Zt.<T>]`                        | 32   |
+| LSL (immediate, predicated)                   | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | `ZLSL $const, Zdn.<T>, Pg/M, Zdn.<T>`                              | 15   |
+| LSL (immediate, unpredicated)                 | `LSL <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | `ZLSL $const, Zn.<T>, Zd.<T>`                                      | 18   |
+| LSL (vectors)                                 | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZLSL Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 16   |
+| LSL (wide elements, predicated)               | `LSL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | `ZLSL Zm.D, Zdn.<T>, Pg/M, Zdn.<T>`                                | 16   |
+| LSL (wide elements, unpredicated)             | `LSL <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | `ZLSL Zm.D, Zn.<T>, Zd.<T>`                                        | 19   |
+| LSLR                                          | `LSLR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZLSLR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 16   |
+| LSR (immediate, predicated)                   | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                        | `ZLSR $const, Zdn.<T>, Pg/M, Zdn.<T>`                              | 15   |
+| LSR (immediate, unpredicated)                 | `LSR <Zd>.<T>, <Zn>.<T>, #<const>`                                                  | `ZLSR $const, Zn.<T>, Zd.<T>`                                      | 18   |
+| LSR (vectors)                                 | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZLSR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 16   |
+| LSR (wide elements, predicated)               | `LSR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.D`                                          | `ZLSR Zm.D, Zdn.<T>, Pg/M, Zdn.<T>`                                | 16   |
+| LSR (wide elements, unpredicated)             | `LSR <Zd>.<T>, <Zn>.<T>, <Zm>.D`                                                    | `ZLSR Zm.D, Zn.<T>, Zd.<T>`                                        | 19   |
+| LSRR                                          | `LSRR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZLSRR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 16   |
+| MUL (immediate)                               | `MUL <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                  | `ZMUL $imm, Zdn.<T>, Zdn.<T>`                                      | 3    |
+| MUL (indexed)                                 | `MUL <Zd>.<T>, <Zn>.<T>, <Zm>.<T>[<imm>]`                                           | `ZMUL Zm.<T>[imm], Zn.<T>, Zd.<T>`                                 | 9    |
+| MUL (vectors, predicated)                     | `MUL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZMUL Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| MUL (vectors, unpredicated)                   | `MUL <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | `ZMUL Zm.<T>, Zn.<T>, Zd.<T>`                                      | 1    |
+| NAND                                          | `NAND <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PNAND Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| NANDS                                         | `NANDS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                              | `PNANDS Pm.B, Pn.B, Pg/Z, Pd.B`                                    | 6    |
+| NEG                                           | `NEG <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZNEG Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| NOR                                           | `NOR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PNOR Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| NORS                                          | `NORS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PNORS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| NOT (vector)                                  | `NOT <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                    | `ZNOT Zn.<T>, Pg/M, Zd.<T>`                                        | 17   |
+| ORN (immediate)                               | `ORN <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZORN $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| ORN (predicates)                              | `ORN <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PORN Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| ORNS                                          | `ORNS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PORNS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| ORR (immediate)                               | `ORR <Zdn>.<T>, <Zdn>.<T>, #<const>`                                                | `ZORR $const, Zdn.<T>, Zdn.<T>`                                    | 5    |
+| ORR (predicates)                              | `ORR <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                                | `PORR Pm.B, Pn.B, Pg/Z, Pd.B`                                      | 6    |
+| ORR (vectors, predicated)                     | `ORR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZORR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| ORR (vectors, unpredicated)                   | `ORR <Zd>.D, <Zn>.D, <Zm>.D`                                                        | `ZORR Zm.D, Zn.D, Zd.D`                                            | 4    |
+| ORRS                                          | `ORRS <Pd>.B, <Pg>/Z, <Pn>.B, <Pm>.B`                                               | `PORRS Pm.B, Pn.B, Pg/Z, Pd.B`                                     | 6    |
+| PFALSE                                        | `PFALSE <Pd>.B`                                                                     | `PFALSE Pd.B`                                                      | 22   |
+| PFIRST                                        | `PFIRST <Pdn>.B, <Pg>, <Pdn>.B`                                                     | `PFIRST Pdn.B, Pg, Pdn.B`                                          | 21   |
+| PMUL                                          | `PMUL <Zd>.B, <Zn>.B, <Zm>.B`                                                       | `ZPMUL Zm.<T>, Zn.<T>, Zd.<T>`                                     | 1    |
+| PTEST                                         | `PTEST <Pg>, <Pn>.B`                                                                | `PTEST Pn.B, Pg`                                                   | 20   |
+| PTRUE (predicate)                             | `PTRUE <Pd>.<T>{, <pattern>}`                                                       | `PTRUE {pattern, }Pd.<T>`                                          | 25   |
+| PTRUES                                        | `PTRUES <Pd>.<T>{, <pattern>}`                                                      | `PTRUES {pattern, }Pd.<T>`                                         | 25   |
+| PNEXT                                         | `PNEXT <Pdn>.<T>, <Pv>, <Pdn>.<T>`                                                  | `PNEXT Pdn.<T>, Pv, Pdn.<T>`                                       | 24   |
+| PUNPKHI                                       | `PUNPKHI <Pd>.H, <Pn>.B`                                                            | `PUNPKHI Pn.B, Pd.H`                                               | 27   |
+| PUNPKLO                                       | `PUNPKLO <Pd>.H, <Pn>.B`                                                            | `PUNPKLO Pn.B, Pd.H`                                               | 27   |
+| RDFFR (predicated)                            | `RDFFR <Pd>.B, <Pg>/Z`                                                              | `PRDFFR Pg/Z, Pd.B`                                                | 23   |
+| RDFFR (unpredicated)                          | `RDFFR <Pd>.B`                                                                      | `PRDFFR Pd.B`                                                      | 23   |
+| RDFFRS                                        | `RDFFRS <Pd>.B, <Pg>/Z`                                                             | `PRDFFRS Pg/Z, Pd.B`                                               | 23   |
+| SABD                                          | `SABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZSABD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| SADDV                                         | `SADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | `ZSADDV Zn.<T>, Pg, Vd`                                            | 47   |
+| SDIV                                          | `SDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZSDIV Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| SDIVR                                         | `SDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZSDIVR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| SEL (predicates)                              | `SEL <Pd>.B, <Pg>, <Pn>.B, <Pm>.B`                                                  | `PSEL Pm.B, Pn.B, Pg, Pd.B`                                        | 6    |
+| SEL (vectors)                                 | `SEL <Zd>.<T>, <Pv>, <Zn>.<T>, <Zm>.<T>`                                            | `ZSEL Zm.<T>, Zn.<T>, Pv, Zd.<T>`                                  | 14   |
+| SMAX (immediate)                              | `SMAX <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | `ZSMAX $imm, Zdn.<T>, Zdn.<T>`                                     | 3    |
+| SMAX (vectors)                                | `SMAX <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZSMAX Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| SMIN (immediate)                              | `SMIN <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | `ZSMIN $imm, Zdn.<T>, Zdn.<T>`                                     | 3    |
+| SMIN (vectors)                                | `SMIN <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZSMIN Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| SMULH (predicated)                            | `SMULH <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZSMULH Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| SMULH (unpredicated)                          | `SMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZSMULH Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| SQADD (immediate)                             | `SQADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | `ZSQADD $imm, Zdn.<T>, Zdn.<T>`                                    | 3    |
+| SQADD (vectors, predicated)                   | `SQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZSQADD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| SQADD (vectors, unpredicated)                 | `SQADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZSQADD Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| SQDMULH (vectors)                             | `SQDMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                              | `ZSQDMULH Zm.<T>, Zn.<T>, Zd.<T>`                                  | 1    |
+| SQRDMULH (vectors)                            | `SQRDMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                             | `ZSQRDMULH Zm.<T>, Zn.<T>, Zd.<T>`                                 | 1    |
+| SQSHL (immediate)                             | `SQSHL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | `ZSQSHL $const, Zdn.<T>, Pg/M, Zdn.<T>`                            | 15   |
+| SQSHLU                                        | `SQSHLU <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                     | `ZSQSHLU $const, Zdn.<T>, Pg/M, Zdn.<T>`                           | 15   |
+| SQSUB (immediate)                             | `SQSUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | `ZSQSUB $imm, Zdn.<T>, Zdn.<T>`                                    | 3    |
+| SQSUB (vectors, predicated)                   | `SQSUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZSQSUB Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| SQSUB (vectors, unpredicated)                 | `SQSUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZSQSUB Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| SQSUBR                                        | `SQSUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | `ZSQSUBR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                           | 2    |
+| SRSHR                                         | `SRSHR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | `ZSRSHR $const, Zdn.<T>, Pg/M, Zdn.<T>`                            | 15   |
+| ST1B (scalar plus immediate, single register) | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | `ZST1B [Zt.<T>], Pg, (VL*imm)(Rn\|RSP)`                            | 38   |
+| ST1B (scalar plus scalar, single register)    | `ST1B { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>]`                                         | `ZST1B [Zt.<T>], Pg, (Rn\|RSP)(Rm{<<shift})`                       | 39   |
+| ST1D (scalar plus immediate, single register) | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | `ZST1D [Zt.<T>], Pg, (VL*imm)(Rn\|RSP)`                            | 38   |
+| ST1D (scalar plus scalar, single register)    | `ST1D { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                                 | `ZST1D [Zt.<T>], Pg, (Rn\|RSP)(Rm{<<shift})`                       | 39   |
+| ST1H (scalar plus immediate, single register) | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | `ZST1H [Zt.<T>], Pg, (VL*imm)(Rn\|RSP)`                            | 38   |
+| ST1H (scalar plus scalar, single register)    | `ST1H { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                                 | `ZST1H [Zt.<T>], Pg, (Rn\|RSP)(Rm{<<shift})`                       | 39   |
+| ST1W (scalar plus immediate, single register) | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                             | `ZST1W [Zt.<T>], Pg, (VL*imm)(Rn\|RSP)`                            | 38   |
+| ST1W (scalar plus scalar, single register)    | `ST1W { <Zt>.<T> }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                                 | `ZST1W [Zt.<T>], Pg, (Rn\|RSP)(Rm{<<shift})`                       | 39   |
+| ST2B (scalar plus immediate)                  | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | `ZST2B [Zt1.B, Zt2.B], Pg, (VL*imm)(Rn\|RSP)`                      | 40   |
+| ST2B (scalar plus scalar)                     | `ST2B { <Zt1>.B, <Zt2>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                                 | `ZST2B [Zt1.B, Zt2.B], Pg, (Rn\|RSP)(Rm{<<shift})`                 | 41   |
+| ST2D (scalar plus immediate)                  | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | `ZST2D [Zt1.D, Zt2.D], Pg, (VL*imm)(Rn\|RSP)`                      | 40   |
+| ST2D (scalar plus scalar)                     | `ST2D { <Zt1>.D, <Zt2>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                         | `ZST2D [Zt1.D, Zt2.D], Pg, (Rn\|RSP)(Rm{<<shift})`                 | 41   |
+| ST2H (scalar plus immediate)                  | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | `ZST2H [Zt1.H, Zt2.H], Pg, (VL*imm)(Rn\|RSP)`                      | 40   |
+| ST2H (scalar plus scalar)                     | `ST2H { <Zt1>.H, <Zt2>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                         | `ZST2H [Zt1.H, Zt2.H], Pg, (Rn\|RSP)(Rm{<<shift})`                 | 41   |
+| ST2Q (scalar plus immediate)                  | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | `ZST2Q [Zt1.Q, Zt2.Q], Pg, (VL*imm)(Rn\|RSP)`                      | 40   |
+| ST2Q (scalar plus scalar)                     | `ST2Q { <Zt1>.Q, <Zt2>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                         | `ZST2Q [Zt1.Q, Zt2.Q], Pg, (Rn\|RSP)(Rm{<<shift})`                 | 41   |
+| ST2W (scalar plus immediate)                  | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`                     | `ZST2W [Zt1.S, Zt2.S], Pg, (VL*imm)(Rn\|RSP)`                      | 40   |
+| ST2W (scalar plus scalar)                     | `ST2W { <Zt1>.S, <Zt2>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                         | `ZST2W [Zt1.S, Zt2.S], Pg, (Rn\|RSP)(Rm{<<shift})`                 | 41   |
+| ST3B (scalar plus immediate)                  | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | `ZST3B [Zt1.B, Zt2.B, Zt3.B], Pg, (VL*imm)(Rn\|RSP)`               | 40   |
+| ST3B (scalar plus scalar)                     | `ST3B { <Zt1>.B, <Zt2>.B, <Zt3>.B }, <Pg>, [<Xn\|SP>, <Xm>]`                        | `ZST3B [Zt1.B, Zt2.B, Zt3.B], Pg, (Rn\|RSP)(Rm{<<shift})`          | 41   |
+| ST3D (scalar plus immediate)                  | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | `ZST3D [Zt1.D, Zt2.D, Zt3.D], Pg, (VL*imm)(Rn\|RSP)`               | 40   |
+| ST3D (scalar plus scalar)                     | `ST3D { <Zt1>.D, <Zt2>.D, <Zt3>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`                | `ZST3D [Zt1.D, Zt2.D, Zt3.D], Pg, (Rn\|RSP)(Rm{<<shift})`          | 41   |
+| ST3H (scalar plus immediate)                  | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | `ZST3H [Zt1.H, Zt2.H, Zt3.H], Pg, (VL*imm)(Rn\|RSP)`               | 40   |
+| ST3H (scalar plus scalar)                     | `ST3H { <Zt1>.H, <Zt2>.H, <Zt3>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`                | `ZST3H [Zt1.H, Zt2.H, Zt3.H], Pg, (Rn\|RSP)(Rm{<<shift})`          | 41   |
+| ST3Q (scalar plus immediate)                  | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | `ZST3Q [Zt1.Q, Zt2.Q, Zt3.Q], Pg, (VL*imm)(Rn\|RSP)`               | 40   |
+| ST3Q (scalar plus scalar)                     | `ST3Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`                | `ZST3Q [Zt1.Q, Zt2.Q, Zt3.Q], Pg, (Rn\|RSP)(Rm{<<shift})`          | 41   |
+| ST3W (scalar plus immediate)                  | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`            | `ZST3W [Zt1.S, Zt2.S, Zt3.S], Pg, (VL*imm)(Rn\|RSP)`               | 40   |
+| ST3W (scalar plus scalar)                     | `ST3W { <Zt1>.S, <Zt2>.S, <Zt3>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`                | `ZST3W [Zt1.S, Zt2.S, Zt3.S], Pg, (Rn\|RSP)(Rm{<<shift})`          | 41   |
+| ST4B (scalar plus immediate)                  | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | `ZST4B [Zt1.B, Zt2.B, Zt3.B, Zt4.B], Pg, (VL*imm)(Rn\|RSP)`        | 40   |
+| ST4B (scalar plus scalar)                     | `ST4B { <Zt1>.B, <Zt2>.B, <Zt3>.B, <Zt4>.B }, <Pg>, [<Xn\|SP>, <Xm>]`               | `ZST4B [Zt1.B, Zt2.B, Zt3.B, Zt4.B], Pg, (Rn\|RSP)(Rm{<<shift})`   | 41   |
+| ST4D (scalar plus immediate)                  | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | `ZST4D [Zt1.D, Zt2.D, Zt3.D, Zt4.D], Pg, (VL*imm)(Rn\|RSP)`        | 40   |
+| ST4D (scalar plus scalar)                     | `ST4D { <Zt1>.D, <Zt2>.D, <Zt3>.D, <Zt4>.D }, <Pg>, [<Xn\|SP>, <Xm>, LSL #3]`       | `ZST4D [Zt1.D, Zt2.D, Zt3.D, Zt4.D], Pg, (Rn\|RSP)(Rm{<<shift})`   | 41   |
+| ST4H (scalar plus immediate)                  | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | `ZST4H [Zt1.H, Zt2.H, Zt3.H, Zt4.H], Pg, (VL*imm)(Rn\|RSP)`        | 40   |
+| ST4H (scalar plus scalar)                     | `ST4H { <Zt1>.H, <Zt2>.H, <Zt3>.H, <Zt4>.H }, <Pg>, [<Xn\|SP>, <Xm>, LSL #1]`       | `ZST4H [Zt1.H, Zt2.H, Zt3.H, Zt4.H], Pg, (Rn\|RSP)(Rm{<<shift})`   | 41   |
+| ST4Q (scalar plus immediate)                  | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | `ZST4Q [Zt1.Q, Zt2.Q, Zt3.Q, Zt4.Q], Pg, (VL*imm)(Rn\|RSP)`        | 40   |
+| ST4Q (scalar plus scalar)                     | `ST4Q { <Zt1>.Q, <Zt2>.Q, <Zt3>.Q, <Zt4>.Q }, <Pg>, [<Xn\|SP>, <Xm>, LSL #4]`       | `ZST4Q [Zt1.Q, Zt2.Q, Zt3.Q, Zt4.Q], Pg, (Rn\|RSP)(Rm{<<shift})`   | 41   |
+| ST4W (scalar plus immediate)                  | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>{, #<imm>, MUL VL}]`   | `ZST4W [Zt1.S, Zt2.S, Zt3.S, Zt4.S], Pg, (VL*imm)(Rn\|RSP)`        | 40   |
+| ST4W (scalar plus scalar)                     | `ST4W { <Zt1>.S, <Zt2>.S, <Zt3>.S, <Zt4>.S }, <Pg>, [<Xn\|SP>, <Xm>, LSL #2]`       | `ZST4W [Zt1.S, Zt2.S, Zt3.S, Zt4.S], Pg, (Rn\|RSP)(Rm{<<shift})`   | 41   |
+| SUB (immediate)                               | `SUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                       | `ZSUB $imm, Zdn.<T>, Zdn.<T>`                                      | 3    |
+| SUB (vectors, predicated)                     | `SUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                        | `ZSUB Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                              | 2    |
+| SUB (vectors, unpredicated)                   | `SUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                  | `ZSUB Zm.<T>, Zn.<T>, Zd.<T>`                                      | 1    |
+| SUBR (immediate)                              | `SUBR <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                      | `ZSUBR $imm, Zdn.<T>, Zdn.<T>`                                     | 3    |
+| SUBR (vectors)                                | `SUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZSUBR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| SUQADD                                        | `SUQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | `ZSUQADD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                           | 2    |
+| SXTB                                          | `SXTB <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZSXTB Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| SXTH                                          | `SXTH <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZSXTH Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| SXTW                                          | `SXTW <Zd>.D, <Pg>/M, <Zn>.D`                                                       | `ZSXTW Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| TRN1 (predicates)                             | `TRN1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PTRN1 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| TRN1 (vectors)                                | `TRN1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZTRN1 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
+| TRN2 (predicates)                             | `TRN2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PTRN2 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| TRN2 (vectors)                                | `TRN2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZTRN2 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
+| UABD                                          | `UABD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZUABD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| UADDV                                         | `UADDV <Dd>, <Pg>, <Zn>.<T>`                                                        | `ZUADDV Zn.<T>, Pg, Vd`                                            | 47   |
+| UDIV                                          | `UDIV <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZUDIV Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| UDIVR                                         | `UDIVR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZUDIVR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| UMAX (immediate)                              | `UMAX <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | `ZUMAX $imm, Zdn.<T>, Zdn.<T>`                                     | 3    |
+| UMAX (vectors)                                | `UMAX <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZUMAX Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| UMIN (immediate)                              | `UMIN <Zdn>.<T>, <Zdn>.<T>, #<imm>`                                                 | `ZUMIN $imm, Zdn.<T>, Zdn.<T>`                                     | 3    |
+| UMIN (vectors)                                | `UMIN <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                       | `ZUMIN Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                             | 2    |
+| UMULH (predicated)                            | `UMULH <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZUMULH Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| UMULH (unpredicated)                          | `UMULH <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZUMULH Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| UQADD (immediate)                             | `UQADD <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | `ZUQADD $imm, Zdn.<T>, Zdn.<T>`                                    | 3    |
+| UQADD (vectors, predicated)                   | `UQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZUQADD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| UQADD (vectors, unpredicated)                 | `UQADD <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZUQADD Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| UQSHL (immediate)                             | `UQSHL <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | `ZUQSHL $const, Zdn.<T>, Pg/M, Zdn.<T>`                            | 15   |
+| UQSUB (immediate)                             | `UQSUB <Zdn>.<T>, <Zdn>.<T>, #<imm>{, <shift>}`                                     | `ZUQSUB $imm, Zdn.<T>, Zdn.<T>`                                    | 3    |
+| UQSUB (vectors, predicated)                   | `UQSUB <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                      | `ZUQSUB Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                            | 2    |
+| UQSUB (vectors, unpredicated)                 | `UQSUB <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                | `ZUQSUB Zm.<T>, Zn.<T>, Zd.<T>`                                    | 1    |
+| UQSUBR                                        | `UQSUBR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | `ZUQSUBR Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                           | 2    |
+| URSHR                                         | `URSHR <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, #<const>`                                      | `ZURSHR $const, Zdn.<T>, Pg/M, Zdn.<T>`                            | 15   |
+| USQADD                                        | `USQADD <Zdn>.<T>, <Pg>/M, <Zdn>.<T>, <Zm>.<T>`                                     | `ZUSQADD Zm.<T>, Zdn.<T>, Pg/M, Zdn.<T>`                           | 2    |
+| UXTB                                          | `UXTB <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZUXTB Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| UXTH                                          | `UXTH <Zd>.<T>, <Pg>/M, <Zn>.<T>`                                                   | `ZUXTH Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| UXTW                                          | `UXTW <Zd>.D, <Pg>/M, <Zn>.D`                                                       | `ZUXTW Zn.<T>, Pg/M, Zd.<T>`                                       | 17   |
+| UZP1 (predicates)                             | `UZP1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PUZP1 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| UZP1 (vectors)                                | `UZP1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZUZP1 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
+| UZP2 (predicates)                             | `UZP2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PUZP2 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| UZP2 (vectors)                                | `UZP2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZUZP2 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
+| WHILEGE (predicate pair)                      | `WHILEGE { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILEGE Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILEGE (predicate)                           | `WHILEGE <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILEGE Rn, Rm, Pd.<T>`<br>`WHILEGEW Rn, Rm, Pd.<T>`              | 10   |
+| WHILEGT (predicate pair)                      | `WHILEGT { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILEGT Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILEGT (predicate)                           | `WHILEGT <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILEGT Rn, Rm, Pd.<T>`<br>`WHILEGTW Rn, Rm, Pd.<T>`              | 10   |
+| WHILEHI (predicate pair)                      | `WHILEHI { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILEHI Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILEHI (predicate)                           | `WHILEHI <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILEHI Rn, Rm, Pd.<T>`<br>`WHILEHIW Rn, Rm, Pd.<T>`              | 10   |
+| WHILEHS (predicate pair)                      | `WHILEHS { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILEHS Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILEHS (predicate)                           | `WHILEHS <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILEHS Rn, Rm, Pd.<T>`<br>`WHILEHSW Rn, Rm, Pd.<T>`              | 10   |
+| WHILELE (predicate pair)                      | `WHILELE { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILELE Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILELE (predicate)                           | `WHILELE <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILELE Rn, Rm, Pd.<T>`<br>`WHILELEW Rn, Rm, Pd.<T>`              | 10   |
+| WHILELO (predicate pair)                      | `WHILELO { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILELO Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILELO (predicate)                           | `WHILELO <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILELO Rn, Rm, Pd.<T>`<br>`WHILELOW Rn, Rm, Pd.<T>`              | 10   |
+| WHILELS (predicate pair)                      | `WHILELS { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILELS Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILELS (predicate)                           | `WHILELS <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILELS Rn, Rm, Pd.<T>`<br>`WHILELSW Rn, Rm, Pd.<T>`              | 10   |
+| WHILELT (predicate pair)                      | `WHILELT { <Pd1>.<T>, <Pd2>.<T> }, <Xn>, <Xm>`                                      | `WHILELT Xn, Xm, [Pd1.<T>, Pd2.<T>]`                               | 11   |
+| WHILELT (predicate)                           | `WHILELT <Pd>.<T>, <R><n>, <R><m>`                                                  | `WHILELT Rn, Rm, Pd.<T>`<br>`WHILELTW Rn, Rm, Pd.<T>`              | 10   |
+| ZIP1 (predicates)                             | `ZIP1 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PZIP1 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| ZIP1 (vectors)                                | `ZIP1 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZZIP1 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
+| ZIP2 (predicates)                             | `ZIP2 <Pd>.<T>, <Pn>.<T>, <Pm>.<T>`                                                 | `PZIP2 Pm.<T>, Pn.<T>, Pd.<T>`                                     | 28   |
+| ZIP2 (vectors)                                | `ZIP2 <Zd>.<T>, <Zn>.<T>, <Zm>.<T>`                                                 | `ZZIP2 Zm.<T>, Zn.<T>, Zd.<T>`                                     | 29   |
