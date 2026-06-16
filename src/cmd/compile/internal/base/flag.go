@@ -195,6 +195,7 @@ func ParseFlags() {
 	Debug.ZeroCopy = 1
 	Debug.RangeFuncCheck = 1
 	Debug.MergeLocals = 1
+	Debug.MutexAdaptiveSpin = 0
 
 	Debug.Checkptr = -1 // so we can tell whether it is set explicitly
 
@@ -371,6 +372,13 @@ func ParseFlags() {
 
 	if Debug.Checkptr == -1 { // if not set explicitly
 		Debug.Checkptr = 0
+	}
+
+	if Debug.MutexAdaptiveSpin != 0 && Debug.MutexAdaptiveSpin != 1 {
+		log.Fatalf("-d=mutexadaptivespin must be 0 or 1")
+	}
+	if Debug.MutexAdaptiveSpin == 1 && buildcfg.GOARCH != "arm64" {
+		log.Fatalf("-d=mutexadaptivespin=1 is only supported on arm64")
 	}
 
 	// set via a -d flag

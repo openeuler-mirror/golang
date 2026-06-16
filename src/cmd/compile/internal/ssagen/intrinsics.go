@@ -173,6 +173,11 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 			return nil
 		},
 		sys.ARM64, sys.Loong64, sys.PPC64, sys.RISCV64)
+	addF("runtime", "mutexAdaptiveSpinEnabled",
+		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+			return s.constInt32(types.Types[types.TUINT32], int32(base.Debug.MutexAdaptiveSpin))
+		},
+		sys.ARM64)
 
 	/******** internal/runtime/sys ********/
 	add("internal/runtime/sys", "GetCallerPC",

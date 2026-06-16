@@ -15,13 +15,21 @@ import (
 
 func TestSizeof(t *testing.T) {
 	const _64bit = unsafe.Sizeof(uintptr(0)) == 8
+
+	// lockSpinExtra accounts for the adaptive spin fields and cache line
+	// padding added to g. The size is rounded up to g's struct alignment
+	// since trailing padding is added when these fields are embedded in g.
+	lockSpinFieldSize := unsafe.Sizeof(runtime.LockSpinFields{})
+	gAlign := unsafe.Alignof(runtime.G{})
+	lockSpinExtra := (lockSpinFieldSize + gAlign - 1) &^ (gAlign - 1)
+
 	var tests = []struct {
 		val    any     // type as a value
 		_32bit uintptr // size on 32bit platforms
 		_64bit uintptr // size on 64bit platforms
 	}{
-		{runtime.G{}, 280, 440},   // g, but exported for testing
-		{runtime.Sudog{}, 56, 88}, // sudog, but exported for testing
+		{runtime.G{}, 280 + lockSpinExtra, 440 + lockSpinExtra}, // g, but exported for testing
+		{runtime.Sudog{}, 56, 88},                               // sudog, but exported for testing
 	}
 
 	for _, tt := range tests {
