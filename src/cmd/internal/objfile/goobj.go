@@ -26,6 +26,10 @@ type goobjFile struct {
 	arch  *sys.Arch
 }
 
+func (f *goobjFile) symbolSize(name string) (uint64, error) {
+	return 0, fmt.Errorf("symbol size not available in go object files")
+}
+
 func openGoFile(f *os.File) (*File, error) {
 	a, err := archive.Parse(f, false)
 	if err != nil {
@@ -225,6 +229,22 @@ func (f *goobjFile) pcln() (textStart uint64, symtab, pclntab []byte, err error)
 	// Should never be called. We implement Liner below, callers
 	// should use that instead.
 	return 0, nil, nil, fmt.Errorf("pcln not available in go object file")
+}
+
+func (f *goobjFile) firstmoduledata() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *goobjFile) buildVersion() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (f *goobjFile) pcHeader(addr uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *goobjFile) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 // Find returns the file name, line, and function data for the given pc.

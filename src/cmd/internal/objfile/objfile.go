@@ -18,6 +18,7 @@ import (
 
 type rawFile interface {
 	symbols() (syms []Sym, err error)
+	symbolSize(name string) (uint64, error)
 	pcln() (textStart uint64, symtab, pclntab []byte, err error)
 	text() (textStart uint64, text []byte, err error)
 	goarch() string

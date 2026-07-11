@@ -18,6 +18,18 @@ type xcoffFile struct {
 	xcoff *xcoff.File
 }
 
+func (f *xcoffFile) symbolSize(name string) (uint64, error) {
+	for i, s := range f.xcoff.Symbols {
+		if s.Name == name {
+			if i+1 < len(f.xcoff.Symbols) {
+				return f.xcoff.Symbols[i+1].Value - s.Value, nil
+			}
+			return 0, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol %q not found", name)
+}
+
 func openXcoff(r io.ReaderAt) (rawFile, error) {
 	f, err := xcoff.NewFile(r)
 	if err != nil {
@@ -96,6 +108,22 @@ func (f *xcoffFile) pcln() (textStart uint64, symtab, pclntab []byte, err error)
 	}
 	symtab, _ = loadXCOFFTable(f.xcoff, "runtime.symtab", "runtime.esymtab") // ignore error, this symbol is not useful anyway
 	return textStart, symtab, pclntab, nil
+}
+
+func (f *xcoffFile) firstmoduledata() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *xcoffFile) buildVersion() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (f *xcoffFile) pcHeader(addr uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *xcoffFile) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (f *xcoffFile) text() (textStart uint64, text []byte, err error) {
