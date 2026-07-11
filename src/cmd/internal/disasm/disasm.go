@@ -24,6 +24,7 @@ import (
 
 	"cmd/internal/objfile"
 	"cmd/internal/src"
+	"internal/abi"
 
 	"golang.org/x/arch/arm/armasm"
 	"golang.org/x/arch/arm64/arm64asm"
@@ -36,14 +37,15 @@ import (
 
 // Disasm is a disassembler for a given File.
 type Disasm struct {
-	syms      []objfile.Sym    // symbols in file, sorted by address
-	pcln      objfile.Liner    // pcln table
-	text      []byte           // bytes of text segment (actual instructions)
-	textStart uint64           // start PC of text
-	textEnd   uint64           // end PC of text
-	goarch    string           // GOARCH string
-	disasm    disasmFunc       // disassembler function for goarch
-	byteOrder binary.ByteOrder // byte order for goarch
+	syms      []objfile.Sym       // symbols in file, sorted by address
+	pcln      objfile.Liner       // pcln table
+	text      []byte              // bytes of text segment (actual instructions)
+	textStart uint64              // start PC of text
+	textEnd   uint64              // end PC of text
+	goarch    string              // GOARCH string
+	disasm    disasmFunc          // disassembler function for goarch
+	byteOrder binary.ByteOrder    // byte order for goarch
+	md        *objfile.Moduledata // moduledata for funcInfo lookup
 }
 
 // DisasmForFile returns a disassembler for the file f.
@@ -109,6 +111,13 @@ func (d *Disasm) lookup(addr uint64) (name string, base uint64) {
 		}
 	}
 	return "", 0
+}
+
+func (d *Disasm) SetModuledata(md *objfile.Moduledata) {
+	if md == nil {
+		return
+	}
+	d.md = md
 }
 
 // base returns the final element in the path.
@@ -194,11 +203,28 @@ func (fc *FileCache) Line(filename string, line int) ([]byte, error) {
 	return cf.Lines[line-1], nil
 }
 
+// MDOptions contains moduledata display options (FUNCDATA, PCSP, PCDATA).
+type MDOptions struct {
+	PrintFuncData     bool
+	InlinePCSP        bool
+	InlineUnsafePoint bool
+	InlineStackMap    bool
+	InlineInlTree     bool
+	InlineArgLive     bool
+}
+
 // Print prints a disassembly of the file to w.
 // If filter is non-nil, the disassembly only includes functions with names matching filter.
 // If printCode is true, the disassembly includes corresponding source lines.
+// If md options are set, the disassembly includes moduledata annotations inline.
 // The disassembly only includes functions that overlap the range [start, end).
-func (d *Disasm) Print(w io.Writer, filter *regexp.Regexp, start, end uint64, printCode bool, gnuAsm bool) {
+func (d *Disasm) Print(w io.Writer, filter *regexp.Regexp, start, end uint64, printCode bool, gnuAsm bool, md MDOptions) {
+	printFuncData := md.PrintFuncData
+	inlinePCSP := md.InlinePCSP
+	inlineUnsafePoint := md.InlineUnsafePoint
+	inlineStackMap := md.InlineStackMap
+	inlineInlTree := md.InlineInlTree
+	inlineArgLive := md.InlineArgLive
 	if start < d.textStart {
 		start = d.textStart
 	}
@@ -230,6 +256,17 @@ func (d *Disasm) Print(w io.Writer, filter *regexp.Regexp, start, end uint64, pr
 		printed = true
 
 		file, _, _ := d.pcln.PCToLine(sym.Addr)
+
+		var currentFuncInfo objfile.FuncInfo
+		if printFuncData && d.md != nil {
+			if fi, ok := d.md.FuncInfoByName(sym.Name); ok {
+				fmt.Fprintf(bw, "%s", fi.String())
+				if inlinePCSP || inlineUnsafePoint || inlineStackMap || inlineInlTree || inlineArgLive {
+					currentFuncInfo = fi
+				}
+			}
+		}
+
 		fmt.Fprintf(bw, "TEXT %s(SB) %s\n", sym.Name, file)
 
 		if symEnd > end {
@@ -258,10 +295,8 @@ func (d *Disasm) Print(w io.Writer, filter *regexp.Regexp, start, end uint64, pr
 			}
 
 			if size%4 != 0 || d.goarch == "386" || d.goarch == "amd64" {
-				// Print instruction as bytes.
 				fmt.Fprintf(tw, "%x", code[i:i+size])
 			} else {
-				// Print instruction as 32-bit words.
 				for j := uint64(0); j < size; j += 4 {
 					if j > 0 {
 						fmt.Fprintf(tw, " ")
@@ -269,7 +304,49 @@ func (d *Disasm) Print(w io.Writer, filter *regexp.Regexp, start, end uint64, pr
 					fmt.Fprintf(tw, "%08x", d.byteOrder.Uint32(code[i+j:]))
 				}
 			}
-			fmt.Fprintf(tw, "\t%s\t\n", text)
+			if currentFuncInfo.Valid() && (inlinePCSP || inlineUnsafePoint || inlineStackMap || inlineInlTree || inlineArgLive) {
+				fmt.Fprintf(tw, "\t%s\t[", text)
+				first := true
+				if inlinePCSP {
+					pcsp := currentFuncInfo.PCSPValue(pc)
+					fmt.Fprintf(tw, "PCSP:%d", pcsp)
+					first = false
+				}
+				if inlineUnsafePoint {
+					if !first {
+						fmt.Fprintf(tw, ",\t")
+					}
+					unsafepoint := currentFuncInfo.PCDataValue(int(abi.PCDATA_UnsafePoint), pc)
+					fmt.Fprintf(tw, "PCDATA_UnsafePoint:%d", unsafepoint)
+					first = false
+				}
+				if inlineStackMap {
+					if !first {
+						fmt.Fprintf(tw, ",\t")
+					}
+					stackmap := currentFuncInfo.PCDataValue(int(abi.PCDATA_StackMapIndex), pc)
+					fmt.Fprintf(tw, "PCDATA_StackMapIndex:%d", stackmap)
+					first = false
+				}
+				if inlineInlTree {
+					if !first {
+						fmt.Fprintf(tw, ",\t")
+					}
+					inltree := currentFuncInfo.PCDataValue(int(abi.PCDATA_InlTreeIndex), pc)
+					fmt.Fprintf(tw, "PCDATA_InlTreeIndex:%d", inltree)
+					first = false
+				}
+				if inlineArgLive {
+					if !first {
+						fmt.Fprintf(tw, ",\t")
+					}
+					arglive := currentFuncInfo.PCDataValue(int(abi.PCDATA_ArgLiveIndex), pc)
+					fmt.Fprintf(tw, "PCDATA_ArgLiveIndex:%d", arglive)
+				}
+				fmt.Fprintf(tw, "]\t\n")
+			} else {
+				fmt.Fprintf(tw, "\t%s\t\n", text)
+			}
 		})
 		tw.Flush()
 	}
