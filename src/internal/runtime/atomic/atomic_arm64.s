@@ -164,8 +164,12 @@ TEXT ·Xchg8(SB), NOSPLIT, $0-17
 	MOVD	ptr+0(FP), R0
 	MOVB	new+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	SWPALB	R1, (R0), R2
 	MOVB	R2, ret+16(FP)
@@ -188,8 +192,12 @@ TEXT ·Xchg(SB), NOSPLIT, $0-20
 	MOVD	ptr+0(FP), R0
 	MOVW	new+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	SWPALW	R1, (R0), R2
 	MOVW	R2, ret+16(FP)
@@ -212,8 +220,12 @@ TEXT ·Xchg64(SB), NOSPLIT, $0-24
 	MOVD	ptr+0(FP), R0
 	MOVD	new+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	SWPALD	R1, (R0), R2
 	MOVD	R2, ret+16(FP)
@@ -239,8 +251,12 @@ TEXT ·Cas(SB), NOSPLIT, $0-17
 	MOVW	old+8(FP), R1
 	MOVW	new+12(FP), R2
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MOVD	R1, R3
 	CASALW	R3, (R0), R2
@@ -274,8 +290,12 @@ TEXT ·Cas64(SB), NOSPLIT, $0-25
 	MOVD	old+8(FP), R1
 	MOVD	new+16(FP), R2
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MOVD	R1, R3
 	CASALD	R3, (R0), R2
@@ -304,8 +324,12 @@ TEXT ·Xadd(SB), NOSPLIT, $0-20
 	MOVD	ptr+0(FP), R0
 	MOVW	delta+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDADDALW	R1, (R0), R2
 	ADD 	R1, R2
@@ -329,8 +353,12 @@ TEXT ·Xadd64(SB), NOSPLIT, $0-24
 	MOVD	ptr+0(FP), R0
 	MOVD	delta+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDADDALD	R1, (R0), R2
 	ADD 	R1, R2
@@ -359,8 +387,12 @@ TEXT ·And8(SB), NOSPLIT, $0-9
 	MOVD	ptr+0(FP), R0
 	MOVB	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MVN 	R1, R2
 	LDCLRALB	R2, (R0), R3
@@ -378,8 +410,12 @@ TEXT ·Or8(SB), NOSPLIT, $0-9
 	MOVD	ptr+0(FP), R0
 	MOVB	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDORALB	R1, (R0), R2
 	RET
@@ -397,8 +433,12 @@ TEXT ·And(SB), NOSPLIT, $0-12
 	MOVD	ptr+0(FP), R0
 	MOVW	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MVN 	R1, R2
 	LDCLRALW	R2, (R0), R3
@@ -417,8 +457,12 @@ TEXT ·Or(SB), NOSPLIT, $0-12
 	MOVD	ptr+0(FP), R0
 	MOVW	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDORALW	R1, (R0), R2
 	RET
@@ -436,8 +480,12 @@ TEXT ·Or32(SB), NOSPLIT, $0-20
 	MOVD	ptr+0(FP), R0
 	MOVW	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDORALW	R1, (R0), R2
 	MOVD	R2, ret+16(FP)
@@ -457,8 +505,12 @@ TEXT ·And32(SB), NOSPLIT, $0-20
 	MOVD	ptr+0(FP), R0
 	MOVW	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MVN 	R1, R2
 	LDCLRALW	R2, (R0), R3
@@ -479,8 +531,12 @@ TEXT ·Or64(SB), NOSPLIT, $0-24
 	MOVD	ptr+0(FP), R0
 	MOVD	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	LDORALD	R1, (R0), R2
 	MOVD	R2, ret+16(FP)
@@ -500,8 +556,12 @@ TEXT ·And64(SB), NOSPLIT, $0-24
 	MOVD	ptr+0(FP), R0
 	MOVD	val+8(FP), R1
 #ifndef GOARM64_LSE
+#ifdef GOARM64_NOLSE
+	B	load_store_loop
+#else
 	MOVBU	internal∕cpu·ARM64+const_offsetARM64HasATOMICS(SB), R4
 	CBZ 	R4, load_store_loop
+#endif
 #endif
 	MVN 	R1, R2
 	LDCLRALD	R2, (R0), R3

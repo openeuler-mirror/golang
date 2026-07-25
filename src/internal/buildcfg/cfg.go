@@ -173,6 +173,8 @@ type Goarm64Features struct {
 	Version string
 	// Large Systems Extension
 	LSE bool
+	// NoLSE disables LSE atomics, forcing load-store exclusive loops.
+	NoLSE bool
 	// ARM v8.0 Cryptographic Extension. It includes the following features:
 	// * FEAT_AES, which includes the AESD and AESE instructions.
 	// * FEAT_PMULL, which includes the PMULL, PMULL2 instructions.
@@ -192,7 +194,9 @@ type Goarm64Features struct {
 
 func (g Goarm64Features) String() string {
 	arm64Str := g.Version
-	if g.LSE {
+	if g.NoLSE {
+		arm64Str += ",nolse"
+	} else if g.LSE {
 		arm64Str += ",lse"
 	}
 	if g.Crypto {
@@ -219,6 +223,7 @@ func (g Goarm64Features) String() string {
 func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	const (
 		lseOpt           = ",lse"
+		nolseOpt         = ",nolse"
 		cryptoOpt        = ",crypto"
 		rcpcOpt          = ",rcpc"
 		intrinsicMatchH2 = ",intrinsicmatchh2"
@@ -228,6 +233,7 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	)
 
 	g.LSE = false
+	g.NoLSE = false
 	g.Crypto = false
 	g.Rcpc = false
 	g.IntrinsicMatchH2 = false
@@ -235,10 +241,18 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 	g.RPRFM = false
 	g.ABIInternal = false
 	// We allow any combination of suffixes, in any order
+	lseExplicitlySet := false
 	for {
 		if strings.HasSuffix(v, lseOpt) {
 			g.LSE = true
+			lseExplicitlySet = true
 			v = v[:len(v)-len(lseOpt)]
+			continue
+		}
+
+		if strings.HasSuffix(v, nolseOpt) {
+			g.NoLSE = true
+			v = v[:len(v)-len(nolseOpt)]
 			continue
 		}
 
@@ -294,9 +308,14 @@ func ParseGoarm64(v string) (g Goarm64Features, e error) {
 		// LSE extension is mandatory starting from 8.1
 		g.LSE = true
 	default:
-		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q, %q, %q and/or %q",
-			lseOpt, cryptoOpt, rcpcOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt, abiInternalOpt)
+		e = fmt.Errorf("invalid GOARM64: must start with v8.{0-9} or v9.{0-5} and may optionally end in %q, %q, %q, %q, %q, %q, %q and/or %q",
+			lseOpt, nolseOpt, cryptoOpt, rcpcOpt, intrinsicMatchH2, KpMemOpt, rprfmOpt, abiInternalOpt)
 		g.Version = DefaultGOARM64
+	}
+
+	if lseExplicitlySet && g.NoLSE {
+		e = fmt.Errorf("invalid GOARM64: lse and nolse cannot both be set")
+		return
 	}
 
 	// RPRFM requires armv8.9 or later.
