@@ -11,6 +11,225 @@
 
 TEXT asmtest(SB),DUPOK|NOSPLIT,$-8
 
+	// SVE instructions.
+	ZADD Z1.B, Z2.B, Z3.B                       // 43002104
+	ZADD Z1.S, Z2.S, P0/M, Z2.S                 // 22008004
+	ZADD Z1.S, Z2.S, P7/M, Z2.S                 // 221c8004
+	ZADD $1, Z0.S, Z0.S                         // 20c0a025
+	PAND P1.B, P2.B, P0/Z, P3.B                 // 43400125
+	WHILELT R0, R1, P0.B                        // 20142025
+	PTRUE P0.B                                  // e0e31825
+	PTRUE VL16, P1.S                            // PTRUE $9, P1.S // 21e19825
+	ZCNTB R0                                    // e0e32004
+	ZLD1B (VL*1)(R0), P0/Z, [Z0.B]              // 00a001a4
+	ZLD1B (VL*1)(R0), P7/Z, [Z0.B]              // 00bc01a4
+	ZST1B [Z0.B], P0, (VL*1)(R0)                // 00e001e4
+	ZST1B [Z0.B], P7, (VL*1)(R0)                // 00fc01e4
+	PANDS P1.B, P2.B, P0/Z, P3.B                       // 43404125
+	PBIC P1.B, P2.B, P0/Z, P3.B                        // 53400125
+	PBICS P1.B, P2.B, P0/Z, P3.B                       // 53404125
+	PBRKA P1.B, P0/Z, P2.B                             // 22401025
+	PBRKAS P1.B, P0/Z, P2.B                            // 22405025
+	PBRKB P1.B, P0/Z, P2.B                             // 22409025
+	PBRKBS P1.B, P0/Z, P2.B                            // 2240d025
+	PBRKN P0.B, P1.B, P2/Z, P0.B                       // 20481825
+	PBRKNS P0.B, P1.B, P2/Z, P0.B                      // 20485825
+	PBRKPA P1.B, P2.B, P0/Z, P3.B                      // 43c00125
+	PBRKPAS P1.B, P2.B, P0/Z, P3.B                     // 43c04125
+	PBRKPB P1.B, P2.B, P0/Z, P3.B                      // 53c00125
+	PBRKPBS P1.B, P2.B, P0/Z, P3.B                     // 53c04125
+	PEOR P1.B, P2.B, P0/Z, P3.B                        // 43420125
+	PEORS P1.B, P2.B, P0/Z, P3.B                       // 43424125
+	PFALSE P0.B                                        // 00e41825
+	PFIRST P0.B, P1, P0.B                              // 20c05825
+	PNAND P1.B, P2.B, P0/Z, P3.B                       // 53428125
+	PNANDS P1.B, P2.B, P0/Z, P3.B                      // 5342c125
+	PNEXT P0.B, P1, P0.B                               // 20c45925
+	PNOR P1.B, P2.B, P0/Z, P3.B                        // 43428125
+	PNORS P1.B, P2.B, P0/Z, P3.B                       // 4342c125
+	PORN P1.B, P2.B, P0/Z, P3.B                        // 53408125
+	PORNS P1.B, P2.B, P0/Z, P3.B                       // 5340c125
+	PORRS P1.B, P2.B, P0/Z, P3.B                       // 4340c125
+	PRDFFR P0.B                                        // 00f01925
+	PRDFFRS P0/Z, P1.B                                 // 01f05825
+	PSEL P1.B, P2.B, P0, P3.B                          // 53420125
+	PTEST P1.B, P0                                     // 20c05025
+	PTRN1 P1.B, P2.B, P3.B                             // 43502105
+	PTRN2 P1.B, P2.B, P3.B                             // 43542105
+	PTRUES P0.B                                        // e0e31925
+	PUNPKHI P0.B, P1.H                                 // 01403105
+	PUNPKLO P0.B, P1.H                                 // 01403005
+	PUZP1 P1.B, P2.B, P3.B                             // 43482105
+	PUZP2 P1.B, P2.B, P3.B                             // 434c2105
+	PZIP1 P1.B, P2.B, P3.B                             // 43402105
+	PZIP2 P1.B, P2.B, P3.B                             // 43442105
+	WHILEGE R0, R1, P0.B                               // 20102025
+	WHILEGEW R0, R1, P0.B                              // 20002025
+	WHILEGT R0, R1, P0.B                               // 30102025
+	WHILEGTW R0, R1, P0.B                              // 30002025
+	WHILEHI R0, R1, P0.B                               // 30182025
+	WHILEHIW R0, R1, P0.B                              // 30082025
+	WHILEHS R0, R1, P0.B                               // 20182025
+	WHILEHSW R0, R1, P0.B                              // 20082025
+	WHILELE R0, R1, P0.B                               // 30142025
+	WHILELEW R0, R1, P0.B                              // 30042025
+	WHILELO R0, R1, P0.B                               // 201c2025
+	WHILELOW R0, R1, P0.B                              // 200c2025
+	WHILELS R0, R1, P0.B                               // 301c2025
+	WHILELSW R0, R1, P0.B                              // 300c2025
+	WHILELTW R0, R1, P0.B                              // 20042025
+	ZABS Z1.S, P0/M, Z2.S                              // 22a09604
+	ZAESD Z1.B, Z0.B, Z0.B                             // 20e42245
+	ZAESE Z1.B, Z0.B, Z0.B                             // 20e02245
+	ZAESIMC Z0.B, Z0.B                                 // 00e42045
+	ZAESMC Z0.B, Z0.B                                  // 00e02045
+	ZAND Z1.S, Z2.S, P0/M, Z2.S                        // 22009a04
+	ZASR $1, Z0.S, P0/M, Z0.S                          // e0834004
+	ZASRD $1, Z0.S, P0/M, Z0.S                         // e0834404
+	ZASRR Z1.S, Z0.S, P0/M, Z0.S                       // 20809404
+	ZBIC Z1.S, Z2.S, P0/M, Z2.S                        // 22009b04
+	ZCLS Z1.S, P0/M, Z2.S                              // 22a09804
+	ZCLZ Z1.S, P0/M, Z2.S                              // 22a09904
+	ZCMPEQ Z1.S, Z2.S, P0/Z, P3.S                      // 43a08124
+	ZCMPGE Z1.S, Z2.S, P0/Z, P3.S                      // 43808124
+	ZCMPGT Z1.S, Z2.S, P0/Z, P3.S                      // 53808124
+	ZCMPHI Z1.S, Z2.S, P0/Z, P3.S                      // 53008124
+	ZCMPHS Z1.S, Z2.S, P0/Z, P3.S                      // 43008124
+	ZCMPLE Z1.S, Z2.S, P0/Z, P3.S                      // 23808224
+	ZCMPLO Z1.S, Z2.S, P0/Z, P3.S                      // 33008224
+	ZCMPLS Z1.S, Z2.S, P0/Z, P3.S                      // 23008224
+	ZCMPLT Z1.S, Z2.S, P0/Z, P3.S                      // 33808224
+	ZCMPNE Z1.S, Z2.S, P0/Z, P3.S                      // 53a08124
+	ZCNOT Z1.S, P0/M, Z2.S                             // 22a09b04
+	ZCNT Z1.S, P0/M, Z2.S                              // 22a09a04
+	ZCNTD R0                                           // e0e3e004
+	ZCNTH R0                                           // e0e36004
+	ZCNTP P0.S, P1, R0                                 // 0084a025
+	ZCNTW R0                                           // e0e3a004
+	ZDECB R0                                           // e0e73004
+	ZDECD R0                                           // e0e7f004
+	ZDECH R0                                           // e0e77004
+	ZDECW R0                                           // e0e7b004
+	ZDUP $1, Z0.S                                      // 20c0b825
+	ZEON $1, Z0.D, Z0.D                                // c0ff4305
+	ZEOR Z1.S, Z2.S, P0/M, Z2.S                        // 22009904
+	ZFABS Z1.S, P0/M, Z2.S                             // 22a09c04
+	ZFNEG Z1.S, P0/M, Z2.S                             // 22a09d04
+	ZINCB R0                                           // e0e33004
+	ZINCD R0                                           // e0e3f004
+	ZINCH R0                                           // e0e37004
+	ZINCW R0                                           // e0e3b004
+	ZINDEX $0, $1, Z0.S                                // 2040a004
+	ZLASTA Z0.S, P0, R1                                // 01a0a005
+	ZLASTB Z0.S, P0, R1                                // 01a0a105
+	ZLD1D (VL*1)(R0), P0/Z, [Z0.D]                     // 00a0e1a5
+	ZLD1H (VL*1)(R0), P0/Z, [Z0.H]                     // 00a0a1a4
+	ZLD1SB (VL*1)(R0), P0/Z, [Z0.H]                    // 00a0c1a5
+	ZLD1SH (VL*1)(R0), P0/Z, [Z0.S]                    // 00a021a5
+	ZLD1SW (VL*1)(R0), P0/Z, [Z0.D]                    // 00a081a4
+	ZLD1W (VL*1)(R0), P0/Z, [Z0.S]                     // 00a041a5
+	ZLD2B (VL*2)(R0), P0/Z, [Z0.B, Z1.B]               // 00e021a4
+	ZLD2D (VL*2)(R0), P0/Z, [Z0.D, Z1.D]               // 00e0a1a5
+	ZLD2H (VL*2)(R0), P0/Z, [Z0.H, Z1.H]               // 00e0a1a4
+	ZLD2Q (VL*2)(R0), P0/Z, [Z0.Q, Z1.Q]               // 00e091a4
+	ZLD2W (VL*2)(R0), P0/Z, [Z0.S, Z1.S]               // 00e021a5
+	ZLD3B (VL*3)(R0), P0/Z, [Z0.B, Z1.B, Z2.B]         // 00e041a4
+	ZLD3D (VL*3)(R0), P0/Z, [Z0.D, Z1.D, Z2.D]         // 00e0c1a5
+	ZLD3H (VL*3)(R0), P0/Z, [Z0.H, Z1.H, Z2.H]         // 00e0c1a4
+	ZLD3Q (VL*3)(R0), P0/Z, [Z0.Q, Z1.Q, Z2.Q]         // 00e011a5
+	ZLD3W (VL*3)(R0), P0/Z, [Z0.S, Z1.S, Z2.S]         // 00e041a5
+	ZLD4B (VL*4)(R0), P0/Z, [Z0.B, Z1.B, Z2.B, Z3.B]   // 00e061a4
+	ZLD4D (VL*4)(R0), P0/Z, [Z0.D, Z1.D, Z2.D, Z3.D]   // 00e0e1a5
+	ZLD4H (VL*4)(R0), P0/Z, [Z0.H, Z1.H, Z2.H, Z3.H]   // 00e0e1a4
+	ZLD4Q (VL*4)(R0), P0/Z, [Z0.Q, Z1.Q, Z2.Q, Z3.Q]   // 00e091a5
+	ZLD4W (VL*4)(R0), P0/Z, [Z0.S, Z1.S, Z2.S, Z3.S]   // 00e061a5
+	ZLDFF1B (R0), P0/Z, [Z0.B]                         // 00601fa4
+	ZLDFF1D (R0), P0/Z, [Z0.D]                         // 0060ffa5
+	ZLDFF1H (R0), P0/Z, [Z0.H]                         // 0060bfa4
+	ZLDFF1SB (R0), P0/Z, [Z0.H]                        // 0060dfa5
+	ZLDFF1SH (R0), P0/Z, [Z0.S]                        // 00603fa5
+	ZLDFF1SW (R0), P0/Z, [Z0.D]                        // 00609fa4
+	ZLDFF1W (R0), P0/Z, [Z0.S]                         // 00605fa5
+	ZLDNF1B (VL*1)(R0), P0/Z, [Z0.B]                   // 00a011a4
+	ZLDNF1D (VL*1)(R0), P0/Z, [Z0.D]                   // 00a0f1a5
+	ZLDNF1H (VL*1)(R0), P0/Z, [Z0.H]                   // 00a0b1a4
+	ZLDNF1SB (VL*1)(R0), P0/Z, [Z0.H]                  // 00a0d1a5
+	ZLDNF1SH (VL*1)(R0), P0/Z, [Z0.S]                  // 00a031a5
+	ZLDNF1SW (VL*1)(R0), P0/Z, [Z0.D]                  // 00a091a4
+	ZLDNF1W (VL*1)(R0), P0/Z, [Z0.S]                   // 00a051a5
+	ZLSL $1, Z0.S, P0/M, Z0.S                          // 20804304
+	ZLSLR Z1.S, Z0.S, P0/M, Z0.S                       // 20809704
+	ZLSR $1, Z0.S, P0/M, Z0.S                          // e0834104
+	ZLSRR Z1.S, Z0.S, P0/M, Z0.S                       // 20809504
+	ZMUL Z1.S, Z2.S, Z3.S                              // 4360a104
+	ZNEG Z1.S, P0/M, Z2.S                              // 22a09704
+	ZNOT Z1.S, P0/M, Z2.S                              // 22a09e04
+	ZORN $1, Z0.D, Z0.D                                // c0ff0305
+	ZORR Z1.S, Z2.S, P0/M, Z2.S                        // 22009804
+	ZPMUL Z1.B, Z2.B, Z3.B                             // 43642104
+	ZSABD Z1.S, Z2.S, P0/M, Z2.S                       // 22008c04
+	ZSADDV Z0.S, P0, V0                                // 00208004
+	ZSDIV Z1.S, Z2.S, P0/M, Z2.S                       // 22009404
+	ZSDIVR Z1.S, Z2.S, P0/M, Z2.S                      // 22009604
+	ZSEL Z1.S, Z2.S, P0, Z3.S                          // 43c0a105
+	ZSMAX Z1.S, Z2.S, P0/M, Z2.S                       // 22008804
+	ZSMIN Z1.S, Z2.S, P0/M, Z2.S                       // 22008a04
+	ZSMULH Z1.S, Z2.S, Z3.S                            // 4368a104
+	ZSQADD Z1.S, Z2.S, Z3.S                            // 4310a104
+	ZSQDMULH Z1.S, Z2.S, Z3.S                          // 4370a104
+	ZSQRDMULH Z1.S, Z2.S, Z3.S                         // 4374a104
+	ZSQSHL $1, Z0.S, P0/M, Z0.S                        // 20804604
+	ZSQSHLU $1, Z0.S, P0/M, Z0.S                       // 20804f04
+	ZSQSUB Z1.S, Z2.S, Z3.S                            // 4318a104
+	ZSQSUBR Z1.S, Z2.S, P0/M, Z2.S                     // 22809e44
+	ZSRSHR $1, Z0.S, P0/M, Z0.S                        // e0834c04
+	ZST1D [Z0.D], P0, (VL*1)(R0)                       // 00e0e1e5
+	ZST1H [Z0.H], P0, (VL*1)(R0)                       // 00e0a1e4
+	ZST1W [Z0.S], P0, (VL*1)(R0)                       // 00e041e5
+	ZST2B [Z0.B, Z1.B], P0, (VL*2)(R0)                 // 00e031e4
+	ZST2D [Z0.D, Z1.D], P0, (VL*2)(R0)                 // 00e0b1e5
+	ZST2H [Z0.H, Z1.H], P0, (VL*2)(R0)                 // 00e0b1e4
+	ZST2Q [Z0.Q, Z1.Q], P0, (VL*2)(R0)                 // 000041e4
+	ZST2W [Z0.S, Z1.S], P0, (VL*2)(R0)                 // 00e031e5
+	ZST3B [Z0.B, Z1.B, Z2.B], P0, (VL*3)(R0)           // 00e051e4
+	ZST3D [Z0.D, Z1.D, Z2.D], P0, (VL*3)(R0)           // 00e0d1e5
+	ZST3H [Z0.H, Z1.H, Z2.H], P0, (VL*3)(R0)           // 00e0d1e4
+	ZST3Q [Z0.Q, Z1.Q, Z2.Q], P0, (VL*3)(R0)           // 000081e4
+	ZST3W [Z0.S, Z1.S, Z2.S], P0, (VL*3)(R0)           // 00e051e5
+	ZST4B [Z0.B, Z1.B, Z2.B, Z3.B], P0, (VL*4)(R0)     // 00e071e4
+	ZST4D [Z0.D, Z1.D, Z2.D, Z3.D], P0, (VL*4)(R0)     // 00e0f1e5
+	ZST4H [Z0.H, Z1.H, Z2.H, Z3.H], P0, (VL*4)(R0)     // 00e0f1e4
+	ZST4Q [Z0.Q, Z1.Q, Z2.Q, Z3.Q], P0, (VL*4)(R0)     // 0000c1e4
+	ZST4W [Z0.S, Z1.S, Z2.S, Z3.S], P0, (VL*4)(R0)     // 00e071e5
+	ZSUB Z1.S, Z2.S, Z3.S                              // 4304a104
+	ZSUBR Z1.S, Z2.S, P0/M, Z2.S                       // 22008304
+	ZSUQADD Z1.S, Z2.S, P0/M, Z2.S                     // 22809c44
+	ZSXTB Z1.S, P0/M, Z2.S                             // 22a09004
+	ZSXTH Z1.S, P0/M, Z2.S                             // 22a09204
+	ZSXTW Z1.D, P0/M, Z2.D                             // 22a0d404
+	ZTRN1 Z1.S, Z2.S, Z3.S                             // 4370a105
+	ZTRN2 Z1.S, Z2.S, Z3.S                             // 4374a105
+	ZUABD Z1.S, Z2.S, P0/M, Z2.S                       // 22008d04
+	ZUADDV Z0.S, P0, V0                                // 00208104
+	ZUDIV Z1.S, Z2.S, P0/M, Z2.S                       // 22009504
+	ZUDIVR Z1.S, Z2.S, P0/M, Z2.S                      // 22009704
+	ZUMAX Z1.S, Z2.S, P0/M, Z2.S                       // 22008904
+	ZUMIN Z1.S, Z2.S, P0/M, Z2.S                       // 22008b04
+	ZUMULH Z1.S, Z2.S, Z3.S                            // 436ca104
+	ZUQADD Z1.S, Z2.S, Z3.S                            // 4314a104
+	ZUQSHL $1, Z0.S, P0/M, Z0.S                        // 20804704
+	ZUQSUB Z1.S, Z2.S, Z3.S                            // 431ca104
+	ZUQSUBR Z1.S, Z2.S, P0/M, Z2.S                     // 22809f44
+	ZURSHR $1, Z0.S, P0/M, Z0.S                        // e0834d04
+	ZUSQADD Z1.S, Z2.S, P0/M, Z2.S                     // 22809d44
+	ZUXTB Z1.S, P0/M, Z2.S                             // 22a09104
+	ZUXTH Z1.S, P0/M, Z2.S                             // 22a09304
+	ZUXTW Z1.D, P0/M, Z2.D                             // 22a0d504
+	ZUZP1 Z1.S, Z2.S, Z3.S                             // 4368a105
+	ZUZP2 Z1.S, Z2.S, Z3.S                             // 436ca105
+	ZZIP1 Z1.S, Z2.S, Z3.S                             // 4360a105
+	ZZIP2 Z1.S, Z2.S, Z3.S                             // 4364a105
+
 	AND $(1<<63), R1                           // AND $-9223372036854775808, R1     // 21004192
 	ADCW ZR, R8, R10                           // 0a011f1a
 	ADC R0, R2, R12                            // 4c00009a

@@ -589,8 +589,36 @@ func (p *Parser) atStartOfRegister(name string) bool {
 	if present {
 		return true
 	}
+	if p.isARM64SVERegisterOutOfRange(name) {
+		return true
+	}
 	// Parenthesized register: R(10).
 	return p.arch.RegisterPrefix[name] && p.peek() == '('
+}
+
+// isARM64SVERegisterOutOfRange reports whether name is an out-of-range ARM64 SVE P or Z register.
+func (p *Parser) isARM64SVERegisterOutOfRange(name string) bool {
+	if p.arch.Family != sys.ARM64 || len(name) < 2 {
+		return false
+	}
+	var max int64
+	switch name[0] {
+	case 'P':
+		max = 15
+	case 'Z':
+		max = 31
+	default:
+		return false
+	}
+	// Only diagnose plain Pn/Zn names here; suffixed operands such as P0.B and Z0.S
+	// are handled by the ARM64 scalable-register parsing paths.
+	for _, r := range name[1:] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	num, err := strconv.ParseInt(name[1:], 10, 16)
+	return err == nil && num > max
 }
 
 // atRegisterShift reports whether we are at the start of an ARM shifted register.
@@ -673,6 +701,10 @@ func (p *Parser) registerReference(name string) (int16, bool) {
 	r, present := p.arch.Register[name]
 	if present {
 		return r, true
+	}
+	if p.isARM64SVERegisterOutOfRange(name) {
+		p.errorf("invalid register number: %s", name)
+		return 0, false
 	}
 	if !p.arch.RegisterPrefix[name] {
 		p.errorf("expected register; found %s", name)

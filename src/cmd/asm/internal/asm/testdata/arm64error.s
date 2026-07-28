@@ -3,6 +3,13 @@
 // license that can be found in the LICENSE file.
 
 TEXT errors(SB),$0
+	ZADD	Z1.S, Z2.S, P8/M, Z2.S                         // ERROR "invalid governing scalable predicate register P0-P7"
+	ZCMPEQ	Z1.S, Z2.S, P8/Z, P3.S                         // ERROR "invalid governing scalable predicate register P0-P7"
+	ZASR	$1, Z0.S, P8/M, Z0.S                           // ERROR "invalid governing scalable predicate register P0-P7"
+	ZABS	Z1.S, P8/M, Z2.S                               // ERROR "invalid governing scalable predicate register P0-P7"
+	ZLD1B	(VL*1)(R0), P8/Z, [Z0.B]                       // ERROR "invalid governing scalable predicate register P0-P7"
+	ZST1B	[Z0.B], P8, (VL*1)(R0)                         // ERROR "invalid governing scalable predicate register P0-P7"
+	ZSADDV	Z0.S, P8, V0                                   // ERROR "invalid governing scalable predicate register P0-P7"
 	AND	$1, RSP                                          // ERROR "illegal source register"
 	ANDS	$1, R0, RSP                                      // ERROR "illegal combination"
 	ADDSW	R7->32, R14, R13                                 // ERROR "shift amount out of range 0 to 31"

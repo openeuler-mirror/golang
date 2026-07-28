@@ -110,6 +110,7 @@ func TestARMOperandParser(t *testing.T) {
 func TestARM64OperandParser(t *testing.T) {
 	parser := newParser("arm64")
 	testOperandParser(t, parser, arm64OperandTests)
+	testBadOperandParser(t, parser, arm64BadOperandTests)
 }
 
 func TestPPC64OperandParser(t *testing.T) {
@@ -683,8 +684,37 @@ var arm64OperandTests = []operandTest{
 	{"$runtime·badsystemstack(SB)", "$runtime.badsystemstack(SB)"},
 	{"ZR", "ZR"},
 	{"(ZR)", "(ZR)"},
+	{"Z0", "Z0"},
+	{"Z31", "Z31"},
+	{"P0", "P0"},
+	{"P15", "P15"},
+	{"Z0.B", "Z0.B"},
+	{"Z1.H", "Z1.H"},
+	{"Z2.S", "Z2.S"},
+	{"Z3.D", "Z3.D"},
+	{"Z4.Q", "Z4.Q"},
+	{"P0.B", "P0.B"},
+	{"P1.H", "P1.H"},
+	{"P2.S", "P2.S"},
+	{"P3.D", "P3.D"},
+	{"P0/M", "P0/M"},
+	{"P7/M", "P7/M"},
+	{"P0/Z", "P0/Z"},
+	{"P7/Z", "P7/Z"},
+	{"Z0.B[0]", "Z0.B[0]"},
+	{"(VL*1)(R0)", "(VL*1)(R0)"},
+	{"(VL*-1)(RSP)", "(VL*-1)(RSP)"},
 	{"(R29, RSP)", "(R29, RSP)"},
 	{"[):[o-FP", ""}, // Issue 12469 - asm hung parsing the o-FP range on non ARM platforms.
+}
+
+var arm64BadOperandTests = []badOperandTest{
+	{"P16", "invalid register number: P16"},
+	{"Z32", "invalid register number: Z32"},
+	{"P16.B", "invalid register number: P16"},
+	{"Z32.S", "invalid register number: Z32"},
+	{"P0/X", "invalid predication"},
+	{"Z0/M", "invalid governing predicate registers"},
 }
 
 var mips64OperandTests = []operandTest{
