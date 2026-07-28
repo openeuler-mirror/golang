@@ -395,7 +395,9 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 	makeAtomicGuardedIntrinsicARM64common := func(op0, op1 ssa.Op, typ types.Kind, emit atomicOpEmitter, needReturn bool) intrinsicBuilder {
 
 		return func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
-			if cfg.goarm64.LSE {
+			if cfg.goarm64.NoLSE {
+				emit(s, n, args, op0, typ, needReturn)
+			} else if cfg.goarm64.LSE {
 				emit(s, n, args, op1, typ, needReturn)
 			} else {
 				// Target Atomic feature is identified by dynamic detection

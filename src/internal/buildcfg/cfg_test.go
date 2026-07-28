@@ -88,6 +88,38 @@ func TestConfigFlags(t *testing.T) {
 	if goarm64().Version != "v8.9" || goarm64().LSE != true || goarm64().RPRFM != true {
 		t.Errorf("Wrong parsing of GOARM64=v8.9,lse,rprfm")
 	}
+
+	// nolse tests
+	os.Setenv("GOARM64", "v8.0,nolse")
+	if g := goarm64(); g.Version != "v8.0" || g.NoLSE != true || g.LSE != false {
+		t.Errorf("Wrong parsing of GOARM64=v8.0,nolse: got Version=%s NoLSE=%v LSE=%v", g.Version, g.NoLSE, g.LSE)
+	}
+
+	os.Setenv("GOARM64", "v8.1,nolse")
+	if g := goarm64(); g.Version != "v8.1" || g.NoLSE != true || g.LSE != true {
+		t.Errorf("Wrong parsing of GOARM64=v8.1,nolse: got Version=%s NoLSE=%v LSE=%v", g.Version, g.NoLSE, g.LSE)
+	}
+
+	Error = nil
+	os.Setenv("GOARM64", "v8.0,lse,nolse")
+	if _ = goarm64(); Error == nil {
+		t.Errorf("Wrong parsing of GOARM64=v8.0,lse,nolse: expected error for explicit conflict")
+	}
+
+	Error = nil
+	os.Setenv("GOARM64", "v8.0,nolse,lse")
+	if _ = goarm64(); Error == nil {
+		t.Errorf("Wrong parsing of GOARM64=v8.0,nolse,lse: expected error for explicit conflict")
+	}
+
+	// String() round-trip: Parse(String(Parse("v8.1,nolse"))) should succeed
+	os.Setenv("GOARM64", "v8.1,nolse")
+	g := goarm64()
+	s := g.String()
+	_, err := ParseGoarm64(s)
+	if err != nil {
+		t.Errorf("Round-trip failed: ParseGoarm64(%q) returned error: %v", s, err)
+	}
 }
 
 func TestGoarm64FeaturesSupports(t *testing.T) {
