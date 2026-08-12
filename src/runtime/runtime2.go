@@ -505,6 +505,14 @@ type g struct {
 	// and check for debt in the malloc hot path. The assist ratio
 	// determines how this corresponds to scan work debt.
 	gcAssistBytes int64
+
+	lockSpinAcqWe        uint32
+	lockSpinAcqNoWe      uint32
+	lockSpinAcqWeNoSleep uint32
+	lockProcyieldCnt     uint32
+	lockOsyieldCnt       uint32
+	lockSemaCnt          uint32
+	adaptiveSpinSize     uint32
 }
 
 // gTrackingPeriod is the number of transitions out of _Grunning between

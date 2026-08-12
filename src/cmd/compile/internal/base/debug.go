@@ -48,6 +48,7 @@ type DebugFlags struct {
 	MergeLocalsHash       string `help:"hash value for debugging stack slot merging of local variables" concurrent:"ok"`
 	MergeLocalsTrace      int    `help:"trace debug output for locals merging"`
 	MergeLocalsHTrace     int    `help:"hash-selected trace debug output for locals merging"`
+	MutexAdaptiveSpin     int    `help:"enable adaptive spin (0=off, 1=on, default 0)"`
 	Nil                   int    `help:"print information about nil checks"`
 	NoDeadLocals          int    `help:"disable deadlocals pass" concurrent:"ok"`
 	NoOpenDefer           int    `help:"disable open-coded defers" concurrent:"ok"`

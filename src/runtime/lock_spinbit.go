@@ -67,7 +67,24 @@ const (
 	mutexPassiveSpinCount = 1
 
 	mutexTailWakePeriod = 16
+
+	// Adaptive spin tuning parameters (arm64 only).
+	// These control how the per-goroutine spin size is adjusted based on
+	// observed lock acquisition behavior.
+	adaptiveSpinProcyieldThreshold = 1000 // procyield count to trigger adjustment
+	adaptiveSpinOsyieldHigh        = 200  // osyield count: indicates relatively long critical section
+	adaptiveSpinOsyieldMedium      = 50   // osyield count: indicates relatively short critical section
+	adaptiveSpinSizeMin            = 30   // minimum spin size (default)
+	adaptiveSpinSizeMax            = 1000 // maximum spin size
+	adaptiveSpinAdjustStep         = 90   // step size for spin adjustment
+	adaptiveSpinSemaThreshold      = 500  // sema count: reflects lock contention degree
+	adaptiveSpinAcqHigh            = 400  // lock acquisitions during spin (We + WeNoSleep): high threshold
+	adaptiveSpinAcqLow             = 300  // lock acquisitions during spin (We + WeNoSleep): low threshold
 )
+
+// mutexAdaptiveSpinEnabled returns whether the adaptive spin mode is enabled.
+// -gcflags=-d=mutexadaptivespin=[0|1] (default 0, disabled).
+func mutexAdaptiveSpinEnabled() uint32 { return 0 }
 
 //go:nosplit
 func key8(p *uintptr) *uint8 {
@@ -146,6 +163,115 @@ func mutexContended(l *mutex) bool {
 	return atomic.Loaduintptr(&l.key) > mutexLocked
 }
 
+// adaptiveSpinActive reports whether the adaptive spin mode is enabled.
+func adaptiveSpinActive() bool {
+	return goarch.IsArm64 == 1 && mutexAdaptiveSpinEnabled() == 1
+}
+
+// adaptiveSpinAccountAcq records a lock acquisition made while spinning.
+func adaptiveSpinAccountAcq(gp *g, sleepFlag bool) {
+	if adaptiveSpinActive() {
+		if sleepFlag {
+			gp.lockSpinAcqWe++
+		} else {
+			gp.lockSpinAcqWeNoSleep++
+		}
+	}
+}
+
+// adaptiveSpinAccountAcqNoWe records a lock acquisition made without spinning.
+func adaptiveSpinAccountAcqNoWe(gp *g, sleepFlag bool) {
+	if adaptiveSpinActive() && sleepFlag {
+		gp.lockSpinAcqNoWe++
+	}
+}
+
+// adaptiveSpinAccountSleep records a sleep while contending for the lock,
+// returning the updated sleep flag.
+func adaptiveSpinAccountSleep(gp *g, sleepFlag bool) bool {
+	if adaptiveSpinActive() {
+		gp.lockSemaCnt++
+		return true
+	}
+	return sleepFlag
+}
+
+// adaptiveProcyield actively spins on the lock with the per-goroutine
+// adaptive spin size.
+func adaptiveProcyield(gp *g) {
+	if gp.adaptiveSpinSize == 0 {
+		gp.adaptiveSpinSize = mutexActiveSpinSize
+	}
+	gp.lockProcyieldCnt++
+	procyield(gp.adaptiveSpinSize)
+}
+
+// adaptiveOsyield passively spins, adjusting the adaptive spin size based on
+// the observed lock acquisition behavior.
+func adaptiveOsyield(gp *g) {
+	gp.lockOsyieldCnt++
+	adaptiveSpinAdjust(gp)
+}
+
+// adaptiveSpinAdjust tunes the adaptive spin size once lockProcyieldCnt
+// exceeds adaptiveSpinProcyieldThreshold, then resets the counters.
+func adaptiveSpinAdjust(gp *g) {
+	if gp.lockProcyieldCnt <= adaptiveSpinProcyieldThreshold {
+		return
+	}
+	if gp.lockOsyieldCnt > adaptiveSpinOsyieldHigh {
+		// Long critical sections: spinning has little value.
+		gp.adaptiveSpinSize = adaptiveSpinSizeMin
+	} else if gp.lockOsyieldCnt > adaptiveSpinOsyieldMedium {
+		adaptiveSpinAdjustByContention(gp)
+	}
+	gp.lockProcyieldCnt = 0
+	gp.lockOsyieldCnt = 0
+	gp.lockSpinAcqWe = 0
+	gp.lockSpinAcqNoWe = 0
+	gp.lockSemaCnt = 0
+	gp.lockSpinAcqWeNoSleep = 0
+}
+
+// adaptiveSpinAdjustByContention tunes the adaptive spin size based on the
+// observed lock contention.
+func adaptiveSpinAdjustByContention(gp *g) {
+	if gp.lockSemaCnt < adaptiveSpinSemaThreshold {
+		// Low contention: tune the spin size to how often the lock was
+		// acquired while spinning.
+		if gp.lockSpinAcqWe+gp.lockSpinAcqWeNoSleep > adaptiveSpinAcqHigh {
+			gp.adaptiveSpinSize = adaptiveSpinIncrease(gp.adaptiveSpinSize)
+		} else if gp.lockSpinAcqWe+gp.lockSpinAcqWeNoSleep < adaptiveSpinAcqLow {
+			gp.adaptiveSpinSize = adaptiveSpinSizeMin
+		}
+		return
+	}
+	// High contention: tune by the ratio of acquisitions to sleeps.
+	if (gp.lockSpinAcqWe+gp.lockSpinAcqNoWe)*2 < gp.lockSemaCnt {
+		gp.adaptiveSpinSize = adaptiveSpinIncrease(gp.adaptiveSpinSize)
+	} else if (gp.lockSpinAcqWe+gp.lockSpinAcqNoWe)*4 > gp.lockSemaCnt*3 {
+		gp.adaptiveSpinSize = adaptiveSpinDecrease(gp.adaptiveSpinSize)
+	}
+}
+
+// adaptiveSpinIncrease returns size plus adaptiveSpinAdjustStep, or size when
+// that would exceed adaptiveSpinSizeMax.
+func adaptiveSpinIncrease(size uint32) uint32 {
+	if newSize := size + adaptiveSpinAdjustStep; newSize <= adaptiveSpinSizeMax {
+		return newSize
+	}
+	return size
+}
+
+// adaptiveSpinDecrease returns size minus adaptiveSpinAdjustStep, or size when
+// it is not greater than adaptiveSpinAdjustStep.
+func adaptiveSpinDecrease(size uint32) uint32 {
+	if size > adaptiveSpinAdjustStep {
+		return size - adaptiveSpinAdjustStep
+	}
+	return size
+}
+
 func lock(l *mutex) {
 	lockWithRank(l, getLockRank(l))
 }
@@ -177,8 +303,7 @@ func lock2(l *mutex) {
 	if ncpu > 1 {
 		spin = mutexActiveSpinCount
 	}
-
-	var weSpin, atTail bool
+	var weSpin, atTail, sleepFlag bool
 	v := atomic.Loaduintptr(&l.key)
 tryAcquire:
 	for i := 0; ; i++ {
@@ -192,12 +317,14 @@ tryAcquire:
 				}
 				if atomic.Casuintptr(&l.key, v, next) {
 					timer.end()
+					adaptiveSpinAccountAcq(gp, sleepFlag)
 					return
 				}
 			} else {
 				prev8 := atomic.Xchg8(k8, mutexLocked|mutexSleeping)
 				if prev8&mutexLocked == 0 {
 					timer.end()
+					adaptiveSpinAccountAcqNoWe(gp, sleepFlag)
 					return
 				}
 			}
@@ -212,11 +339,18 @@ tryAcquire:
 
 		if weSpin || atTail || mutexPreferLowLatency(l) {
 			if i < spin {
-				procyield(mutexActiveSpinSize)
+				if adaptiveSpinActive() {
+					adaptiveProcyield(gp)
+				} else {
+					procyield(mutexActiveSpinSize)
+				}
 				v = atomic.Loaduintptr(&l.key)
 				continue tryAcquire
 			} else if i < spin+mutexPassiveSpinCount {
-				osyield() // TODO: Consider removing this step. See https://go.dev/issue/69268.
+				if adaptiveSpinActive() {
+					adaptiveOsyield(gp)
+				}
+				osyield()
 				v = atomic.Loaduintptr(&l.key)
 				continue tryAcquire
 			}
@@ -242,8 +376,8 @@ tryAcquire:
 			semasleep(-1)
 			atTail = gp.m.mWaitList.next == 0 // we were at risk of starving
 			i = 0
+			sleepFlag = adaptiveSpinAccountSleep(gp, sleepFlag)
 		}
-
 		gp.m.mWaitList.next = 0
 		v = atomic.Loaduintptr(&l.key)
 	}

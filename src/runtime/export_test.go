@@ -554,6 +554,18 @@ type G = g
 
 type Sudog = sudog
 
+// LockSpinFields mirrors the adaptive spin fields added to g for sizeof testing.
+// See [g] for the canonical layout.
+type LockSpinFields struct {
+	_ uint32
+	_ uint32
+	_ uint32
+	_ uint32
+	_ uint32
+	_ uint32
+	_ uint32
+}
+
 func Getg() *G {
 	return getg()
 }
