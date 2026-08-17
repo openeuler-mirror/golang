@@ -179,6 +179,15 @@ func initIntrinsics(cfg *intrinsicBuildConfig) {
 		},
 		sys.ARM64)
 
+	// base64SimdEnabled is a stub in encoding/base64 that the compiler replaces with a
+	// compile-time constant based on the -Base64Simd flag, enabling DCE of the unused path.
+	base64simdVal := base.Flag.Base64Simd
+	addF("encoding/base64", "base64SimdEnabled",
+		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {
+			return s.constBool(base64simdVal)
+		},
+		sys.ARM64)
+
 	/******** internal/runtime/sys ********/
 	add("internal/runtime/sys", "GetCallerPC",
 		func(s *state, n *ir.CallExpr, args []*ssa.Value) *ssa.Value {

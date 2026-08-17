@@ -130,6 +130,7 @@ type CmdFlags struct {
 	ErrorURL           bool         "help:\"print explanatory URL with error message if applicable\""
 
 	BytesStringBytesOpt  bool "help:\"convert []byte(string([]byte)) to makeslicecopy\""
+	Base64Simd           bool "help:\"enable base64 SIMD optimization on arm64\""
 	AggressivePatterns   bool "help:\"enable additional optimization patterns\""
 	AggressiveDse        bool "help:\"enable aggressive dse optimization\""
 	AggressiveLoopRotate bool "help:\"enable aggressive loop rotate optimization, including keeping nested loops in place\""
@@ -175,6 +176,7 @@ func ParseFlags() {
 	*Flag.DwarfLocationLists = true
 	Flag.Dynlink = &Ctxt.Flag_dynlink
 	Flag.CcmpGen = false
+	Flag.Base64Simd = false
 	Flag.EmbedCfg = readEmbedCfg
 	Flag.Env = addEnv
 	Flag.GenDwarfInl = 2
