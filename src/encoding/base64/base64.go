@@ -8,8 +8,8 @@ package base64
 import (
 	"encoding/binary"
 	"io"
-	"slices"
 	"strconv"
+	"unsafe"
 )
 
 /*
@@ -22,10 +22,20 @@ import (
 // (RFC 1421).  RFC 4648 also defines an alternate encoding, which is
 // the standard encoding with - and _ substituted for + and /.
 type Encoding struct {
-	encode    [64]byte   // mapping of symbol index to symbol byte value
-	decodeMap [256]uint8 // mapping of symbol byte value to symbol index
+	encode    [64]byte  // mapping of symbol index to symbol byte value
+	decodeMap [256]byte // mapping of symbol byte value to symbol index
 	padChar   rune
 	strict    bool
+	// lut identifies the alphabet for the SIMD decode path: nil for custom
+	// alphabets, &encodeStdLut or &encodeURLLut for the standard and URL
+	// alphabets (see NewEncoding). It is only ever compared by pointer
+	// equality to select the matching SIMD decode table and is never
+	// dereferenced — the pointed-to bytes are unused (the SIMD encode path
+	// reads enc.encode directly), so the two 16-byte tables serve purely as
+	// identity tokens. WithPadding and Strict copy the Encoding value, so
+	// the identity survives derived encodings. Any other alphabet falls back
+	// to the generic path.
+	lut *[16]byte
 }
 
 const (
@@ -53,6 +63,29 @@ const (
 		"\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff\xff"
 	invalidIndex = '\xff'
 )
+
+const encodeStdInner = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+const encodeURL = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+// A lookup table containing the absolute offsets for all ranges for STD encoding.
+// Translate values 0..63 to the Base64 alphabet. There are five sets:
+// #  From      To         Abs    Index  Characters
+// 0  [0..25]   [65..90]   +65        0  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+// 1  [26..51]  [97..122]  +71        1  abcdefghijklmnopqrstuvwxyz
+// 2  [52..61]  [48..57]    -4  [2..11]  0123456789
+// 3  [62]      [43]       -19       12  +
+// 4  [63]      [47]       -16       13  /
+var encodeStdLut = [16]byte{65, 71, 252, 252, 252, 252, 252, 252, 252, 252, 252, 252, 237, 240, 0, 0}
+
+// A lookup table containing the absolute offsets for all ranges for URL encoding.
+// Translate values 0..63 to the Base64 alphabet. There are five sets:
+// #  From      To         Abs    Index  Characters
+// 0  [0..25]   [65..90]   +65        0  ABCDEFGHIJKLMNOPQRSTUVWXYZ
+// 1  [26..51]  [97..122]  +71        1  abcdefghijklmnopqrstuvwxyz
+// 2  [52..61]  [48..57]    -4  [2..11]  0123456789
+// 3  [62]      [45]       -17       12  -
+// 4  [63]      [95]       +32       13  _
+var encodeURLLut = [16]byte{65, 71, 252, 252, 252, 252, 252, 252, 252, 252, 252, 252, 239, 32, 0, 0}
 
 // NewEncoding returns a new padded Encoding defined by the given alphabet,
 // which must be a 64-byte string that contains unique byte values and
@@ -82,6 +115,12 @@ func NewEncoding(encoder string) *Encoding {
 			panic("encoding alphabet includes duplicate symbols")
 		}
 		e.decodeMap[encoder[i]] = uint8(i)
+	}
+	// for SIMD
+	if encoder == encodeURL {
+		e.lut = &encodeURLLut
+	} else if encoder == encodeStdInner {
+		e.lut = &encodeStdLut
 	}
 	return e
 }
@@ -116,11 +155,11 @@ func (enc Encoding) Strict() *Encoding {
 }
 
 // StdEncoding is the standard base64 encoding, as defined in RFC 4648.
-var StdEncoding = NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+var StdEncoding = NewEncoding(encodeStdInner)
 
 // URLEncoding is the alternate base64 encoding defined in RFC 4648.
 // It is typically used in URLs and file names.
-var URLEncoding = NewEncoding("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_")
+var URLEncoding = NewEncoding(encodeURL)
 
 // RawStdEncoding is the standard raw, unpadded base64 encoding,
 // as defined in RFC 4648 section 3.2.
@@ -136,16 +175,7 @@ var RawURLEncoding = URLEncoding.WithPadding(NoPadding)
  * Encoder
  */
 
-// Encode encodes src using the encoding enc,
-// writing [Encoding.EncodedLen](len(src)) bytes to dst.
-//
-// The encoding pads the output to a multiple of 4 bytes,
-// so Encode is not appropriate for use on individual blocks
-// of a large data stream. Use [NewEncoder] instead.
-func (enc *Encoding) Encode(dst, src []byte) {
-	if len(src) == 0 {
-		return
-	}
+func encodeGeneric(enc *Encoding, dst, src []byte) {
 	// enc is a pointer receiver, so the use of enc.encode within the hot
 	// loop below means a nil check at every operation. Lift that nil check
 	// outside of the loop to speed up the encoder.
@@ -193,20 +223,49 @@ func (enc *Encoding) Encode(dst, src []byte) {
 	}
 }
 
+// Encode encodes src using the encoding enc,
+// writing [Encoding.EncodedLen](len(src)) bytes to dst.
+//
+// The encoding pads the output to a multiple of 4 bytes,
+// so Encode is not appropriate for use on individual blocks
+// of a large data stream. Use [NewEncoder] instead.
+func (enc *Encoding) Encode(dst, src []byte) {
+	if len(src) == 0 {
+		return
+	}
+	encode(enc, dst, src)
+}
+
+// growByteSlice grows s's capacity to hold n additional bytes, keeping the
+// existing length. It is an inline copy of slices.Grow kept here to avoid a
+// dependency on the slices package; keep it in sync with that implementation.
+func growByteSlice(s []byte, n int) []byte {
+	if n -= cap(s) - len(s); n > 0 {
+		s = append(s[:cap(s)], make([]byte, n)...)[:len(s)]
+	}
+	return s
+}
+
 // AppendEncode appends the base64 encoded src to dst
 // and returns the extended buffer.
 func (enc *Encoding) AppendEncode(dst, src []byte) []byte {
 	n := enc.EncodedLen(len(src))
-	dst = slices.Grow(dst, n)
+	dst = growByteSlice(dst, n)
 	enc.Encode(dst[len(dst):][:n], src)
 	return dst[:len(dst)+n]
 }
 
 // EncodeToString returns the base64 encoding of src.
 func (enc *Encoding) EncodeToString(src []byte) string {
-	buf := make([]byte, enc.EncodedLen(len(src)))
+	srcLen := len(src)
+	if srcLen == 0 {
+		return ""
+	}
+	buf := make([]byte, enc.EncodedLen(srcLen))
 	enc.Encode(buf, src)
-	return string(buf)
+	// buf is freshly allocated here and never written again, so the string
+	// may safely share its backing array without copying.
+	return unsafe.String(unsafe.SliceData(buf), len(buf))
 }
 
 type encoder struct {
@@ -418,7 +477,8 @@ func (enc *Encoding) AppendDecode(dst, src []byte) ([]byte, error) {
 	}
 	n = decodedLen(n, NoPadding)
 
-	dst = slices.Grow(dst, n)
+	dst = growByteSlice(dst, n)
+
 	n, err := enc.Decode(dst[len(dst):][:n], src)
 	return dst[:len(dst)+n], err
 }
@@ -427,8 +487,15 @@ func (enc *Encoding) AppendDecode(dst, src []byte) ([]byte, error) {
 // If the input is malformed, it returns the partially decoded data and
 // [CorruptInputError]. New line characters (\r and \n) are ignored.
 func (enc *Encoding) DecodeString(s string) ([]byte, error) {
-	dbuf := make([]byte, enc.DecodedLen(len(s)))
-	n, err := enc.Decode(dbuf, []byte(s))
+	srcLen := len(s)
+	if srcLen == 0 {
+		return []byte{}, nil
+	}
+	dbuf := make([]byte, enc.DecodedLen(srcLen))
+	// s is read-only input; the slice shares its memory and is only read by
+	// Decode, so the zero-copy view is safe.
+	d := unsafe.Slice(unsafe.StringData(s), srcLen)
+	n, err := enc.Decode(dbuf, d)
 	return dbuf[:n], err
 }
 
@@ -509,17 +576,7 @@ func (d *decoder) Read(p []byte) (n int, err error) {
 	return n, d.err
 }
 
-// Decode decodes src using the encoding enc. It writes at most
-// [Encoding.DecodedLen](len(src)) bytes to dst and returns the number of bytes
-// written. The caller must ensure that dst is large enough to hold all
-// the decoded data. If src contains invalid base64 data, it will return the
-// number of bytes successfully written and [CorruptInputError].
-// New line characters (\r and \n) are ignored.
-func (enc *Encoding) Decode(dst, src []byte) (n int, err error) {
-	if len(src) == 0 {
-		return 0, nil
-	}
-
+func decodeGeneric(enc *Encoding, dst, src []byte) (n int, err error) {
 	// Lift the nil check outside of the loop. enc.decodeMap is directly
 	// used later in this function, to let the compiler know that the
 	// receiver can't be nil.
@@ -581,6 +638,19 @@ func (enc *Encoding) Decode(dst, src []byte) (n int, err error) {
 		}
 	}
 	return n, err
+}
+
+// Decode decodes src using the encoding enc. It writes at most
+// [Encoding.DecodedLen](len(src)) bytes to dst and returns the number of bytes
+// written. The caller must ensure that dst is large enough to hold all
+// the decoded data. If src contains invalid base64 data, it will return the
+// number of bytes successfully written and [CorruptInputError].
+// New line characters (\r and \n) are ignored.
+func (enc *Encoding) Decode(dst, src []byte) (int, error) {
+	if len(src) == 0 {
+		return 0, nil
+	}
+	return decode(enc, dst, src)
 }
 
 // assemble32 assembles 4 base64 digits into 3 bytes.

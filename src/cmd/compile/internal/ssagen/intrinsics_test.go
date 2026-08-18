@@ -214,6 +214,7 @@ var wantIntrinsics = map[testIntrinsicKey]struct{}{
 	{"arm", "math/bits", "TrailingZeros8"}:                             struct{}{},
 	{"arm", "runtime", "KeepAlive"}:                                    struct{}{},
 	{"arm", "runtime", "slicebytetostringtmp"}:                         struct{}{},
+	{"arm64", "encoding/base64", "base64SimdEnabled"}:                  struct{}{},
 	{"arm64", "internal/runtime/atomic", "And"}:                        struct{}{},
 	{"arm64", "internal/runtime/atomic", "And32"}:                      struct{}{},
 	{"arm64", "internal/runtime/atomic", "And64"}:                      struct{}{},
