@@ -13,26 +13,36 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"sync"
 	"sync/atomic"
 	"encoding/binary"
 )
 
 type pmuEvent struct {
-	fd    int
-	name  string
-	buf   []byte
-	meta  *perfEventMmapPage
-	data  []byte
+	fd        int
+	name      string
+	buf       []byte
+	meta      *perfEventMmapPage
+	data      []byte
+	prev      uint64
+	recordBuf []byte
 }
 
 type pmuList struct {
-	pd          int
-	events      map[int]*pmuEvent  // key = fd
-	enableBRBE  bool
+	pd      int
+	attr    PMUAttr
+	mu      sync.Mutex
+	events  map[int]*pmuEvent // key = fd
+	enabled bool
 }
 
-var pdCounter int
-var pdMap = make(map[int]*pmuList)
+var errSetOutput = errors.New("set perf event output")
+
+var (
+	pdMu      sync.Mutex
+	pdCounter int
+	pdMap     = make(map[int]*pmuList)
+)
 
 func initMmap(fd int, enableBRBE bool) ([]byte, error){
 	//init mmap ring buffer
@@ -66,7 +76,7 @@ func perfEventOpen(attr *perfEventAttr, pid, cpu, groupFd, flags int) (fd int, e
 	return fd, nil
 }
 
-func beginSampling(evtName string, inputAttr *PMUAttr, pid int, cpu int) (int, error) {
+func beginSampling(evtName string, inputAttr *PMUAttr, tid, cpu int) (int, error) {
 	var attr perfEventAttr
 	evtConfig, evtType := getCoreEvent(evtName)
 	if evtConfig == -1 || evtType == -1 {
@@ -75,8 +85,9 @@ func beginSampling(evtName string, inputAttr *PMUAttr, pid int, cpu int) (int, e
 	attr.config = uint64(evtConfig)
 	attr.evtType = uint32(evtType)
 	attr.size = uint32(unsafe.Sizeof(attr))
-	attr.bits = perfAttrSampleIdAll | perfAttrDisabled | perfAttrExcludeGuest | perfAttrInherit |
- 	 			perfAttrMmap | perfAttrComm | perfAttrPinned | perfAttrTask | perfAttrMmap2
+	attr.bits = perfAttrSampleIdAll | perfAttrDisabled | perfAttrInherit | perfAttrExcludeGuest |
+		perfAttrExcludeKernel | perfAttrExcludeHv |
+		perfAttrMmap | perfAttrComm | perfAttrPinned | perfAttrTask | perfAttrMmap2
 	if inputAttr.Period > 0 {
 		attr.sample = inputAttr.Period
 	} else {
@@ -88,7 +99,7 @@ func beginSampling(evtName string, inputAttr *PMUAttr, pid int, cpu int) (int, e
 		attr.branchSampleType = perfSampleBranchAny | perfSampleBranchUser
 	}
 
-	fd, err := perfEventOpen(&attr, pid, cpu, -1, 0)
+	fd, err := perfEventOpen(&attr, tid, cpu, -1, 0)
 	if fd < 0 {
 		return -1, err
 	}
@@ -97,11 +108,8 @@ func beginSampling(evtName string, inputAttr *PMUAttr, pid int, cpu int) (int, e
 }
 
 func newPd() int {
-	for i := 0; i < pdCounter; i++ {
-		if _, exists := pdMap[i]; !exists {
-			return i
-		}
-	}
+	pdMu.Lock()
+	defer pdMu.Unlock()
 
 	if pdCounter == int(^uint(0)>>1) {
 		return -1
@@ -113,10 +121,18 @@ func newPd() int {
 }
 
 func freePd(pd int) error {
+	pdMu.Lock()
 	pl, ok := pdMap[pd]
+	if ok {
+		delete(pdMap, pd)
+	}
+	pdMu.Unlock()
 	if !ok {
 		return nil
 	}
+
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
 
 	var errs []error
 	for _, e := range pl.events {
@@ -137,8 +153,14 @@ func freePd(pd int) error {
 		}
 	}
 
-	delete(pdMap, pd)
 	return errors.Join(errs...)
+}
+
+func getPmuList(pd int) (*pmuList, bool) {
+	pdMu.Lock()
+	defer pdMu.Unlock()
+	pl, ok := pdMap[pd]
+	return pl, ok
 }
 
 func checkTimingParam(EvtList []string, period uint64, freq uint64) error {
@@ -218,25 +240,55 @@ func getTids(pid int) ([]int, error) {
 	return tids, nil
 }
 
-func getPhysicalCore() (int, error) {
-	file, err := os.Open("/proc/cpuinfo")
+func getAllowedCPUs() ([]int, error) {
+	status, err := os.Open("/proc/self/status")
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
-	defer file.Close()
+	defer status.Close()
 
-	count := 0
-	scanner := bufio.NewScanner(file)
+	const prefix = "Cpus_allowed_list:"
+	scanner := bufio.NewScanner(status)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.HasPrefix(line, "processor") {
-			count++
+		if strings.HasPrefix(line, prefix) {
+			return parseCPUList(strings.TrimSpace(strings.TrimPrefix(line, prefix)))
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		return 0, err
+		return nil, err
 	}
-	return count, nil
+	return nil, fmt.Errorf("%s not found in /proc/self/status", prefix)
+}
+
+func parseCPUList(list string) ([]int, error) {
+	if list == "" {
+		return nil, errors.New("CPU list is empty")
+	}
+
+	cpus := make([]int, 0)
+	for _, part := range strings.Split(list, ",") {
+		startText, endText, hasRange := strings.Cut(strings.TrimSpace(part), "-")
+		start, err := strconv.Atoi(startText)
+		if err != nil || start < 0 {
+			return nil, errors.New("invalid CPU list")
+		}
+		end := start
+		if hasRange {
+			end, err = strconv.Atoi(endText)
+			if err != nil || end < start {
+				return nil, errors.New("invalid CPU list")
+			}
+		}
+
+		for cpu := start; ; cpu++ {
+			cpus = append(cpus, cpu)
+			if cpu == end {
+				break
+			}
+		}
+	}
+	return cpus, nil
 }
 
 type openErrGroup struct {
@@ -260,8 +312,105 @@ func summarizeOpenErrors(groups map[string]*openErrGroup) error {
 	return errors.New(strings.Join(msgs, "; "))
 }
 
+type eventOpenError struct {
+	event string
+	err   error
+}
+
+func perfEventIoctl(fd int, command uintptr) error {
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), command, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+func perfEventSetOutput(fd, outputFd int) error {
+	_, _, errno := syscall.Syscall(
+		syscall.SYS_IOCTL,
+		uintptr(fd),
+		perfEventIocSetOutput,
+		uintptr(outputFd),
+	)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+func closePmuEvent(evt *pmuEvent) error {
+	var errs []error
+	if len(evt.buf) > 0 {
+		if err := syscall.Munmap(evt.buf); err != nil {
+			errs = append(errs, err)
+		}
+		evt.buf = nil
+		evt.meta = nil
+		evt.data = nil
+	}
+	if evt.fd >= 0 {
+		if err := syscall.Close(evt.fd); err != nil {
+			errs = append(errs, err)
+		}
+		evt.fd = -1
+	}
+	return errors.Join(errs...)
+}
+
+func (pl *pmuList) newEvent(evtName string, tid, cpu, outputFd int) (*pmuEvent, error) {
+	fd, err := beginSampling(evtName, &pl.attr, tid, cpu)
+	if err != nil || fd < 0 {
+		if err == nil {
+			err = fmt.Errorf("beginSampling returned invalid fd")
+		}
+		return nil, err
+	}
+
+	evt := &pmuEvent{
+		fd:   fd,
+		name: evtName,
+	}
+
+	// only the first TID for an event/CPU pair owns an mmap ring
+	if outputFd >= 0 {
+		if err := perfEventSetOutput(fd, outputFd); err != nil {
+			closeErr := closePmuEvent(evt)
+			return nil, errors.Join(fmt.Errorf("%w fd %d: %w", errSetOutput, outputFd, err), closeErr)
+		}
+	} else {
+		buf, err := initMmap(fd, pl.attr.EnableBRBE)
+		if err != nil {
+			closeErr := closePmuEvent(evt)
+			return nil, errors.Join(fmt.Errorf("initMmap failed: %w", err), closeErr)
+		}
+		evt.buf = buf
+		evt.meta = (*perfEventMmapPage)(unsafe.Pointer(&buf[0]))
+		dataOffset := evt.meta.dataOffset
+		dataSize := evt.meta.dataSize
+		if dataOffset > uint64(len(buf)) || dataSize > uint64(len(buf))-dataOffset {
+			closeErr := closePmuEvent(evt)
+			return nil, errors.Join(fmt.Errorf("invalid perf mmap data range"), closeErr)
+		}
+		evt.data = buf[dataOffset : dataOffset+dataSize]
+	}
+
+	if pl.enabled {
+		if err := perfEventIoctl(fd, perfEventIocReset); err != nil {
+			closeErr := closePmuEvent(evt)
+			return nil, errors.Join(fmt.Errorf("reset new event: %w", err), closeErr)
+		}
+		if err := perfEventIoctl(fd, perfEventIocEnable); err != nil {
+			closeErr := closePmuEvent(evt)
+			return nil, errors.Join(fmt.Errorf("enable new event: %w", err), closeErr)
+		}
+	}
+
+	return evt, nil
+}
+
 // pmuOpen initializes a new PMU context with the given attributes.
-// It opens and mmaps all requested events, returning a pd handle or an error if setup fails.
+// It opens all requested events and mmaps one ring per event/CPU pair,
+// returning a pd handle or an error if setup fails.
 func pmuOpen(pmuInputAttr *PMUAttr) (int, error) {
 	if err := checkAttr(pmuInputAttr); err != nil {
 		return -1, err
@@ -272,19 +421,20 @@ func pmuOpen(pmuInputAttr *PMUAttr) (int, error) {
 		return -1, fmt.Errorf("no available pd")
 	}
 
+	attr := *pmuInputAttr
+	attr.EvtList = append([]string(nil), pmuInputAttr.EvtList...)
 	pl := &pmuList{
-		pd:        pd,
-		events:    make(map[int]*pmuEvent),
-		enableBRBE: pmuInputAttr.EnableBRBE,
+		pd:     pd,
+		attr:   attr,
+		events: make(map[int]*pmuEvent),
 	}
 
+	pdMu.Lock()
 	pdMap[pd] = pl
+	pdMu.Unlock()
 	cleanupAndReturn := func(mainErr error) (int, error) {
 		if cleanupErr := freePd(pd); cleanupErr != nil {
-			return -1, errors.Join(
-				mainErr,
-				fmt.Errorf("free pd %d failed: %w", pd, cleanupErr),
-			)
+			return -1, errors.Join(mainErr, fmt.Errorf("free pd %d failed: %w", pd, cleanupErr))
 		}
 		return -1, mainErr
 	}
@@ -293,80 +443,57 @@ func pmuOpen(pmuInputAttr *PMUAttr) (int, error) {
 	if err != nil {
 		return cleanupAndReturn(fmt.Errorf("get tids failed: %w", err))
 	}
-	cpuNum, err := getPhysicalCore()
+	cpus, err := getAllowedCPUs()
 	if err != nil {
-		return cleanupAndReturn(fmt.Errorf("get physical core failed: %w", err))
+		return cleanupAndReturn(fmt.Errorf("get allowed CPUs failed: %w", err))
 	}
 
 	errGroups := make(map[string]*openErrGroup)
-	addErr := func(evtName string, err error) {
-		reason := err.Error()
-		key := evtName + "|" + reason
-
-		g, ok := errGroups[key]
+	var setOutputErrs []error
+	addErr := func(openErr eventOpenError) {
+		reason := openErr.err.Error()
+		key := openErr.event + "|" + reason
+		group, ok := errGroups[key]
 		if !ok {
-			g = &openErrGroup{
-				event:  evtName,
-				reason: reason,
-			}
-			errGroups[key] = g
+			group = &openErrGroup{event: openErr.event, reason: reason}
+			errGroups[key] = group
 		}
-		g.count++
+		group.count++
 	}
 
-	closeErrGroups := make(map[string]int)
-	for cpu := 0; cpu < cpuNum; cpu++ {
-		for _, tid := range tids {
-			for _, evtName := range pmuInputAttr.EvtList {
-				fd, err := beginSampling(evtName, pmuInputAttr, tid, cpu)
-				if err != nil || fd == -1 {
-					if err == nil {
-						err = fmt.Errorf("beginSampling returned invalid fd")
-					}
-					addErr(evtName, err)
-					continue
-				}
-
-				buf, err := initMmap(fd, pmuInputAttr.EnableBRBE)
+	pl.mu.Lock()
+	for _, evtName := range pl.attr.EvtList {
+		for _, cpu := range cpus {
+			outputFd := -1
+			for _, tid := range tids {
+				evt, err := pl.newEvent(evtName, tid, cpu, outputFd)
 				if err != nil {
-					addErr(evtName, fmt.Errorf("initMmap failed: %w", err))
-
-					if closeErr := syscall.Close(fd); closeErr != nil {
-						closeErrGroups[closeErr.Error()]++
+					addErr(eventOpenError{event: evtName, err: err})
+					if errors.Is(err, errSetOutput) {
+						setOutputErrs = append(setOutputErrs, err)
 					}
 					continue
 				}
-
-				meta := (*perfEventMmapPage)(unsafe.Pointer(&buf[0]))
-				pl.events[fd] = &pmuEvent{
-					fd:   fd,
-					buf:  buf,
-					meta: meta,
-					data: buf[meta.dataOffset : meta.dataOffset+meta.dataSize],
-					name: fmt.Sprintf("%s-tid-%d", evtName, tid),
+				pl.events[evt.fd] = evt
+				if outputFd < 0 {
+					outputFd = evt.fd
 				}
 			}
 		}
 	}
-	if len(pl.events) > 0 {
+	eventCount := len(pl.events)
+	pl.mu.Unlock()
+
+	if len(setOutputErrs) > 0 {
+		return cleanupAndReturn(errors.Join(setOutputErrs...))
+	}
+	if eventCount > 0 {
 		return pd, nil
 	}
-
 	if len(errGroups) == 0 {
 		return cleanupAndReturn(fmt.Errorf("no event opened"))
 	}
-
-	mainErr := summarizeOpenErrors(errGroups)
-	if len(closeErrGroups) > 0 {
-		closeMsgs := make([]string, 0, len(closeErrGroups))
-		for reason, count := range closeErrGroups {
-			closeMsgs = append(closeMsgs,
-				fmt.Sprintf("cleanup close failed %d times: %s", count, reason),
-			)
-		}
-		mainErr = fmt.Errorf("%w; %s", mainErr, strings.Join(closeMsgs, "; "))
-	}
-	return cleanupAndReturn(mainErr)
+	return cleanupAndReturn(summarizeOpenErrors(errGroups))
 }
 
 func getSampleType(enableBRBE bool) uint64 {
@@ -477,48 +604,96 @@ func parseSample(b []byte, sampleType uint64, name string) sample {
 	return s
 }
 
-func readSamples(evt *pmuEvent, sampleType uint64, handler func(sample)) error {
-	head := atomic.LoadUint64(&evt.meta.dataHead)
-	tail := atomic.LoadUint64(&evt.meta.dataTail)
+func copyRing(dst, data []byte, pos uint64) {
+	offset := int(pos % uint64(len(data)))
+	n := copy(dst, data[offset:])
+	copy(dst[n:], data[:len(dst)-n])
+}
 
-	for tail < head {
-		offset := tail % uint64(len(evt.data))
-		if offset+uint64(unsafe.Sizeof(perfEventHeader{})) > uint64(len(evt.data)) {
-			break  // incomplete header
-		}
-
-		header := (*perfEventHeader)(unsafe.Pointer(&evt.data[offset]))
-		headerSize := uint64(unsafe.Sizeof(*header))
-
-		if header.size < uint16(headerSize) || offset+uint64(header.size) > uint64(len(evt.data)) {
-			break  // invalid header size
-		}
-
-		switch header.typ {
-		case perfRecordSample:
-			payload := evt.data[offset+headerSize : offset+uint64(header.size)]
-			s := parseSample(payload, sampleType, evt.name)
-			handler(s)
-		default:
-			// do nothing
-		}
-
-		tail += uint64(header.size)
+func readRingHeader(data []byte, pos uint64) (perfEventHeader, error) {
+	const headerSize = 8
+	if len(data) < headerSize {
+		return perfEventHeader{}, errors.New("perf ring is smaller than an event header")
 	}
 
-	atomic.StoreUint64(&evt.meta.dataTail, head)
-	return nil
+	var raw [headerSize]byte
+	copyRing(raw[:], data, pos)
+	return perfEventHeader{
+		typ:  binary.LittleEndian.Uint32(raw[0:4]),
+		misc: binary.LittleEndian.Uint16(raw[4:6]),
+		size: binary.LittleEndian.Uint16(raw[6:8]),
+	}, nil
+}
+
+func ringRecord(evt *pmuEvent, pos uint64, size int) []byte {
+	if cap(evt.recordBuf) < size {
+		evt.recordBuf = make([]byte, size)
+	}
+	record := evt.recordBuf[:size]
+	copyRing(record, evt.data, pos)
+	return record
+}
+
+func readRingRecords(evt *pmuEvent, start, end, sampleType uint64, handler func(sample)) (uint64, error) {
+	headerSize := uint64(unsafe.Sizeof(perfEventHeader{}))
+	capacity := uint64(len(evt.data))
+	for start != end {
+		remaining := end - start
+		if remaining < headerSize {
+			return start, fmt.Errorf("incomplete perf record header: %d bytes remain", remaining)
+		}
+
+		header, err := readRingHeader(evt.data, start)
+		if err != nil {
+			return start, err
+		}
+		size := uint64(header.size)
+		if size < headerSize || size > capacity || size > remaining {
+			return start, fmt.Errorf("invalid perf record size %d with %d bytes remaining", size, remaining)
+		}
+
+		record := ringRecord(evt, start, int(size))
+		if header.typ == perfRecordSample {
+			payload := record[headerSize:size]
+			handler(parseSample(payload, sampleType, evt.name))
+		}
+		start += size
+		evt.prev = start
+		atomic.StoreUint64(&evt.meta.dataTail, start)
+	}
+	return start, nil
+}
+
+func readSamples(evt *pmuEvent, sampleType uint64, handler func(sample)) error {
+	if evt.meta == nil || len(evt.data) == 0 {
+		return nil
+	}
+
+	head := atomic.LoadUint64(&evt.meta.dataHead)
+	start := evt.prev
+	if head-start > uint64(len(evt.data)) {
+		// Match libkperf's forward-ring behavior: if the reader falls behind
+		// the mapped capacity, discard the unread range and resume at head.
+		evt.prev = head
+		atomic.StoreUint64(&evt.meta.dataTail, head)
+		return nil
+	}
+
+	_, err := readRingRecords(evt, start, head, sampleType, handler)
+	return err
 }
 
 // PmuRead collects samples from all events under a pd.
 // Returns all gathered samples or an error if reading fails.
 func pmuRead(pd int) ([]sample, error) {
-	pl, ok := pdMap[pd]
+	pl, ok := getPmuList(pd)
 	if !ok {
 		return nil, fmt.Errorf("PmuRead failed. Invalid pd %d", pd)
 	}
 
-	sampleType := getSampleType(pl.enableBRBE)
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+	sampleType := getSampleType(pl.attr.EnableBRBE)
 
 	var samples []sample
 	for _, evt := range pl.events {
@@ -536,18 +711,16 @@ func pmuRead(pd int) ([]sample, error) {
 // PmuReset resets all events under a given pd.
 // Returns an error if the ioctl reset call fails.
 func pmuReset(pd int) error {
-	pl, ok := pdMap[pd]
+	pl, ok := getPmuList(pd)
 	if !ok {
 		return fmt.Errorf("PmuReset failed. Invalid pd: %d", pd)
 	}
 
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
 	for _, evt := range pl.events {
-		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-			uintptr(evt.fd),
-			perfEventIocReset,
-			0)
-		if errno != 0 {
-			return errno
+		if err := perfEventIoctl(evt.fd, perfEventIocReset); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -556,64 +729,79 @@ func pmuReset(pd int) error {
 // PmuEnable enables all events under a given pd.
 // Returns an error if the ioctl enable call fails.
 func pmuEnable(pd int) error {
-	pl, ok := pdMap[pd]
+	pl, ok := getPmuList(pd)
 	if !ok {
 		return fmt.Errorf("PmuEnable failed. Invalid pd: %d", pd)
 	}
 
-	for _, evt := range pl.events {
-		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-			uintptr(evt.fd),
-			perfEventIocEnable,
-			0)
-		if errno != 0 {
-			return errno
-		}
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+	if pl.enabled {
+		return nil
 	}
+
+	var enabledEvents []*pmuEvent
+	for _, evt := range pl.events {
+		if err := perfEventIoctl(evt.fd, perfEventIocEnable); err != nil {
+			errs := []error{err}
+			for _, enabledEvt := range enabledEvents {
+				if disableErr := perfEventIoctl(enabledEvt.fd, perfEventIocDisable); disableErr != nil {
+					errs = append(errs, fmt.Errorf("rollback disable fd %d: %w", enabledEvt.fd, disableErr))
+				}
+			}
+			return errors.Join(errs...)
+		}
+		enabledEvents = append(enabledEvents, evt)
+	}
+	pl.enabled = true
 	return nil
 }
 
 // PmuDisable disables all events under a given pd.
 // Returns an error if the ioctl disable call fails.
 func pmuDisable(pd int) error {
-	pl, ok := pdMap[pd]
+	pl, ok := getPmuList(pd)
 	if !ok {
 		return fmt.Errorf("PmuDisable failed. Invalid pd: %d", pd)
 	}
 
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+	if !pl.enabled {
+		return nil
+	}
+
+	var errs []error
 	for _, evt := range pl.events {
-		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL,
-			uintptr(evt.fd),
-			perfEventIocDisable,
-			0)
-		if errno != 0 {
-			return errno
+		if err := perfEventIoctl(evt.fd, perfEventIocDisable); err != nil {
+			errs = append(errs, err)
 		}
 	}
-	return nil
+	pl.enabled = false
+	return errors.Join(errs...)
 }
 
 // pmuClose closes all perf event file descriptors and unmaps their buffers for a given pd.
 // It attempts to clean up all events even if some cleanup operations fail.
 func pmuClose(pd int) error {
+	pdMu.Lock()
 	pl, ok := pdMap[pd]
+	if ok {
+		delete(pdMap, pd)
+	}
+	pdMu.Unlock()
 	if !ok {
 		return fmt.Errorf("PmuClose failed. Invalid pd: %d", pd)
 	}
 
+	pl.mu.Lock()
+	defer pl.mu.Unlock()
+
 	var errs []error
 	for fd, evt := range pl.events {
-		if len(evt.buf) > 0 {
-			if err := syscall.Munmap(evt.buf); err != nil {
-				errs = append(errs, fmt.Errorf("munmap failed for %s(fd=%d): %w", evt.name, fd, err))
-			}
-		}
-
-		if err := syscall.Close(fd); err != nil {
-			errs = append(errs, fmt.Errorf("close fd failed for %s(fd=%d): %w", evt.name, fd, err))
+		if err := closePmuEvent(evt); err != nil {
+			errs = append(errs, fmt.Errorf("close event failed for %s(fd=%d): %w", evt.name, fd, err))
 		}
 	}
-
-	delete(pdMap, pd)
 	return errors.Join(errs...)
 }

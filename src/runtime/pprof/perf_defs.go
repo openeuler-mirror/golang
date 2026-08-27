@@ -13,6 +13,8 @@ const (
 	perfEventIocEnable  = 0x2400
 	// IOCTL command: reset the selected perf event's counters/buffers
 	perfEventIocReset   = 0x2403
+	// IOCTL command: redirect samples to another event's ring buffer
+	perfEventIocSetOutput = 0x2405
 )
 
 // The page size setting for ring buffer mmap
