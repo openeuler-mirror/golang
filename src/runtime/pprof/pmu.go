@@ -104,21 +104,39 @@ func StartPMUProfile(w io.Writer, pmuAttr *PMUAttr) (<-chan error, error) {
 		enabled = true
 
 		allSamples := []sample{}
-		for i := int64(0); i < pmuAttr.Duration; i++ {
-			time.Sleep(time.Second)
-
+		readSamples := func() error {
 			samples, err := pmuRead(pd)
 			if err != nil {
-				retErr = fmt.Errorf("Read PMU failed: %w", err)
-				return
+				return err
 			}
-			if len(samples) > 0 {
-				allSamples = append(allSamples, samples...)
+			allSamples = append(allSamples, samples...)
+			return nil
+		}
+
+		const readInterval = 50 * time.Millisecond
+		ticker := time.NewTicker(readInterval)
+		timer := time.NewTimer(time.Duration(pmuAttr.Duration) * time.Second)
+		for collecting := true; collecting; {
+			select {
+			case <-ticker.C:
+				if err := readSamples(); err != nil {
+					ticker.Stop()
+					timer.Stop()
+					retErr = fmt.Errorf("Read PMU failed: %w", err)
+					return
+				}
+			case <-timer.C:
+				collecting = false
 			}
 		}
+		ticker.Stop()
 
 		if err := disable(); err != nil {
 			retErr = fmt.Errorf("Disable PMU failed: %w", err)
+			return
+		}
+		if err := readSamples(); err != nil {
+			retErr = fmt.Errorf("Read PMU failed: %w", err)
 			return
 		}
 
