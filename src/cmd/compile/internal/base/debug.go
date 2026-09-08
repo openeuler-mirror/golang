@@ -76,6 +76,7 @@ type DebugFlags struct {
 	WrapGlobalMapDbg      int    `help:"debug trace output for global map init wrapping"`
 	WrapGlobalMapCtl      int    `help:"global map init wrap control (0 => default, 1 => off, 2 => stress mode, no size cutoff)"`
 	ZeroCopy              int    `help:"enable zero-copy string->[]byte conversions" concurrent:"ok"`
+	Go119UseJumpTables    int    `help:"allow to use jump tables"`
 	ForceInline           int    `help:"enable force inline"`
 	ForceInlineLog        int    `help:"print force inline log"`
 	AArch64LdSt           string `help:"allow to merge loads and stores using ldp/stp on AArch64\nOne of: none, off, load, store, all, on"`

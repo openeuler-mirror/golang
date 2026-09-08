@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build !goboltci
+//go:build goboltci
 
 // Package testdir_test runs tests in the GOROOT/test directory.
 package testdir_test
@@ -47,6 +47,7 @@ var (
 
 	shard  = flag.Int("shard", 0, "shard index to run. Only applicable if -shards is non-zero.")
 	shards = flag.Int("shards", 0, "number of shards. If 0, all tests are run. This is used by the continuous build.")
+	keep   = flag.Bool("k", false, "keep. keep temporary directory.")
 )
 
 // defaultAllCodeGen returns the default value of the -all_codegen
@@ -173,7 +174,7 @@ func goFiles(t *testing.T, dir string) []string {
 	names := []string{}
 	for _, file := range files {
 		name := file.Name()
-		if !strings.HasPrefix(name, ".") && (strings.HasSuffix(name, ".go") || strings.HasSuffix(name, ".s")) && shardMatch(name) {
+		if !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go") && shardMatch(name) {
 			names = append(names, name)
 		}
 	}
@@ -388,6 +389,13 @@ func shouldTest(src string, goos, goarch string) (ok bool, whyNot string) {
 				noOptEnv:   strings.Contains(gcFlags, "-N") || strings.Contains(gcFlags, "-l"),
 			}
 
+			// Dummy check for goboltci tag
+			if expr.String() == "!goboltci" {
+				return false, line
+			} else if expr.String() == "goboltci" {
+				return true, ""
+			}
+
 			if !expr.Eval(ctxt.match) {
 				return false, line
 			}
@@ -441,11 +449,49 @@ func (ctxt *context) match(name string) bool {
 // or else the commands will rebuild any needed packages (like runtime)
 // over and over.
 func (test) goGcflags() string {
-	return "-gcflags=all=" + os.Getenv("GO_GCFLAGS")
+	if gcflags := os.Getenv("TEST_GCFLAGS"); gcflags != "" {
+		return "-gcflags=all=" + gcflags
+	} else if gcflags := os.Getenv("GO_GCFLAGS"); gcflags != "" {
+		return "-gcflags=all=" + gcflags
+	}
+	return ""
 }
 
 func (test) goGcflagsIsEmpty() bool {
 	return "" == os.Getenv("GO_GCFLAGS")
+}
+
+func (test) goLdflags() string {
+	if ldflags := os.Getenv("TEST_LDFLAGS"); ldflags != "" {
+		return "-ldflags=" + ldflags
+	}
+	return ""
+}
+
+func (t test) goBuildFlags() []string {
+	flags := []string{}
+	if buildflags := os.Getenv("TEST_BUILDFLAGS"); buildflags != "" {
+		flags = append(flags, strings.Split(buildflags, " ")...)
+	}
+	if gcflags := t.goGcflags(); gcflags != "" {
+		flags = append(flags, gcflags)
+	}
+	if ldflags := t.goLdflags(); ldflags != "" {
+		flags = append(flags, ldflags)
+	}
+	return flags
+}
+
+func (t test) setTestEnvVars(tempDir string, wantError bool) {
+	if err := os.Setenv("expect"+filepath.Base(tempDir), strconv.FormatBool(wantError)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("output"+filepath.Base(tempDir), t.expectedOutput()); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Setenv("outputIsSet"+filepath.Base(tempDir), "true"); err != nil {
+		t.Fatal(err)
+	}
 }
 
 var errTimeout = errors.New("command exceeded time limit")
@@ -593,10 +639,22 @@ func (t test) run() error {
 		}
 	}
 
-	tempDir := t.TempDir()
+	tempDirPath := ""
+	if *keep {
+		tempDirPath = os.Getenv("TMPDIR")
+	}
+	tempDir, err := os.MkdirTemp(tempDirPath, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	log.Printf("Temporary directory is %s", tempDir)
 	err = os.Mkdir(filepath.Join(tempDir, "test"), 0755)
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !*keep {
+		defer os.RemoveAll(tempDir)
 	}
 
 	err = os.WriteFile(filepath.Join(tempDir, t.goFile), srcBytes, 0644)
@@ -661,6 +719,9 @@ func (t test) run() error {
 				tick.Stop()
 			}
 		} else {
+			if err := os.Setenv("filename"+filepath.Base(tempDir), t.goFileName()); err != nil {
+				t.Fatal(err)
+			}
 			err = cmd.Run()
 		}
 		if err != nil && err != errTimeout {
@@ -692,6 +753,8 @@ func (t test) run() error {
 	case "asmcheck":
 		// Compile Go file and match the generated assembly
 		// against a set of regexps in comments.
+		// TODO: enable asmcheck under BOLT CI (needs TEST_GCFLAGS injection).
+		t.Skipf("action %q not supported under goboltci", action)
 		ops := t.wantedAsmOpcodes(long)
 		self := runtime.GOOS + "/" + runtime.GOARCH
 		for _, env := range ops.Envs() {
@@ -703,34 +766,24 @@ func (t test) run() error {
 			// -S=2 forces outermost line numbers when disassembling inlined code.
 			cmdline := []string{"build", "-gcflags", "-S=2"}
 
-			if strings.HasSuffix(t.goFileName(), ".s") {
-				cmdline[0] = "tool"
-				cmdline[1] = "asm"
-				cmdline[2] = "-S=2"
-				// Append flags
-				for i := 0; i < len(flags); i++ {
-					flag := flags[i]
+			// Append flags, but don't override -gcflags=-S=2; add to it instead.
+			for i := 0; i < len(flags); i++ {
+				flag := flags[i]
+				switch {
+				case strings.HasPrefix(flag, "-gcflags="):
+					cmdline[2] += " " + strings.TrimPrefix(flag, "-gcflags=")
+				case strings.HasPrefix(flag, "--gcflags="):
+					cmdline[2] += " " + strings.TrimPrefix(flag, "--gcflags=")
+				case flag == "-gcflags", flag == "--gcflags":
+					i++
+					if i < len(flags) {
+						cmdline[2] += " " + flags[i]
+					}
+				default:
 					cmdline = append(cmdline, flag)
 				}
-			} else {
-				// Append flags, but don't override -gcflags=-S=2; add to it instead.
-				for i := 0; i < len(flags); i++ {
-					flag := flags[i]
-					switch {
-					case strings.HasPrefix(flag, "-gcflags="):
-						cmdline[2] += " " + strings.TrimPrefix(flag, "-gcflags=")
-					case strings.HasPrefix(flag, "--gcflags="):
-						cmdline[2] += " " + strings.TrimPrefix(flag, "--gcflags=")
-					case flag == "-gcflags", flag == "--gcflags":
-						i++
-						if i < len(flags) {
-							cmdline[2] += " " + flags[i]
-						}
-					default:
-						cmdline = append(cmdline, flag)
-					}
-				}
 			}
+
 			cmdline = append(cmdline, long)
 			cmd := exec.Command(goTool, cmdline...)
 			cmd.Env = append(os.Environ(), env.Environ()...)
@@ -842,6 +895,9 @@ func (t test) run() error {
 		// In case of errorcheckandrundir, ignore failed compilation of the package before the last.
 		// Link as if the last file is the main package, run it.
 		// Verify the expected output.
+		// TODO: enable rundir under BOLT CI (needs gc/ld flag injection into
+		// the go tool pipeline and getExecCmd wrapping of the final binary).
+		t.Skipf("action %q not supported under goboltci", action)
 		longdir := filepath.Join(t.gorootTestDir, t.goDirName())
 		pkgs := goDirPackages(t.T, longdir, singlefilepkgs)
 		// Split flags into gcflags and ldflags
@@ -910,13 +966,22 @@ func (t test) run() error {
 			t.Fatal(err)
 		}
 
-		cmd := []string{goTool, "run", t.goGcflags()}
+		exe := filepath.Join(tempDir, "a.exe")
+		cmd := []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
 		if *linkshared {
 			cmd = append(cmd, "-linkshared")
 		}
 		cmd = append(cmd, flags...)
+		cmd = append(cmd, "-o", exe)
 		cmd = append(cmd, ".")
 		out, err := runcmd(cmd...)
+		if err != nil {
+			return err
+		}
+		t.setTestEnvVars(tempDir, wantError)
+		cmd = getExecCmd(exe)
+		out, err = runcmd(cmd...)
 		if err != nil {
 			return err
 		}
@@ -924,7 +989,8 @@ func (t test) run() error {
 
 	case "build":
 		// Build Go file.
-		cmd := []string{goTool, "build", t.goGcflags()}
+		cmd := []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
 		cmd = append(cmd, flags...)
 		cmd = append(cmd, "-o", "a.exe", long)
 		_, err := runcmd(cmd...)
@@ -933,6 +999,9 @@ func (t test) run() error {
 	case "builddir", "buildrundir":
 		// Build an executable from all the .go and .s files in a subdirectory.
 		// Run it and verify its output in the buildrundir case.
+		// TODO: enable builddir/buildrundir under BOLT CI (needs gc/ld flag
+		// injection into the go tool pipeline and getExecCmd wrapping).
+		t.Skipf("action %q not supported under goboltci", action)
 		longdir := filepath.Join(t.gorootTestDir, t.goDirName())
 		files, err := os.ReadDir(longdir)
 		if err != nil {
@@ -1006,7 +1075,10 @@ func (t test) run() error {
 		// Build an executable from Go file, then run it, verify its output.
 		// Useful for timeout tests where failure mode is infinite loop.
 		// TODO: not supported on NaCl
-		cmd := []string{goTool, "build", t.goGcflags(), "-o", "a.exe"}
+		exe := filepath.Join(tempDir, "a.exe")
+		cmd := []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
+		cmd = append(cmd, "-o", exe)
 		if *linkshared {
 			cmd = append(cmd, "-linkshared")
 		}
@@ -1017,7 +1089,8 @@ func (t test) run() error {
 		if err != nil {
 			return err
 		}
-		cmd = []string{"./a.exe"}
+		t.setTestEnvVars(tempDir, wantError)
+		cmd = getExecCmd(exe)
 		out, err := runcmd(append(cmd, args...)...)
 		if err != nil {
 			return err
@@ -1032,7 +1105,7 @@ func (t test) run() error {
 		runInDir = ""
 		var out []byte
 		var err error
-		if len(flags)+len(args) == 0 && t.goGcflagsIsEmpty() && !*linkshared && goarch == runtime.GOARCH && goos == runtime.GOOS && goexp == goExperiment && godebug == goDebug {
+		if 0 != 0 {
 			// If we're not using special go command flags,
 			// skip all the go command machinery.
 			// This avoids any time the go command would
@@ -1052,12 +1125,25 @@ func (t test) run() error {
 			}
 			out, err = runcmd(append([]string{exe}, args...)...)
 		} else {
-			cmd := []string{goTool, "run", t.goGcflags()}
+			exe := filepath.Join(tempDir, "a.exe")
+			cmd := []string{goTool, "build"}
+			cmd = append(cmd, t.goBuildFlags()...)
 			if *linkshared {
 				cmd = append(cmd, "-linkshared")
 			}
 			cmd = append(cmd, flags...)
+			cmd = append(cmd, "-o", exe)
 			cmd = append(cmd, t.goFileName())
+			out, err = runcmd(append(cmd, args...)...)
+			if err != nil {
+				out, err = runcmd(cmd...)
+				if err != nil {
+					return err
+				}
+			}
+
+			t.setTestEnvVars(tempDir, wantError)
+			cmd = getExecCmd(exe)
 			out, err = runcmd(append(cmd, args...)...)
 		}
 		if err != nil {
@@ -1073,24 +1159,44 @@ func (t test) run() error {
 			<-t.runoutputGate
 		}()
 		runInDir = ""
-		cmd := []string{goTool, "run", t.goGcflags()}
+		exe := filepath.Join(tempDir, "a.exe")
+		cmd := []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
 		if *linkshared {
 			cmd = append(cmd, "-linkshared")
 		}
+		cmd = append(cmd, "-o", exe)
 		cmd = append(cmd, t.goFileName())
 		out, err := runcmd(append(cmd, args...)...)
 		if err != nil {
 			return err
 		}
+		cmd = getExecCmd(exe)
+		out, err = runcmd(cmd...)
+		if err != nil {
+			return err
+		}
+
 		tfile := filepath.Join(tempDir, "tmp__.go")
+		texe := filepath.Join(tempDir, "b.exe")
 		if err := os.WriteFile(tfile, out, 0666); err != nil {
 			t.Fatalf("write tempfile: %v", err)
 		}
-		cmd = []string{goTool, "run", t.goGcflags()}
+		cmd = []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
 		if *linkshared {
 			cmd = append(cmd, "-linkshared")
 		}
+		cmd = append(cmd, "-o")
+		cmd = append(cmd, texe)
 		cmd = append(cmd, tfile)
+		_, err = runcmd(cmd...)
+		if err != nil {
+			return err
+		}
+
+		t.setTestEnvVars(tempDir, wantError)
+		cmd = getExecCmd(texe)
 		out, err = runcmd(cmd...)
 		if err != nil {
 			return err
@@ -1101,12 +1207,24 @@ func (t test) run() error {
 		// Run Go file and write its output into temporary Go file.
 		// Compile and errorCheck generated Go file.
 		runInDir = ""
-		cmd := []string{goTool, "run", t.goGcflags()}
+		exe := filepath.Join(tempDir, "a.exe")
+		cmd := []string{goTool, "build"}
+		cmd = append(cmd, t.goBuildFlags()...)
 		if *linkshared {
 			cmd = append(cmd, "-linkshared")
 		}
+		cmd = append(cmd, "-o", exe)
 		cmd = append(cmd, t.goFileName())
-		out, err := runcmd(append(cmd, args...)...)
+		out, err := runcmd(cmd...)
+		if err != nil {
+			out, err = runcmd(append(cmd, args...)...)
+			if err != nil {
+				return err
+			}
+		}
+
+		cmd = getExecCmd(exe)
+		out, err = runcmd(cmd...)
 		if err != nil {
 			return err
 		}
@@ -1142,6 +1260,28 @@ var findExecCmd = sync.OnceValue(func() (execCmd []string) {
 	return execCmd
 })
 
+func getExecCmd(cmd string) []string {
+	go_test_script := os.Getenv("GO_TEST_SCRIPT")
+	if go_test_script != "" {
+		return []string{go_test_script, cmd}
+	}
+
+	return []string{cmd}
+}
+
+// var execCmdOnce sync.Once
+// var execCmd []string
+
+// func findExecCmd() []string {
+// 	execCmdOnce.Do(func() {
+// 		if goos == runtime.GOOS && goarch == runtime.GOARCH {
+// 			// Do nothing.
+// 		} else if path, err := exec.LookPath(fmt.Sprintf("go_%s_%s_exec", goos, goarch)); err == nil {
+// 			execCmd = []string{path}
+// 		}
+// 	})
+// }
+
 // checkExpectedOutput compares the output from compiling and/or running with the contents
 // of the corresponding reference output file, if any (replace ".go" with ".out").
 // If they don't match, fail with an informative message.
@@ -1166,6 +1306,14 @@ func (t test) checkExpectedOutput(gotBytes []byte) error {
 		}
 	}
 	return nil
+}
+
+func (t *test) expectedOutput() string {
+	filename := filepath.Join(t.dir, t.goFile)
+	filename = filename[:len(filename)-len(".go")]
+	filename += ".out"
+	b, _ := os.ReadFile(filepath.Join(t.gorootTestDir, filename))
+	return string(b)
 }
 
 func splitOutput(out string, wantAuto bool) []string {

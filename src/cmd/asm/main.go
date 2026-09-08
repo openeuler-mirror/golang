@@ -18,6 +18,7 @@ import (
 	"cmd/asm/internal/lex"
 
 	"cmd/internal/bio"
+	"cmd/internal/goobj"
 	"cmd/internal/obj"
 	"cmd/internal/objabi"
 	"cmd/internal/telemetry/counter"
@@ -38,6 +39,11 @@ func main() {
 	architecture := arch.Set(GOARCH, *flags.Shared || *flags.Dynlink)
 	if architecture == nil {
 		log.Fatalf("unrecognized architecture %s", GOARCH)
+	}
+	if goobj.EnableMappingSymbols && GOARCH != "arm64" {
+		// mapping symbols are arm64-only; keep the goobj file format
+		// identical to upstream on other architectures
+		goobj.EnableMappingSymbols = false
 	}
 	ctxt := obj.Linknew(architecture.LinkArch)
 	ctxt.Debugasm = flags.PrintOut

@@ -90,6 +90,34 @@ func (f *peFile) symbols() ([]Sym, error) {
 	return syms, nil
 }
 
+func (f *peFile) symbolSize(name string) (uint64, error) {
+	imageBase, _ := f.imageBase()
+	for _, s := range f.pe.Symbols {
+		if s.Name == name {
+			var symAddr uint64 = uint64(s.Value)
+			if s.SectionNumber > 0 {
+				symAddr += imageBase + uint64(f.pe.Sections[s.SectionNumber-1].VirtualAddress)
+			}
+			i := sort.Search(len(f.pe.Symbols), func(x int) bool {
+				var otherAddr uint64 = uint64(f.pe.Symbols[x].Value)
+				if f.pe.Symbols[x].SectionNumber > 0 {
+					otherAddr += imageBase + uint64(f.pe.Sections[f.pe.Symbols[x].SectionNumber-1].VirtualAddress)
+				}
+				return otherAddr > symAddr
+			})
+			if i < len(f.pe.Symbols) {
+				var otherAddr uint64 = uint64(f.pe.Symbols[i].Value)
+				if f.pe.Symbols[i].SectionNumber > 0 {
+					otherAddr += imageBase + uint64(f.pe.Sections[f.pe.Symbols[i].SectionNumber-1].VirtualAddress)
+				}
+				return otherAddr - symAddr, nil
+			}
+			return 0, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol %q not found", name)
+}
+
 func (f *peFile) pcln() (textStart uint64, symtab, pclntab []byte, err error) {
 	imageBase, err := f.imageBase()
 	if err != nil {
@@ -115,6 +143,22 @@ func (f *peFile) pcln() (textStart uint64, symtab, pclntab []byte, err error) {
 		}
 	}
 	return textStart, symtab, pclntab, nil
+}
+
+func (f *peFile) firstmoduledata() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *peFile) buildVersion() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (f *peFile) pcHeader(addr uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *peFile) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (f *peFile) text() (textStart uint64, text []byte, err error) {

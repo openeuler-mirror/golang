@@ -7,7 +7,7 @@
 // search a particular binary to see if they are present.
 // On other platforms (those using this source file), they don't.
 
-//go:build !amd64
+//go:build !amd64 || bolt
 
 TEXT ·BoringCrypto(SB),$0
 	RET

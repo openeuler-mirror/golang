@@ -12,10 +12,12 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"unsafe"
 )
 
 type elfFile struct {
 	elf *elf.File
+	r   io.ReaderAt
 }
 
 func openElf(r io.ReaderAt) (rawFile, error) {
@@ -23,13 +25,17 @@ func openElf(r io.ReaderAt) (rawFile, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &elfFile{f}, nil
+	return &elfFile{f, r}, nil
 }
 
 func (f *elfFile) symbols() ([]Sym, error) {
 	elfSyms, err := f.elf.Symbols()
 	if err != nil {
-		return nil, err
+		elfDSyms, err2 := f.elf.DynamicSymbols()
+		if err2 != nil {
+			return nil, err2
+		}
+		elfSyms = elfDSyms
 	}
 
 	var syms []Sym
@@ -62,6 +68,19 @@ func (f *elfFile) symbols() ([]Sym, error) {
 	}
 
 	return syms, nil
+}
+
+func (f *elfFile) symbolSize(name string) (uint64, error) {
+	elfSyms, err := f.elf.Symbols()
+	if err != nil {
+		return 0, err
+	}
+	for _, s := range elfSyms {
+		if s.Name == name {
+			return s.Size, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol %q not found", name)
 }
 
 func (f *elfFile) pcln() (textStart uint64, symtab, pclntab []byte, err error) {
@@ -98,6 +117,33 @@ func (f *elfFile) pcln() (textStart uint64, symtab, pclntab []byte, err error) {
 	}
 
 	return textStart, symtab, pclntab, nil
+}
+
+func (f *elfFile) firstmoduledata() ([]byte, error) {
+	size := uint64(unsafe.Sizeof(*(*moduledata)(nil)))
+	buf := f.symbolDataSz("runtime.firstmoduledata", size)
+	if buf == nil {
+		return nil, fmt.Errorf("reading runtime.firstmoduledata symbol")
+	}
+	return buf, nil
+}
+
+func (f *elfFile) buildVersion() (string, error) {
+	buf := f.symbolDataSz("runtime.buildVersion.str", 6)
+	if buf == nil {
+		return "", fmt.Errorf("reading runtime.buildVersion symbol")
+	}
+	return fmt.Sprintf("%s", buf), nil
+}
+
+func (f *elfFile) pcHeader(addr uint64) ([]byte, error) {
+	var ph pcHeader
+	size := uint64(unsafe.Sizeof(ph))
+	return f.tableBufAt(addr, size)
+}
+
+func (f *elfFile) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return f.segmentDataAt(addr, size)
 }
 
 func (f *elfFile) text() (textStart uint64, text []byte, err error) {
@@ -158,7 +204,11 @@ func (f *elfFile) dwarf() (*dwarf.Data, error) {
 func (f *elfFile) symbolData(start, end string) []byte {
 	elfSyms, err := f.elf.Symbols()
 	if err != nil {
-		return nil
+		elfDSyms, err2 := f.elf.DynamicSymbols()
+		if err2 != nil {
+			return nil
+		}
+		elfSyms = elfDSyms
 	}
 	var addr, eaddr uint64
 	for _, s := range elfSyms {
@@ -175,14 +225,91 @@ func (f *elfFile) symbolData(start, end string) []byte {
 		return nil
 	}
 	size := eaddr - addr
-	data := make([]byte, size)
-	for _, prog := range f.elf.Progs {
-		if prog.Vaddr <= addr && addr+size-1 <= prog.Vaddr+prog.Filesz-1 {
-			if _, err := prog.ReadAt(data, int64(addr-prog.Vaddr)); err != nil {
-				return nil
-			}
-			return data
+	return f.symbolDataAt(addr, size)
+}
+
+func (f *elfFile) symbolDataSz(start string, size uint64) []byte {
+	elfSyms, err := f.elf.Symbols()
+	if err != nil {
+		elfDSyms, err2 := f.elf.DynamicSymbols()
+		if err2 != nil {
+			return nil
+		}
+		elfSyms = elfDSyms
+	}
+	var addr uint64
+	for _, s := range elfSyms {
+		if s.Name == start {
+			addr = s.Value
+			break
+		}
+	}
+	if addr == 0 {
+		return nil
+	}
+	return f.symbolDataAt(addr, size)
+}
+
+func (f *elfFile) symbolDataAt(addr uint64, size uint64) []byte {
+	if size == 0 {
+		return make([]byte, 0)
+	}
+	buf, err := f.segmentDataAt(addr, size)
+	if err != nil {
+		return nil
+	}
+	return buf
+}
+
+func (f *elfFile) findSectionForAddr(addr uint64) *elf.Section {
+	for _, sect := range f.elf.Sections {
+		if sect.Flags&elf.SHF_ALLOC == 0 {
+			continue
+		}
+		if sect.Type == elf.SHT_NOBITS {
+			continue
+		}
+		if sect.Addr <= addr && addr < sect.Addr+sect.Size {
+			return sect
 		}
 	}
 	return nil
+}
+
+func (f *elfFile) addrToFileOffset(addr uint64) (uint64, *elf.Prog, bool) {
+	for _, prog := range f.elf.Progs {
+		if prog.Type != elf.PT_LOAD {
+			continue
+		}
+		vmaEnd := prog.Vaddr + prog.Filesz
+		if prog.Vaddr <= addr && addr < vmaEnd {
+			return prog.Off + (addr - prog.Vaddr), prog, true
+		}
+	}
+	return 0, nil, false
+}
+
+func (f *elfFile) segmentDataAt(addr uint64, size uint64) ([]byte, error) {
+	if size == 0 {
+		return []byte{}, nil
+	}
+
+	fileOff, prog, found := f.addrToFileOffset(addr)
+	if !found {
+		return nil, fmt.Errorf("address 0x%x not in any PT_LOAD segment", addr)
+	}
+
+	endOff := fileOff + size
+	segEnd := prog.Off + prog.Filesz
+
+	if endOff > segEnd {
+		return nil, fmt.Errorf("address 0x%x (size %d) extends past PT_LOAD segment boundary (segment end 0x%x)", addr, size, segEnd)
+	}
+
+	data := make([]byte, size)
+	_, err := f.r.ReadAt(data, int64(fileOff))
+	if err != nil {
+		return nil, fmt.Errorf("reading at file offset 0x%x: %v", fileOff, err)
+	}
+	return data, nil
 }

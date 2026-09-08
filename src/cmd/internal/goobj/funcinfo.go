@@ -10,6 +10,8 @@ import (
 	"internal/abi"
 )
 
+var EnableMappingSymbols bool
+
 // CUFileIndex is used to index the filenames that are stored in the
 // per-package/per-CU FileList.
 type CUFileIndex uint32
@@ -24,6 +26,7 @@ type FuncInfo struct {
 	StartLine int32
 	File      []CUFileIndex
 	InlTree   []InlTreeNode
+	PoolsInfo []PoolInfo
 }
 
 func (a *FuncInfo) Write(w *bytes.Buffer) {
@@ -52,6 +55,12 @@ func (a *FuncInfo) Write(w *bytes.Buffer) {
 	for i := range a.InlTree {
 		a.InlTree[i].Write(w)
 	}
+	if EnableMappingSymbols {
+		writeUint32(uint32(len(a.PoolsInfo)))
+		for i := range a.PoolsInfo {
+			a.PoolsInfo[i].Write(w)
+		}
+	}
 }
 
 // FuncInfoLengths is a cache containing a roadmap of offsets and
@@ -64,6 +73,8 @@ type FuncInfoLengths struct {
 	FileOff     uint32
 	NumInlTree  uint32
 	InlTreeOff  uint32
+	NumPoolInfo uint32
+	PoolInfoOff uint32
 	Initialized bool
 }
 
@@ -80,9 +91,57 @@ func (*FuncInfo) ReadFuncInfoLengths(b []byte) FuncInfoLengths {
 	result.NumInlTree = binary.LittleEndian.Uint32(b[numinltreeOff:])
 	result.InlTreeOff = numinltreeOff + 4
 
+	if EnableMappingSymbols {
+		numpoolinfoOff := result.InlTreeOff + 24*result.NumInlTree
+		result.NumPoolInfo = binary.LittleEndian.Uint32(b[numpoolinfoOff:])
+		result.PoolInfoOff = numpoolinfoOff + 4
+	}
+
 	result.Initialized = true
 
 	return result
+}
+
+func (*FuncInfo) ReadPoolInfo(b []byte, PoolInfoOff uint32, k uint32) PoolInfo {
+	if !EnableMappingSymbols {
+		panic("disabled mapping symbols, but (*FuncInfo).ReadPoolInfo is called, is there a bug?")
+	}
+	const PoolInfoSize = 4 * 2
+	var result PoolInfo
+	result.Read(b[PoolInfoOff+k*PoolInfoSize:])
+	return result
+}
+
+type PoolInfo struct {
+	PoolOff uint32
+	CodeOff uint32
+}
+
+func (pinfo *PoolInfo) Write(w *bytes.Buffer) {
+	if !EnableMappingSymbols {
+		panic("disabled mapping symbols, but (*PoolInfo).Write is called, is there a bug?")
+	}
+	var b [4]byte
+	writeUint32 := func(x uint32) {
+		binary.LittleEndian.PutUint32(b[:], x)
+		w.Write(b[:])
+	}
+	writeUint32(pinfo.PoolOff)
+	writeUint32(pinfo.CodeOff)
+}
+
+func (pinfo *PoolInfo) Read(b []byte) []byte {
+	if !EnableMappingSymbols {
+		panic("disabled mapping symbols, but (*PoolInfo).Read is called, is there a bug?")
+	}
+	readUint32 := func() uint32 {
+		x := binary.LittleEndian.Uint32(b)
+		b = b[4:]
+		return x
+	}
+	pinfo.PoolOff = readUint32()
+	pinfo.CodeOff = readUint32()
+	return b
 }
 
 func (*FuncInfo) ReadArgs(b []byte) uint32 { return binary.LittleEndian.Uint32(b) }

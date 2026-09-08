@@ -7,8 +7,10 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"debug/elf"
 	"debug/macho"
 	"errors"
+	"fmt"
 	"internal/platform"
 	"internal/testenv"
 	"os"
@@ -16,6 +18,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"testing"
@@ -1092,6 +1095,20 @@ func TestContentAddressableSymbols(t *testing.T) {
 	}
 }
 
+func TestCoreGoPadFunc(t *testing.T) {
+	// Test that the linker handles padfunc correctly.
+	testenv.MustHaveGoBuild(t)
+
+	t.Parallel()
+
+	src := filepath.Join("testdata", "testCoreGo", "padfunc.go")
+	cmd := testenv.Command(t, testenv.GoToolPath(t), "run", "-ldflags=-padfunc", src)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("command %s failed: %v\n%s", cmd, err, out)
+	}
+}
+
 func TestReadOnly(t *testing.T) {
 	// Test that read-only data is indeed read-only.
 	testenv.MustHaveGoBuild(t)
@@ -1674,5 +1691,145 @@ func TestLinknameBSS(t *testing.T) {
 	out, err = cmd.CombinedOutput()
 	if err != nil {
 		t.Errorf("executable failed to run: %v\n%s", err, out)
+	}
+}
+
+const testMappingSymbolSrcHead = `
+package main
+
+import "unsafe"
+
+type A struct {
+	c [16384]uint8
+}
+
+//go:noinline
+func foo(i int) A {
+	var a [65536]A
+	b := uint16(0)
+`
+
+const testMappingSymbolSrcTail = `
+	return a[i]
+}
+
+func main() {
+	_ = foo(1023)
+	return
+}
+`
+
+func TestMappingSymbol(t *testing.T) {
+	if runtime.GOARCH != "arm64" {
+		t.Skip("skipping arm64 only test")
+	}
+
+	testenv.MustHaveGoBuild(t)
+
+	t.Parallel()
+
+	var sb strings.Builder
+
+	tmpdir := t.TempDir()
+
+	src := filepath.Join(tmpdir, "main.go")
+	sb.WriteString(testMappingSymbolSrcHead)
+
+	for i := 0; i < 65535; i++ {
+		str := fmt.Sprintf("*(*uint16)(unsafe.Pointer(&a[%d].c[1])) = b\nb++\n", i)
+		sb.WriteString(str)
+	}
+	sb.WriteString(testMappingSymbolSrcTail)
+	err := os.WriteFile(src, []byte(sb.String()), 0666)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exe := filepath.Join(tmpdir, "main.exe")
+	objfile := filepath.Join(tmpdir, "go.o")
+
+	// The debug text size limit is larger than main.foo (about 1MB), but
+	// smaller than the runtime text plus main.foo, so the text is split
+	// right before main.foo and main.foo starts the second text section.
+	cmd := testenv.Command(t, testenv.GoToolPath(t), "build", "-buildmode=default", "-mappingsymbol", "-o", exe,
+		"-ldflags=-linkmode=external -debugtextsize=0x140000 -tmpdir="+tmpdir, src)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build failed: %v\n%s", err, out)
+	}
+
+	// The object file emitted by the Go linker is inspected rather than the
+	// final executable because the external linker merges the split .text
+	// sections into a single output section.
+	checkTextSplitMappingSymbols(t, objfile)
+	checkMappingSymbolPositions(t, objfile)
+
+	cmd = testenv.Command(t, exe)
+	out, err = cmd.CombinedOutput()
+	if err != nil {
+		t.Errorf("executable failed to run: %v\n%s", err, out)
+	}
+}
+
+// checkMappingSymbolPositions checks that the $x and $d mapping symbols of
+// main.foo are at their expected positions: an $x at the start of the
+// function, then a $d at every literal pool inside it and an $x where the
+// code resumes after the pool, strictly alternating in address order.
+func checkMappingSymbolPositions(t *testing.T, objfile string) {
+	f, err := elf.Open(objfile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer f.Close()
+
+	symbols, err := f.Symbols()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var foo *elf.Symbol
+	for i := range symbols {
+		if symbols[i].Name == "main.foo" {
+			foo = &symbols[i]
+			break
+		}
+	}
+	if foo == nil {
+		t.Fatal("main.foo symbol not found")
+	}
+
+	// Collect the mapping symbols inside main.foo, in address order.
+	var syms []elf.Symbol
+	for _, sym := range symbols {
+		if sym.Section != foo.Section || (sym.Name != "$x" && sym.Name != "$d") {
+			continue
+		}
+		if sym.Value < foo.Value || sym.Value >= foo.Value+foo.Size {
+			continue
+		}
+		if elf.ST_TYPE(sym.Info) != elf.STT_NOTYPE || elf.ST_BIND(sym.Info) != elf.STB_LOCAL {
+			t.Errorf("mapping symbol %s at %#x has incorrect info %v", sym.Name, sym.Value, sym.Info)
+			continue
+		}
+		syms = append(syms, sym)
+	}
+	sort.Slice(syms, func(i, j int) bool { return syms[i].Value < syms[j].Value })
+
+	if len(syms) < 3 {
+		t.Fatalf("expected an $x plus at least one $d/$x pair in main.foo, got %d mapping symbols", len(syms))
+	}
+	if syms[0].Value != foo.Value {
+		t.Errorf("first mapping symbol of main.foo is at %#x, want %#x", syms[0].Value, foo.Value)
+	}
+	for i, sym := range syms {
+		want := "$d"
+		if i%2 == 0 {
+			want = "$x"
+		}
+		if sym.Name != want {
+			t.Errorf("mapping symbol %d of main.foo at %#x is %s, want %s", i, sym.Value, sym.Name, want)
+		}
+	}
+	if syms[len(syms)-1].Name != "$x" {
+		t.Errorf("last mapping symbol of main.foo is %s, want $x", syms[len(syms)-1].Name)
 	}
 }

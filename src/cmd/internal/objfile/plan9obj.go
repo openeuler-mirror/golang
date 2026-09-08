@@ -29,6 +29,22 @@ type plan9File struct {
 	plan9 *plan9obj.File
 }
 
+func (f *plan9File) symbolSize(name string) (uint64, error) {
+	plan9Syms, err := f.plan9.Symbols()
+	if err != nil {
+		return 0, err
+	}
+	for i, s := range plan9Syms {
+		if s.Name == name {
+			if i+1 < len(plan9Syms) {
+				return plan9Syms[i+1].Value - s.Value, nil
+			}
+			return 0, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol %q not found", name)
+}
+
 func openPlan9(r io.ReaderAt) (rawFile, error) {
 	f, err := plan9obj.NewFile(r)
 	if err != nil {
@@ -89,6 +105,22 @@ func (f *plan9File) pcln() (textStart uint64, symtab, pclntab []byte, err error)
 		}
 	}
 	return textStart, symtab, pclntab, nil
+}
+
+func (f *plan9File) firstmoduledata() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *plan9File) buildVersion() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (f *plan9File) pcHeader(addr uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *plan9File) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (f *plan9File) text() (textStart uint64, text []byte, err error) {

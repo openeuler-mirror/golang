@@ -6,6 +6,7 @@ package base
 
 import (
 	"cmd/internal/cov/covcmd"
+	"cmd/internal/goobj"
 	"cmd/internal/telemetry/counter"
 	"encoding/json"
 	"flag"
@@ -203,7 +204,10 @@ func ParseFlags() {
 
 	Debug.AArch64LdSt = "none"
 
+	Debug.Go119UseJumpTables = 1 // allow to use jump tables by default
+
 	Flag.Cfg.ImportMap = make(map[string]string)
+	flag.BoolVar(&goobj.EnableMappingSymbols, "mappingsymbol", false, "generate mapping symbols for arm64")
 
 	objabi.AddVersionFlag() // -V
 	registerFlags()
@@ -284,6 +288,11 @@ func ParseFlags() {
 		MergeLocalsHash = NewHashDebug("mergelocals", Debug.MergeLocalsHash, nil)
 	}
 
+	if goobj.EnableMappingSymbols && buildcfg.GOARCH != "arm64" {
+		// mapping symbols are arm64-only; keep the goobj file format
+		// identical to upstream on other architectures
+		goobj.EnableMappingSymbols = false
+	}
 	if Flag.MSan && !platform.MSanSupported(buildcfg.GOOS, buildcfg.GOARCH) {
 		log.Fatalf("%s/%s does not support -msan", buildcfg.GOOS, buildcfg.GOARCH)
 	}

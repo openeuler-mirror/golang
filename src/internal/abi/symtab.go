@@ -108,4 +108,6 @@ const (
 
 const MINFUNC = 16 // minimum size for a function
 
+const PADMINFUNC = 32 // padding the minimum function size to 32 bytes, amd64 has funcAlign=32
+
 const FuncTabBucketSize = 256 * MINFUNC // size of bucket in the pc->func lookup table

@@ -79,6 +79,24 @@ func (f *machoFile) symbols() ([]Sym, error) {
 	return syms, nil
 }
 
+func (f *machoFile) symbolSize(name string) (uint64, error) {
+	if f.macho.Symtab == nil {
+		return 0, fmt.Errorf("symbol table not available")
+	}
+	for _, s := range f.macho.Symtab.Syms {
+		if s.Name == name {
+			i := sort.Search(len(f.macho.Symtab.Syms), func(x int) bool {
+				return f.macho.Symtab.Syms[x].Value > s.Value
+			})
+			if i < len(f.macho.Symtab.Syms) {
+				return f.macho.Symtab.Syms[i].Value - s.Value, nil
+			}
+			return 0, nil
+		}
+	}
+	return 0, fmt.Errorf("symbol %q not found", name)
+}
+
 func (f *machoFile) pcln() (textStart uint64, symtab, pclntab []byte, err error) {
 	if sect := f.macho.Section("__text"); sect != nil {
 		textStart = sect.Addr
@@ -94,6 +112,22 @@ func (f *machoFile) pcln() (textStart uint64, symtab, pclntab []byte, err error)
 		}
 	}
 	return textStart, symtab, pclntab, nil
+}
+
+func (f *machoFile) firstmoduledata() ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *machoFile) buildVersion() (string, error) {
+	return "", fmt.Errorf("not implemented")
+}
+
+func (f *machoFile) pcHeader(addr uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (f *machoFile) tableBufAt(addr uint64, size uint64) ([]byte, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (f *machoFile) text() (textStart uint64, text []byte, err error) {

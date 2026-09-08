@@ -31,6 +31,7 @@
 package arm64
 
 import (
+	"cmd/internal/goobj"
 	"cmd/internal/obj"
 	"cmd/internal/objabi"
 	"encoding/binary"
@@ -1447,11 +1448,18 @@ func (c *ctxt7) flushpool(p *obj.Prog) {
 	// Needs to insert a branch before flushing the pool.
 	// We don't need the jump if following an unconditional branch.
 	// TODO: other unconditional operations.
-	if !(p.As == AB || p.As == obj.ARET || p.As == AERET) {
+	// Mark with $d mapping symbol if it is located past end of last instruction, but before next function
+	if !(p.As == AB || p.As == obj.ARET || p.As == AERET) || goobj.EnableMappingSymbols {
 		if c.ctxt.Debugvlog {
 			fmt.Printf("note: flush literal pool at %#x: len=%d ref=%x\n", uint64(p.Pc+4), c.pool.size, c.pool.start)
 		}
-		q := c.newprog()
+		var q *obj.Prog
+		if !goobj.EnableMappingSymbols {
+			q = c.newprog()
+		} else {
+			q = new(obj.Prog)
+			q.Ctxt = c.ctxt
+		}
 		if p.Link == nil {
 			// If p is the last instruction of the function, insert an UNDEF instruction in case the
 			// execution fall through to the pool.
@@ -1465,6 +1473,9 @@ func (c *ctxt7) flushpool(p *obj.Prog) {
 		q.Link = c.blitrl
 		q.Pos = p.Pos
 		c.blitrl = q
+		if goobj.EnableMappingSymbols {
+			c.cursym.Func().Pool = append(c.cursym.Func().Pool, q)
+		}
 	}
 
 	// The line number for constant pool entries doesn't really matter.
@@ -8520,8 +8531,8 @@ func (c *ctxt7) asmout(p *obj.Prog, out []uint32) (count int) {
 		o1 |= ((Q & 1) << 30) | (imm & 0x7f << 16) | (uint32(rf&31) << 5) | uint32(rt&31)
 
 	case 109: /* rprfm (Rn), Rm, <rprfop | $imm6> */
-		srcReg := p.From.Reg  // Rn - register with base address
-		rangeReg := p.Reg     // Rm - register with prefetch metadata
+		srcReg := p.From.Reg // Rn - register with base address
+		rangeReg := p.Reg    // Rm - register with prefetch metadata
 		var operation uint32
 		var ok bool
 
@@ -8552,7 +8563,7 @@ func (c *ctxt7) asmout(p *obj.Prog, out []uint32) (count int) {
 		rt := operation & 7
 
 		o1 = c.opirr(p, p.As)
-		o1 |= (uint32(rangeReg&31)<<16) | (uint32(srcReg&31)<<5) | option2 | option0 | s | rt
+		o1 |= (uint32(rangeReg&31) << 16) | (uint32(srcReg&31) << 5) | option2 | option0 | s | rt
 	}
 	out[0] = o1
 	out[1] = o2

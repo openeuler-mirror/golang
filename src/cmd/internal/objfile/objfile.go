@@ -18,7 +18,12 @@ import (
 
 type rawFile interface {
 	symbols() (syms []Sym, err error)
+	symbolSize(name string) (uint64, error)
 	pcln() (textStart uint64, symtab, pclntab []byte, err error)
+	firstmoduledata() ([]byte, error)
+	buildVersion() (string, error)
+	pcHeader(uint64) ([]byte, error)
+	tableBufAt(addr uint64, size uint64) ([]byte, error)
 	text() (textStart uint64, text []byte, err error)
 	goarch() string
 	loadAddress() (uint64, error)
@@ -117,6 +122,10 @@ func (f *File) LoadAddress() (uint64, error) {
 
 func (f *File) DWARF() (*dwarf.Data, error) {
 	return f.entries[0].DWARF()
+}
+
+func (f *File) Moduledata(checkVersion bool) (*Moduledata, error) {
+	return f.entries[0].Moduledata(checkVersion)
 }
 
 func (e *Entry) Name() string {
